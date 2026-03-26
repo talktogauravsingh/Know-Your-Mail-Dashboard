@@ -64,6 +64,11 @@ class TrackingService
         }
     }
 
+    public function getReferrer($request)
+    {
+        return $request->header('Referer', 'Unknown');
+    }
+
     public function getTrackingData($request)
     {
         $userAgent = $request->header('User-Agent');
@@ -71,13 +76,15 @@ class TrackingService
         $browser = $this->getBrowserName($userAgent);
         $os = $this->getOSName($userAgent);
         $deviceType = $this->getDeviceType($userAgent);
+        $referrer = $this->getReferrer($request);
 
         return [
             'ip_address' => $ipAddress,
             'browser' => $browser,
             'os' => $os,
             'device_type' => $deviceType,
-            'user_agent' => $userAgent
+            'user_agent' => $userAgent,
+            'referrer' => $referrer
         ];
     }
 }
