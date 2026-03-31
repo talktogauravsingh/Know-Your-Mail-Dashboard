@@ -18,11 +18,12 @@ class TrackingController extends Controller
 
     public function OpenMailTrack(Request $request)
     {
-        dd($this->trackingService->getTrackingData($request));
         $base64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=';
-
+        
         $image = base64_decode($base64);
-
+        
+        $this->trackingService->getTrackingData($request);
+        
         return response($image, 200)
             ->header('Content-Type', 'image/png')
             ->header('Content-Length', strlen($image))
