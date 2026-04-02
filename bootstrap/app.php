@@ -16,8 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
         ]);
-        $middleware->throttle(Limit::perMinute(60));
+
     })
+
 
     ->withExceptions(function (Exceptions $exceptions): void {
         //
