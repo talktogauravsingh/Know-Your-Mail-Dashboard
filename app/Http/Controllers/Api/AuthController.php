@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,7 +29,7 @@ class AuthController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'role' => 'user',
+            'role_id' => Role::where('slug', 'user')->first()->id ?? null,
         ]);
 
         $token = $user->createToken('auth-token')->plainTextToken;
@@ -35,7 +37,7 @@ class AuthController extends Controller
         event(new Registered($user));
 
         return response()->json([
-            'user' => $user,
+            'user' => $user->load('role'),
             'token' => $token,
         ]);
     }
@@ -51,7 +53,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        $user = Auth::user();
+        $user = Auth::user()->load('role.permissions');
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
@@ -66,6 +68,58 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logged out successfully']);
+    }
+
+    public function createManager(Request $request)
+    {
+        $user = $request->user();
+
+        if (! $user->hasPermission('create_manager')) {
+            abort(403, 'You do not have permission to create managers.');
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'role_id' => 'required|exists:roles,id',
+            'organization_id' => 'nullable|exists:organizations,id',
+            'permission_slugs' => 'nullable|array',
+            'permission_slugs.*' => 'exists:permissions,slug',
+        ]);
+
+        // Prevent assigning higher permissions than self (simple check)
+        $requestedPerms = Permission::whereIn('slug', $validated['permission_slugs'] ?? [])->get();
+        foreach ($requestedPerms as $perm) {
+            if (! $user->hasPermission($perm->slug)) {
+                abort(403, "Cannot assign permission '{$perm->slug}' you don't have.");
+            }
+        }
+
+        $manager = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'role_id' => $validated['role_id'],
+            'organization_id' => $validated['organization_id'],
+            'created_by' => $user->id,
+        ]);
+
+        // Assign extra permissions if provided
+        if (!empty($validated['permission_slugs'])) {
+            $manager->permissions()->attach(
+                Permission::whereIn('slug', $validated['permission_slugs'])->pluck('id')
+            );
+        }
+
+        $manager->load('role.permissions');
+
+        $token = $manager->createToken('auth-token')->plainTextToken;
+
+        return response()->json([
+            'manager' => $manager,
+            'token' => $token,
+        ]);
     }
 
     public function forgotPassword(Request $request)

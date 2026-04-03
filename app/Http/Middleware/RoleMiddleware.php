@@ -13,10 +13,15 @@ class RoleMiddleware
      *
      * @param  Closure(Request): (Response)  $next
      */
-public function handle(Request $request, Closure $next, string $role): Response
+public function handle(Request $request, Closure $next, ...$permissions): Response
     {
-        if (! $request->user() || $request->user()->role !== $role) {
-            abort(403, 'Insufficient role permissions.');
+        $user = $request->user();
+        if (! $user) {
+            abort(401, 'Unauthenticated.');
+        }
+
+        if (! $user->hasAnyPermission($permissions)) {
+            abort(403, 'Insufficient permissions.');
         }
 
         return $next($request);

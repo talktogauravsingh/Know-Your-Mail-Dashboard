@@ -16,4 +16,8 @@ Route::prefix('auth')->group(function () {
     Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
 });
 
+Route::middleware('auth:sanctum')->prefix('managers')->group(function () {
+    Route::post('/', [AuthController::class, 'createManager'])->middleware('permissions:create_manager');
+});
+
 Route::get('/o/{requestUserId}', [\App\Http\Controllers\Tracking\TrackingController::class, 'OpenMailTrack']);
