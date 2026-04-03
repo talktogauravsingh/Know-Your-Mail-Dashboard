@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Laravel\Sanctum\HasApiTokens;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -12,13 +10,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 
 #[Fillable(['name', 'email', 'password', 'role_id', 'organization_id', 'created_by'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, MustVerifyEmail, HasApiTokens;
+    use HasFactory, Notifiable, HasApiTokens;
 
     /**
      * Get the attributes that should be cast.
@@ -55,10 +55,13 @@ class User extends Authenticatable
 
     public function permissions(): BelongsToMany
     {
-        return $this->belongsToMany(Permission::class, 'user_permissions')
-                    ->union(
-                        $this->role->permissions()
-                    );
+        if ($this->relationLoaded('role')) {
+            return $this->belongsToMany(Permission::class, 'user_permissions')
+                        ->union(
+                            $this->role->permissions()
+                        );
+        }
+        return $this->belongsToMany(Permission::class, 'user_permissions');
     }
 
     public function hasPermission(string $permissionSlug): bool
@@ -71,3 +74,4 @@ class User extends Authenticatable
         return $this->permissions()->whereIn('slug', $permissionSlugs)->exists();
     }
 }
+
