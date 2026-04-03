@@ -3,20 +3,26 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Permission;
-use App\Models\Role;
-use App\Models\User;
+use App\Repositories\AuthRepository;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
+    protected $authRepo;
+
+    public function __construct(AuthRepository $authRepo)
+    {
+        $this->authRepo = $authRepo;
+    }
+
+    /**
+     * Register User
+     */
     public function register(Request $request)
     {
         $validated = $request->validate([
@@ -25,12 +31,7 @@ class AuthController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'role_id' => Role::where('slug', 'user')->first()->id ?? null,
-        ]);
+        $user = $this->authRepo->createUser($validated);
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
@@ -42,6 +43,9 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Login
+     */
     public function login(Request $request)
     {
         $validated = $request->validate([
@@ -49,11 +53,11 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        if (! Auth::attempt($validated)) {
+        $user = $this->authRepo->login($validated);
+
+        if (!$user) {
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
-
-        $user = Auth::user()->load('role.permissions');
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
@@ -63,19 +67,29 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Logout
+     */
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $this->authRepo->logout($request->user());
 
-        return response()->json(['message' => 'Logged out successfully']);
+        return response()->json([
+            'message' => 'Logged out successfully'
+        ]);
     }
 
+    /**
+     * Create Manager
+     */
     public function createManager(Request $request)
     {
         $user = $request->user();
 
-        if (! $user->hasPermission('create_manager')) {
-            abort(403, 'You do not have permission to create managers.');
+        if (!$user->hasPermission('create_manager')) {
+            return response()->json([
+                'error' => 'You do not have permission to create managers.'
+            ], 403);
         }
 
         $validated = $request->validate([
@@ -88,58 +102,52 @@ class AuthController extends Controller
             'permission_slugs.*' => 'exists:permissions,slug',
         ]);
 
-        // Prevent assigning higher permissions than self (simple check)
-        $requestedPerms = Permission::whereIn('slug', $validated['permission_slugs'] ?? [])->get();
-        foreach ($requestedPerms as $perm) {
-            if (! $user->hasPermission($perm->slug)) {
-                abort(403, "Cannot assign permission '{$perm->slug}' you don't have.");
-            }
+        try {
+            $manager = $this->authRepo->createManager($validated, $user);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 403);
         }
-
-        $manager = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'role_id' => $validated['role_id'],
-            'organization_id' => $validated['organization_id'],
-            'created_by' => $user->id,
-        ]);
-
-        // Assign extra permissions if provided
-        if (!empty($validated['permission_slugs'])) {
-            $manager->permissions()->attach(
-                Permission::whereIn('slug', $validated['permission_slugs'])->pluck('id')
-            );
-        }
-
-        $manager->load('role.permissions');
 
         $token = $manager->createToken('auth-token')->plainTextToken;
 
         return response()->json([
-            'manager' => $manager,
+            'manager' => $manager->load('role.permissions'),
             'token' => $token,
         ]);
     }
 
+    /**
+     * Forgot Password
+     */
     public function forgotPassword(Request $request)
     {
-        $validated = $request->validate(['email' => 'required|email']);
+        $request->validate([
+            'email' => 'required|email'
+        ]);
 
         $status = Password::sendResetLink(
             $request->only('email')
         );
 
         if ($status === Password::RESET_LINK_SENT) {
-            return response()->json(['message' => 'Reset link sent to email']);
+            return response()->json([
+                'message' => 'Reset link sent to email'
+            ]);
         }
 
-        return response()->json(['error' => 'Unable to send reset link'], 400);
+        return response()->json([
+            'error' => 'Unable to send reset link'
+        ], 400);
     }
 
+    /**
+     * Reset Password
+     */
     public function resetPassword(Request $request)
     {
-        $validated = $request->validate([
+        $request->validate([
             'token' => 'required',
             'email' => 'required|email',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
@@ -147,21 +155,19 @@ class AuthController extends Controller
 
         $status = Password::reset(
             $request->only('email', 'token', 'password', 'password_confirmation'),
-            function (User $user, string $password) {
-                $user->forceFill([
-                    'password' => Hash::make($password)
-                ])->setRememberToken(Str::random(60));
-
-                $user->save();
-
-                event(new PasswordReset($user));
+            function ($user, $password) {
+                $this->authRepo->resetUserPassword($user, $password);
             }
         );
 
         if ($status === Password::PASSWORD_RESET) {
-            return response()->json(['message' => 'Password reset successfully']);
+            return response()->json([
+                'message' => 'Password reset successfully'
+            ]);
         }
 
-        return response()->json(['error' => 'Unable to reset password'], 400);
+        return response()->json([
+            'error' => 'Unable to reset password'
+        ], 400);
     }
 }
