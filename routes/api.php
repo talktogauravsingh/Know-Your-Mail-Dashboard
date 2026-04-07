@@ -42,4 +42,8 @@ Route::middleware(['auth:sanctum', 'permissions:manage_roles'])->prefix('roles/{
     Route::delete('/', [\App\Http\Controllers\Api\RolePermissionController::class, 'destroy']);
 });
 
+Route::middleware('auth:sanctum')->prefix('recipients')->group(function () {
+    Route::post('bulk-upload', [\App\Http\Controllers\Api\BulkRecipientController::class, 'bulkUpload']);
+});
+
 Route::get('/o/{requestUserId}', [\App\Http\Controllers\Tracking\TrackingController::class, 'OpenMailTrack']);
