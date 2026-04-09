@@ -2,59 +2,69 @@
 
 namespace Database\Seeders;
 
-use App\Models\Permission;
-use App\Models\Role;
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Organization;
+use App\Models\Role;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
      * Seed the application's database.
      */
     public function run(): void
     {
-        // Create permissions
-        $permissions = [
-            ['name' => 'View Dashboard', 'slug' => 'view_dashboard'],
-            ['name' => 'Manage Agents', 'slug' => 'manage_agents'],
-            ['name' => 'Create Manager', 'slug' => 'create_manager'],
-            ['name' => 'Upload Clients', 'slug' => 'upload_clients'],
-            ['name' => 'Send Email', 'slug' => 'send_email'],
-            ['name' => 'View Clients', 'slug' => 'view_clients'],
-            ['name' => 'Update Clients', 'slug' => 'update_clients'],
-            ['name' => 'Delete Clients', 'slug' => 'delete_clients'],
-            ['name' => 'Assign Roles', 'slug' => 'assign_roles'],
-        ];
+        // Seed RBAC first (roles, permissions, attachments)
+        $this->call(RbacSeeder::class);
 
-        foreach ($permissions as $perm) {
-            Permission::firstOrCreate(['slug' => $perm['slug']], $perm);
-        }
+        // Create test organization
+        $organization = Organization::firstOrCreate(
+            ['name' => 'Test Organization'],
+            ['name' => 'Test Organization']
+        );
 
-        // Create roles
-        $roles = [
-            ['name' => 'User', 'slug' => 'user'],
-            ['name' => 'Manager', 'slug' => 'manager'],
-            ['name' => 'Agent', 'slug' => 'agent'],
-            ['name' => 'Client', 'slug' => 'client'],
-        ];
+        // Get manager role (created by RbacSeeder)
+        $managerRole = Role::where('slug', 'manager')->first();
 
-        foreach ($roles as $roleData) {
-            $role = Role::firstOrCreate(['slug' => $roleData['slug']], $roleData);
-            
-            // Assign basic permissions to roles
-            $role->permissions()->sync(Permission::where('slug', 'view_dashboard')->first());
-        }
+        // Create test manager user (required by all tests)
+        $managerEmail = 'manager@example.com';
+        User::firstOrCreate(
+            ['email' => $managerEmail],
+            [
+                'name' => 'Test Manager',
+                'email' => $managerEmail,
+                'password' => Hash::make('password'),
+                'role_id' => $managerRole?->id,
+                'organization_id' => $organization->id,
+            ]
+        );
 
-        // Update test user to manager
-        $testUser = User::where('email', 'test@example.com')->first();
-        if ($testUser) {
-            $testUser->update([
-                'role_id' => Role::where('slug', 'manager')->first()->id,
-            ]);
-        }
+        // Create test agent user
+        $agentEmail = 'agent@example.com';
+        User::firstOrCreate(
+            ['email' => $agentEmail],
+            [
+                'name' => 'Test Agent',
+                'email' => $agentEmail,
+                'password' => Hash::make('password'),
+                'role_id' => Role::where('slug', 'user')->first()?->id, // Use 'user' role for agent
+                'organization_id' => $organization->id,
+            ]
+        );
+
+        // Create test regular user
+        $userEmail = 'test@example.com';
+        User::firstOrCreate(
+            ['email' => $userEmail],
+            [
+                'name' => 'Test User',
+                'email' => $userEmail,
+                'password' => Hash::make('password'),
+                'role_id' => Role::where('slug', 'user')->first()?->id,
+                'organization_id' => $organization->id,
+            ]
+        );
     }
 }
+

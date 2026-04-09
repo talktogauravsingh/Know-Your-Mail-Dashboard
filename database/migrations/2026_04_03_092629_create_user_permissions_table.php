@@ -20,11 +20,4 @@ Schema::create('user_permissions', function (Blueprint $table) {
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::dropIfExists('user_permissions');
-    }
 };
