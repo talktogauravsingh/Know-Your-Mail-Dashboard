@@ -50,7 +50,7 @@ class PermissionController extends Controller
 
     public function destroy(Permission $permission)
     {
-        $permission->delete();
+$permission->update(['status' => 0]);
         return response()->json(null, 204);
     }
 }

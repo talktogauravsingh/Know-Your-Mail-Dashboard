@@ -82,9 +82,10 @@ class AuthController extends Controller
     /**
      * Create Manager
      */
-    public function createManager(Request $request)
+public function createManager(Request $request)
     {
         $user = $request->user();
+        $user->load('role.permissions');
 
         if (!$user->hasPermission('create_manager')) {
             return response()->json([

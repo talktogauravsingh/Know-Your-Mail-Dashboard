@@ -19,19 +19,4 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropForeign(['role_id']);
-            $table->dropColumn('role_id');
-            $table->dropForeign(['organization_id']);
-            $table->dropColumn('organization_id');
-            $table->dropForeign(['created_by']);
-            $table->dropColumn('created_by');
-            $table->enum('role', ['user', 'admin'])->default('user');
-        });
-    }
 };
