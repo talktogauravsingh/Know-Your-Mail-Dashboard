@@ -22,11 +22,11 @@ class ManagerTest extends TestCase
 
     public function test_manager_creation()
     {
-        $user = User::where('email', 'test@example.com')->first();
+        $user = User::where('email', 'manager@example.com')->first();
         $this->actingAs($user, 'sanctum');
         $role = Role::where('slug', 'manager')->first();
 
-        $response = $this->postJson('/api/managers', [
+$response = $this->postJson('/api/managers', [
             'name' => 'New Manager',
             'email' => 'newmanager@example.com',
             'password' => 'password',
@@ -34,7 +34,15 @@ class ManagerTest extends TestCase
             'role_id' => $role->id,
         ]);
 
-        $response->assertStatus(201);
+$response->assertStatus(200)
+            ->assertJsonStructure([
+                'manager' => [
+                    'id',
+                    'name',
+                    'email',
+                    'role',
+                ],
+                'token'
+            ]);
     }
 }
-

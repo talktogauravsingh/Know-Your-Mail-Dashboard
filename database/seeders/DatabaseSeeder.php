@@ -24,10 +24,25 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Test Organization']
         );
 
-        // Get manager role (created by RbacSeeder)
+        // Get roles
+        $superAdminRole = Role::where('slug', 'super-admin')->first();
         $managerRole = Role::where('slug', 'manager')->first();
+        $userRole = Role::where('slug', 'user')->first();
 
-        // Create test manager user (required by all tests)
+        // Create super admin user
+        $superAdminEmail = 'superadmin@example.com';
+        User::firstOrCreate(
+            ['email' => $superAdminEmail],
+            [
+                'name' => 'Super Admin',
+                'email' => $superAdminEmail,
+                'password' => Hash::make('password'),
+                'role_id' => $superAdminRole?->id,
+                'organization_id' => $organization->id,
+            ]
+        );
+
+        // Create test manager user
         $managerEmail = 'manager@example.com';
         User::firstOrCreate(
             ['email' => $managerEmail],
@@ -48,7 +63,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Test Agent',
                 'email' => $agentEmail,
                 'password' => Hash::make('password'),
-                'role_id' => Role::where('slug', 'user')->first()?->id, // Use 'user' role for agent
+                'role_id' => $userRole?->id,
                 'organization_id' => $organization->id,
             ]
         );
@@ -61,10 +76,9 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Test User',
                 'email' => $userEmail,
                 'password' => Hash::make('password'),
-                'role_id' => Role::where('slug', 'user')->first()?->id,
+                'role_id' => $superAdminRole?->id,
                 'organization_id' => $organization->id,
             ]
         );
     }
 }
-

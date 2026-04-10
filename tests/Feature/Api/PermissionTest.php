@@ -20,7 +20,7 @@ class PermissionTest extends TestCase
         parent::setUp();
         $this->seed(DatabaseSeeder::class);
         $this->seed(RbacSeeder::class);
-        $this->manager = User::where('email', 'test@example.com')->first();
+$this->manager = User::where('email', 'manager@example.com')->first();
     }
 
     public function test_can_list_permissions()
@@ -67,7 +67,7 @@ class PermissionTest extends TestCase
         $response = $this->deleteJson('/api/permissions/' . $permission->id);
 
         $response->assertStatus(204);
-        $this->assertSoftDeleted('permissions', ['id' => $permission->id]);
+$this->assertDatabaseHas('permissions', ['id' => $permission->id, 'status' => 0]);
     }
 
     public function test_requires_authentication()

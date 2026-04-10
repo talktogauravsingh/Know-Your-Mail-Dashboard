@@ -52,7 +52,7 @@ class RoleController extends Controller
 
     public function destroy(Role $role)
     {
-        $role->delete();
+$role->update(['status' => 0]);
         return response()->json(null, 204);
     }
 }

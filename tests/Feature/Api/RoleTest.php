@@ -20,12 +20,7 @@ class RoleTest extends TestCase
         parent::setUp();
         $this->seed(DatabaseSeeder::class);
         $this->seed(RbacSeeder::class);
-        $this->manager = User::where('email', 'test@example.com')->first();
-        if (!$this->manager) {
-            $this->manager = User::factory()->create([
-                'email' => 'test@example.com',
-            ]);
-        }
+$this->manager = User::where('email', 'manager@example.com')->first();
     }
 
     public function test_can_list_roles()
@@ -72,7 +67,7 @@ class RoleTest extends TestCase
         $response = $this->deleteJson('/api/roles/' . $role->id);
 
         $response->assertStatus(204);
-        $this->assertSoftDeleted('roles', ['id' => $role->id]);
+$this->assertDatabaseHas('roles', ['id' => $role->id, 'status' => 0]);
     }
 
     public function test_requires_permission_for_crud_operations()
