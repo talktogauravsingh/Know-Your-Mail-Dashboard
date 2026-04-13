@@ -21,6 +21,12 @@ import Settings from './pages/Settings';
 // Protected Route Wrapper
 function ProtectedRoute({ children }) {
   const user = useStore((state) => state.user);
+  const fetchUser = useStore((state) => state.fetchUser);
+  
+  useEffect(() => {
+    if (!user) fetchUser();
+  }, [fetchUser, user]);
+  
   if (!user) {
     return <Navigate to="/login" replace />;
   }

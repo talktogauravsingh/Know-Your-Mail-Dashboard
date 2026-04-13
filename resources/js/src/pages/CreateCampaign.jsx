@@ -20,13 +20,21 @@ export default function CreateCampaign() {
   const templates = useStore((state) => state.templates);
   const selectedTemplate = templates.find(t => t.id === templateId);
 
-  const handleSubmit = (e) => {
+  const createCampaign = useStore((state) => state.createCampaign);
+  
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
+      await createCampaign(data);
       navigate('/campaigns');
-    }, 1000);
+    } catch (error) {
+      console.error('Campaign creation failed:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

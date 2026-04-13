@@ -12,14 +12,17 @@ export default function Login() {
   const login = useStore((state) => state.login);
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
-      login({ name: 'Marketing Lead', email });
+    try {
+      await login({ email, password });
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Login failed:', error.response?.data || error.message);
+    } finally {
       setIsLoading(false);
-      navigate('/');
-    }, 800);
+    }
   };
 
   return (

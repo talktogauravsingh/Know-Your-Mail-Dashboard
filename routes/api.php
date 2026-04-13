@@ -64,5 +64,11 @@ Route::middleware(['auth:sanctum', 'permissions:view_campaign_analysis'])->prefi
     Route::get('template/{id}', [\App\Http\Controllers\Api\AnalysisController::class, 'templateAnalysis']);
 });
 
+// Campaigns API
+Route::middleware('auth:sanctum')->prefix('campaigns')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\CampaignController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\Api\CampaignController::class, 'store']);
+});
+
 Route::get('/o/{requestUserId}', [\App\Http\Controllers\Tracking\TrackingController::class, 'OpenMailTrack']);
 Route::get('/c/{requestUserId}', [\App\Http\Controllers\Tracking\TrackingController::class, 'ClickMailTrack']);
