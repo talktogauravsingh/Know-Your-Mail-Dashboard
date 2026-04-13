@@ -36,4 +36,16 @@ class Recipient extends Model
     {
         return $this->belongsTo(Organization::class);
     }
+
+    /**
+     * Scope for recipients visible to user hierarchy (subordinates or org)
+     */
+    public function scopeForUserHierarchy($query, \App\Models\User $user): void
+    {
+        $subIds = $user->getSubordinateIds();
+        $query->where(function($q) use ($user, $subIds) {
+            $q->whereIn('agent_id', $subIds)
+              ->orWhere('organization_id', $user->organization_id);
+        });
+    }
 }

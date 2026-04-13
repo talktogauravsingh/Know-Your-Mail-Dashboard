@@ -46,4 +46,23 @@ Route::middleware('auth:sanctum')->prefix('recipients')->group(function () {
     Route::post('bulk-upload', [\App\Http\Controllers\Api\BulkRecipientController::class, 'bulkUpload']);
 });
 
+// Analysis APIs
+Route::middleware(['auth:sanctum', 'permissions:view_hierarchical_analysis'])->prefix('analysis')->group(function () {
+    Route::get('hierarchical', [\App\Http\Controllers\Api\AnalysisController::class, 'hierarchical']);
+});
+
+Route::middleware(['auth:sanctum', 'permissions:track_events'])->prefix('tracking')->group(function () {
+    Route::post('track', [\App\Http\Controllers\Api\AnalysisController::class, 'trackEvent']);
+});
+
+Route::middleware(['auth:sanctum', 'permissions:track_conversions'])->prefix('analysis')->group(function () {
+    Route::post('conversion', [\App\Http\Controllers\Api\AnalysisController::class, 'recordConversion']);
+});
+
+Route::middleware(['auth:sanctum', 'permissions:view_campaign_analysis'])->prefix('analysis')->group(function () {
+    Route::get('campaign/{id}', [\App\Http\Controllers\Api\AnalysisController::class, 'campaignAnalysis']);
+    Route::get('template/{id}', [\App\Http\Controllers\Api\AnalysisController::class, 'templateAnalysis']);
+});
+
 Route::get('/o/{requestUserId}', [\App\Http\Controllers\Tracking\TrackingController::class, 'OpenMailTrack']);
+Route::get('/c/{requestUserId}', [\App\Http\Controllers\Tracking\TrackingController::class, 'ClickMailTrack']);
