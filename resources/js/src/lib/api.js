@@ -11,9 +11,9 @@ const api = axios.create({
 
 // Request interceptor for auth token
 api.interceptors.request.use((config) => {
-  const store = useStore.getState(); // Zustand store access
-  if (store.user?.token) {
-    config.headers.Authorization = `Bearer ${store.user.token}`;
+  const store = useStore.getState();
+  if (store.token) {
+    config.headers.Authorization = `Bearer ${store.token}`;
   }
   return config;
 });
@@ -22,8 +22,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      useStore.getState().logout();
+    const store = useStore.getState();
+    if (error.response?.status === 401 && window.location.pathname !== '/login') {
+      store.addToast('Session expired. Please login again.', 'error');
+      store.clearAuth();
       window.location.href = '/login';
     }
     return Promise.reject(error);

@@ -43,9 +43,14 @@ class SendLog extends Model
         });
     }
 
-    public function recipient()
+public function recipient()
     {
         return $this->belongsTo(Recipient::class, 'email', 'email')
                     ->whereColumn('recipients.campaign_id', 'send_logs.campaign_id');
+    }
+
+    public function campaign()
+    {
+        return $this->belongsTo(Campaign::class);
     }
 }

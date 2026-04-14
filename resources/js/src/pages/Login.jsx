@@ -10,6 +10,7 @@ export default function Login() {
   const [password, setPassword] = useState('password123');
   const [isLoading, setIsLoading] = useState(false);
   const login = useStore((state) => state.login);
+  const addToast = useStore((state) => state.addToast);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
@@ -19,7 +20,8 @@ export default function Login() {
       await login({ email, password });
       navigate('/dashboard');
     } catch (error) {
-      console.error('Login failed:', error.response?.data || error.message);
+      const errorMsg = error.response?.data?.message || (error.response?.data?.errors ? Object.values(error.response.data.errors).flat().join(' ') : error.message);
+      addToast(errorMsg);
     } finally {
       setIsLoading(false);
     }

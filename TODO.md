@@ -1,17 +1,36 @@
-# Frontend API Integration Progress
+# Fix Authentication 401 Infinite Loop - TODO Progress
 
-**✅ Completed:**
-1. Backend CampaignController.php + routes/api.php (GET/POST /api/campaigns)
-2. resources/js/src/lib/api.js (axios auth util)
-3. resources/js/src/store/useStore.js (fetchCampaigns, createCampaign, auth async)
-4. resources/js/src/pages/Campaigns.jsx (real data, loading, search)
+## Approved Plan: Phase 1 - Frontend Token Persistence & Auth Flow
 
-**⏳ In Progress (Next):**
-5. resources/js/src/pages/Dashboard.jsx (fetch KPIs/analytics)
-6. resources/js/src/pages/CreateCampaign.jsx (real form POST)
-7. resources/js/src/App.jsx (fetchUser auth bootstrap)
+**✅ Step 1: Create TODO.md** (done)
 
-**Next: `npm run dev` to build & test**
+**✅ Step 2: Edit useStore.js** (done)
+- Added persistAuth/clearAuth/initAuth
+- Fixed login/register to persist token/user
+- Updated logout/fetchUser
+- Added error toasts
 
-**Final:** Full integration complete - run server `php artisan serve`, visit /dashboard
+**✅ Step 3: Edit api.js** (done)
+- Fixed interceptor token: store.token
+- 401 handler: toast + pathname check + clearAuth
+
+**✅ Step 4: Edit App.jsx** (done)
+- ProtectedRoute calls initAuth + loading spinner
+- Added Loader2 import
+
+**✅ Step 5: Verify Login/Signup.jsx** (done)
+- Already correct: use login/register + toast errors + navigate
+
+**⏳ Step 6: Rebuild & Test**
+- Run `npm run build` or `npm run dev`
+- Test full flow: login → dashboard → refresh → no loops
+- Check localStorage authToken/authUser
+
+**⏳ Step 7: Backend check**
+- Verify /api/user works with token
+- Optional: php artisan sanctum:prune-expired
+
+**⏳ Step 8: attempt_completion**
+
+*Updated: Steps 2-5 complete*
 

@@ -4,34 +4,105 @@ import { mockTemplates } from '../lib/mockData';
 
 export const useStore = create((set, get) => ({
   user: null,
+  token: null,
   theme: 'light',
   isLoading: false,
+
+  // Persistence helpers
+  persistAuth: (user, token) => {
+    localStorage.setItem('authUser', JSON.stringify(user));
+    localStorage.setItem('authToken', token);
+    set({ user, token });
+  },
+  clearAuth: () => {
+    localStorage.removeItem('authUser');
+    localStorage.removeItem('authToken');
+    set({ user: null, token: null });
+  },
+  initAuth: async () => {
+    const token = localStorage.getItem('authToken');
+    const userStr = localStorage.getItem('authUser');
+    if (token && userStr) {
+      const user = JSON.parse(userStr);
+      set({ user, token });
+      // Validate
+      try {
+        await get().fetchUser();
+      } catch {
+        get().clearAuth();
+      }
+    }
+  },
 
   // Auth
   login: async (credentials) => {
     set({ isLoading: true });
     try {
       const { data } = await api.post('/auth/login', credentials);
-      set({ user: data.user });
+      get().persistAuth(data.user, data.token);
       return data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Login failed', 'error');
+      throw error;
     } finally {
       set({ isLoading: false });
     }
   },
-  logout: () => {
-    api.post('/auth/logout').catch(() => {}); // fire and forget
-    set({ user: null });
+
+  // Register new user
+  register: async (credentials) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.post('/auth/register', credentials);
+      get().persistAuth(data.user, data.token);
+      return data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Registration failed', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  logout: async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {}
+    get().clearAuth();
   },
   fetchUser: async () => {
     try {
       const { data } = await api.get('/user');
-      set({ user: data });
+      const token = get().token;
+      get().persistAuth(data, token);
     } catch {
-      set({ user: null });
+      get().clearAuth();
     }
   },
 
-  toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
+toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
+
+  // Toasts
+  toasts: [],
+  addToast: (message, type = 'error') => {
+    const id = Date.now();
+    set((state) => ({ toasts: [...state.toasts, { id, message, type }] }));
+    setTimeout(() => get().removeToast(id), 5000);
+  },
+  removeToast: (id) => set((state) => ({ 
+    toasts: state.toasts.filter(t => t.id !== id) 
+  })),
+
+  // Toast notifications
+  toasts: [],
+  addToast: (message, type = 'error') => {
+    const id = Date.now();
+    set((state) => ({ toasts: [...state.toasts, { id, message, type }] }));
+    setTimeout(() => get().removeToast(id), 5000);
+  },
+  removeToast: (id) => set((state) => ({ 
+    toasts: state.toasts.filter(toast => toast.id !== id) 
+  })),
   
   // Campaigns - Replace mocks with API
   campaigns: [],
@@ -81,6 +152,7 @@ export const useStore = create((set, get) => ({
       set({ dashboardData: data });
     } catch (error) {
       console.error('Failed to fetch dashboard:', error);
+      get().addToast('Failed to load dashboard data. Please refresh.', 'error');
     } finally {
       set({ dashboardLoading: false });
     }

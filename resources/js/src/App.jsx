@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useStore } from './store/useStore';
+import { Loader2 } from 'lucide-react';
 
 // Layouts
 import AuthLayout from './layouts/AuthLayout';
@@ -20,18 +21,25 @@ import Settings from './pages/Settings';
 
 // Protected Route Wrapper
 function ProtectedRoute({ children }) {
-  const user = useStore((state) => state.user);
-  const fetchUser = useStore((state) => state.fetchUser);
+  const { user, initAuth } = useStore();
   
   useEffect(() => {
-    if (!user) fetchUser();
-  }, [fetchUser, user]);
+    initAuth();
+  }, [initAuth]);
+  
+  if (user === null) { // Wait for init
+    return <div className="flex items-center justify-center min-h-screen">
+      <Loader2 className="h-8 w-8 animate-spin" />
+    </div>;
+  }
   
   if (!user) {
     return <Navigate to="/login" replace />;
   }
   return children;
 }
+
+import { ToastList } from './components/ui/ToastList';
 
 export default function App() {
   return (
@@ -62,6 +70,7 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
         </Route>
       </Routes>
+      <ToastList />
     </BrowserRouter>
   );
 }
