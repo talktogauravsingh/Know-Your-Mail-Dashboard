@@ -8,19 +8,25 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 export default function Signup() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const login = useStore((state) => state.login);
+  const register = useStore((state) => state.register);
+  const addToast = useStore((state) => state.addToast);
   const navigate = useNavigate();
 
-  const handleSignup = (e) => {
+  const handleSignup = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
-      login({ name: name || 'Marketing Lead', email });
+    try {
+await register({ name, email, password, password_confirmation: passwordConfirm });
+navigate('/dashboard');
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || (error.response?.data?.errors ? Object.values(error.response.data.errors).flat().join(' ') : error.message);
+      addToast(errorMsg);
+    } finally {
       setIsLoading(false);
-      navigate('/');
-    }, 800);
+    }
   };
 
   return (
@@ -58,8 +64,18 @@ export default function Signup() {
             <Input 
               id="password" 
               type="password" 
-              value={password}
+value={password}
               onChange={(e) => setPassword(e.target.value)}
+              required 
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="passwordConfirm">Confirm Password</Label>
+            <Input 
+              id="passwordConfirm" 
+              type="password" 
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
               required 
             />
           </div>

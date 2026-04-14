@@ -3,6 +3,13 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\PermissionController;
+use App\Http\Controllers\Api\RolePermissionController;
+use App\Http\Controllers\Api\BulkRecipientController;
+use App\Http\Controllers\Api\AnalysisController;
+use App\Http\Controllers\Api\CampaignController;
+use App\Http\Controllers\Api\TrackingController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -21,29 +28,50 @@ Route::middleware('auth:sanctum')->prefix('managers')->group(function () {
 });
 
 Route::middleware(['auth:sanctum', 'permissions:view_roles'])->prefix('roles')->group(function () {
-    Route::get('/', [\App\Http\Controllers\Api\RoleController::class, 'index']);
-    Route::get('/{role}', [\App\Http\Controllers\Api\RoleController::class, 'show']);
-    Route::post('/', [\App\Http\Controllers\Api\RoleController::class, 'store'])->middleware('permissions:manage_roles');
-    Route::put('/{role}', [\App\Http\Controllers\Api\RoleController::class, 'update'])->middleware('permissions:manage_roles');
-    Route::delete('/{role}', [\App\Http\Controllers\Api\RoleController::class, 'destroy'])->middleware('permissions:manage_roles');
+    Route::get('/', [RoleController::class, 'index']);
+    Route::get('/{role}', [RoleController::class, 'show']);
+    Route::post('/', [RoleController::class, 'store'])->middleware('permissions:manage_roles');
+    Route::put('/{role}', [RoleController::class, 'update'])->middleware('permissions:manage_roles');
+    Route::delete('/{role}', [RoleController::class, 'destroy'])->middleware('permissions:manage_roles');
 });
 
 Route::middleware(['auth:sanctum', 'permissions:view_permissions'])->prefix('permissions')->group(function () {
-    Route::get('/', [\App\Http\Controllers\Api\PermissionController::class, 'index']);
-    Route::get('/{permission}', [\App\Http\Controllers\Api\PermissionController::class, 'show']);
-    Route::post('/', [\App\Http\Controllers\Api\PermissionController::class, 'store'])->middleware('permissions:manage_permissions');
-    Route::put('/{permission}', [\App\Http\Controllers\Api\PermissionController::class, 'update'])->middleware('permissions:manage_permissions');
-    Route::delete('/{permission}', [\App\Http\Controllers\Api\PermissionController::class, 'destroy'])->middleware('permissions:manage_permissions');
+    Route::get('/', [PermissionController::class, 'index']);
+    Route::get('/{permission}', [PermissionController::class, 'show']);
+    Route::post('/', [PermissionController::class, 'store'])->middleware('permissions:manage_permissions');
+    Route::put('/{permission}', [PermissionController::class, 'update'])->middleware('permissions:manage_permissions');
+    Route::delete('/{permission}', [PermissionController::class, 'destroy'])->middleware('permissions:manage_permissions');
 });
 
 Route::middleware(['auth:sanctum', 'permissions:manage_roles'])->prefix('roles/{role}/permissions')->group(function () {
-    Route::get('/', [\App\Http\Controllers\Api\RolePermissionController::class, 'index']);
-    Route::post('/', [\App\Http\Controllers\Api\RolePermissionController::class, 'store']);
-    Route::delete('/', [\App\Http\Controllers\Api\RolePermissionController::class, 'destroy']);
+    Route::get('/', [RolePermissionController::class, 'index']);
+    Route::post('/', [RolePermissionController::class, 'store']);
+    Route::delete('/', [RolePermissionController::class, 'destroy']);
 });
 
 Route::middleware('auth:sanctum')->prefix('recipients')->group(function () {
-    Route::post('bulk-upload', [\App\Http\Controllers\Api\BulkRecipientController::class, 'bulkUpload']);
+    Route::post('bulk-upload', [BulkRecipientController::class, 'bulkUpload']);
 });
 
-Route::get('/o/{requestUserId}', [\App\Http\Controllers\Tracking\TrackingController::class, 'OpenMailTrack']);
+// Analysis APIs
+Route::middleware(['auth:sanctum'])->prefix('analysis')->group(function () {
+    Route::middleware('permissions:view_campaign_analysis')->group(function () {
+        Route::get('dashboard', [AnalysisController::class, 'dashboard']);
+        Route::get('hierarchical', [AnalysisController::class, 'hierarchical']);
+        Route::get('campaign/{id}', [AnalysisController::class, 'campaignAnalysis']);
+        Route::get('template/{id}', [AnalysisController::class, 'templateAnalysis']);
+    });
+
+    Route::middleware('permissions:track_conversions')->group(function () {
+        Route::post('conversion', [AnalysisController::class, 'recordConversion']);
+    });
+});
+
+// Campaigns API
+Route::middleware('auth:sanctum')->prefix('campaigns')->group(function () {
+    Route::get('/', [CampaignController::class, 'index']);
+    Route::post('/', [CampaignController::class, 'store']);
+});
+
+Route::get('/o/{requestUserId}', [TrackingController::class, 'OpenMailTrack']);
+Route::get('/c/{requestUserId}', [TrackingController::class, 'ClickMailTrack']);
