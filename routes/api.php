@@ -47,21 +47,17 @@ Route::middleware('auth:sanctum')->prefix('recipients')->group(function () {
 });
 
 // Analysis APIs
-Route::middleware(['auth:sanctum', 'permissions:view_hierarchical_analysis'])->prefix('analysis')->group(function () {
-    Route::get('hierarchical', [\App\Http\Controllers\Api\AnalysisController::class, 'hierarchical']);
-});
+Route::middleware(['auth:sanctum'])->prefix('analysis')->group(function () {
+    Route::middleware('permissions:view_campaign_analysis')->group(function () {
+        Route::get('dashboard', [\App\Http\Controllers\Api\AnalysisController::class, 'dashboard']);
+        Route::get('hierarchical', [\App\Http\Controllers\Api\AnalysisController::class, 'hierarchical']);
+        Route::get('campaign/{id}', [\App\Http\Controllers\Api\AnalysisController::class, 'campaignAnalysis']);
+        Route::get('template/{id}', [\App\Http\Controllers\Api\AnalysisController::class, 'templateAnalysis']);
+    });
 
-Route::middleware(['auth:sanctum', 'permissions:track_events'])->prefix('tracking')->group(function () {
-    Route::post('track', [\App\Http\Controllers\Api\AnalysisController::class, 'trackEvent']);
-});
-
-Route::middleware(['auth:sanctum', 'permissions:track_conversions'])->prefix('analysis')->group(function () {
-    Route::post('conversion', [\App\Http\Controllers\Api\AnalysisController::class, 'recordConversion']);
-});
-
-Route::middleware(['auth:sanctum', 'permissions:view_campaign_analysis'])->prefix('analysis')->group(function () {
-    Route::get('campaign/{id}', [\App\Http\Controllers\Api\AnalysisController::class, 'campaignAnalysis']);
-    Route::get('template/{id}', [\App\Http\Controllers\Api\AnalysisController::class, 'templateAnalysis']);
+    Route::middleware('permissions:track_conversions')->group(function () {
+        Route::post('conversion', [\App\Http\Controllers\Api\AnalysisController::class, 'recordConversion']);
+    });
 });
 
 // Campaigns API

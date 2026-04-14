@@ -80,5 +80,7 @@ class DatabaseSeeder extends Seeder
                 'organization_id' => $organization->id,
             ]
         );
+
+        $this->call(DummyDataSeeder::class);
     }
 }

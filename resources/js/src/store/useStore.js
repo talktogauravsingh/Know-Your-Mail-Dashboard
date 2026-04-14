@@ -35,6 +35,7 @@ export const useStore = create((set, get) => ({
   
   // Campaigns - Replace mocks with API
   campaigns: [],
+  currentCampaign: null,
   campaignsLoading: false,
   fetchCampaigns: async () => {
     set({ campaignsLoading: true });
@@ -45,6 +46,18 @@ export const useStore = create((set, get) => ({
       console.error('Failed to fetch campaigns:', error);
     } finally {
       set({ campaignsLoading: false });
+    }
+  },
+  fetchCampaignDetail: async (id) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.get(`/analysis/campaign/${id}`);
+      set({ currentCampaign: data });
+      return data;
+    } catch (error) {
+      console.error('Failed to fetch campaign detail:', error);
+    } finally {
+      set({ isLoading: false });
     }
   },
   createCampaign: async (campaignData) => {

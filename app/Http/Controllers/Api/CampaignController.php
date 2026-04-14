@@ -14,9 +14,15 @@ class CampaignController extends Controller
     public function index(Request $request)
     {
         $campaigns = Campaign::where('organization_id', Auth::user()->organization_id ?? 1)
-            ->withCount(['sendLogs as sent' => function ($query) {
-                $query->select(\DB::raw('count(distinct recipient_id)'));
-            }])
+            ->withCount([
+                'sendLogs as sent_count',
+                'sendLogs as opened_count' => function ($query) {
+                    $query->whereNotNull('opened_at');
+                },
+                'sendLogs as clicks_count' => function ($query) {
+                    $query->select(\DB::raw('sum(clicks_count)'));
+                }
+            ])
             ->latest()
             ->paginate(10);
 

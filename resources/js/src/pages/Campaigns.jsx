@@ -87,8 +87,12 @@ export default function Campaigns() {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-slate-600 dark:text-slate-400">{campaign.sent_count || 0}</TableCell>
-                <TableCell className="text-slate-600 dark:text-slate-400">-</TableCell>
-                <TableCell className="text-slate-600 dark:text-slate-400">-</TableCell>
+                <TableCell className="text-slate-600 dark:text-slate-400">
+                  {campaign.sent_count > 0 ? `${((campaign.opened_count / campaign.sent_count) * 100).toFixed(1)}%` : '0%'}
+                </TableCell>
+                <TableCell className="text-slate-600 dark:text-slate-400">
+                  {campaign.sent_count > 0 ? `${((Number(campaign.clicks_count) / campaign.sent_count) * 100).toFixed(1)}%` : '0%'}
+                </TableCell>
                 <TableCell className="text-right text-slate-500 dark:text-slate-400">
                   {campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : '-'}
                 </TableCell>

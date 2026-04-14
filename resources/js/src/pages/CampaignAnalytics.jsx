@@ -1,22 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useStore } from '../store/useStore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
 import { Input } from '../components/ui/Input';
-import { ArrowLeft, Download, MousePointerClick, MailOpen, UserX, AlertCircle, Send, Globe, Smartphone, MousePointer2 } from 'lucide-react';
+import { ArrowLeft, Download, MousePointerClick, MailOpen, UserX, AlertCircle, Send, Globe, Smartphone, MousePointer2, Loader2 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { campaignSummary, hourlyOpensData, browserData, locationData, linkPerformanceData, recipientList } from '../lib/mockDetailsData';
 
 const COLORS = ['#6366f1', '#a855f7', '#ec4899', '#14b8a6', '#f59e0b'];
 
 export default function CampaignAnalytics() {
   const { id } = useParams();
+  const { currentCampaign, isLoading, fetchCampaignDetail } = useStore();
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredRecipients = recipientList.filter(r => 
+  useEffect(() => {
+    fetchCampaignDetail(id);
+  }, [id, fetchCampaignDetail]);
+
+  if (isLoading || !currentCampaign) {
+    return (
+      <div className="flex items-center justify-center h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  const { campaign, summary, rates, hourlyOpens, regionBreakdown, recipients, linkPerformance } = currentCampaign;
+
+  const filteredRecipients = recipients.filter(r => 
     r.email.toLowerCase().includes(searchTerm.toLowerCase()) || 
     r.status.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -33,10 +48,10 @@ export default function CampaignAnalytics() {
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">Summer Sale 2026</h2>
-              <Badge variant="success">Completed</Badge>
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">{campaign.name}</h2>
+              <Badge variant={campaign.status === 'Completed' ? 'success' : 'secondary'}>{campaign.status}</Badge>
             </div>
-            <p className="text-slate-500 dark:text-slate-400">Sent on Mar 20, 2026 at 10:00 AM</p>
+            <p className="text-slate-500 dark:text-slate-400">Sent on {campaign.created_at}</p>
           </div>
         </div>
         <Button variant="outline" className="gap-2">
@@ -69,10 +84,10 @@ export default function CampaignAnalytics() {
             <Card className="bg-indigo-600 border-indigo-500 text-white shadow-md">
               <CardContent className="p-6">
                 <div className="flex justify-between items-center mb-4">
-                  <p className="text-indigo-100 font-medium text-sm">Sent</p>
-                  <Send className="h-5 w-5 text-indigo-200" />
+                   <p className="text-indigo-100 font-medium text-sm">Sent</p>
+                   <Send className="h-5 w-5 text-indigo-200" />
                 </div>
-                <h3 className="text-3xl font-bold">{campaignSummary.sent.toLocaleString()}</h3>
+                <h3 className="text-3xl font-bold">{summary.sent.toLocaleString()}</h3>
               </CardContent>
             </Card>
             <Card>
@@ -81,8 +96,8 @@ export default function CampaignAnalytics() {
                   <p className="font-medium text-sm text-slate-500">Delivered</p>
                   <MailOpen className="h-5 w-5" />
                 </div>
-                <h3 className="text-3xl font-bold text-slate-900 dark:text-slate-50">{campaignSummary.delivered.toLocaleString()}</h3>
-                <p className="text-sm font-medium text-emerald-500 mt-1">{(campaignSummary.delivered/campaignSummary.sent * 100).toFixed(1)}%</p>
+                <h3 className="text-3xl font-bold text-slate-900 dark:text-slate-50">{summary.delivered.toLocaleString()}</h3>
+                <p className="text-sm font-medium text-emerald-500 mt-1">{rates.delivery}%</p>
               </CardContent>
             </Card>
             <Card>
@@ -91,8 +106,8 @@ export default function CampaignAnalytics() {
                   <p className="font-medium text-sm text-slate-500">Opened</p>
                   <MousePointerClick className="h-5 w-5" />
                 </div>
-                <h3 className="text-3xl font-bold text-slate-900 dark:text-slate-50">{campaignSummary.opened.toLocaleString()}</h3>
-                <p className="text-sm font-medium text-emerald-500 mt-1">{(campaignSummary.opened/campaignSummary.delivered * 100).toFixed(1)}%</p>
+                <h3 className="text-3xl font-bold text-slate-900 dark:text-slate-50">{summary.opened.toLocaleString()}</h3>
+                <p className="text-sm font-medium text-emerald-500 mt-1">{rates.open}%</p>
               </CardContent>
             </Card>
             <Card>
@@ -101,8 +116,8 @@ export default function CampaignAnalytics() {
                   <p className="font-medium text-sm text-slate-500">Clicked</p>
                   <MousePointer2 className="h-5 w-5" />
                 </div>
-                <h3 className="text-3xl font-bold text-slate-900 dark:text-slate-50">{campaignSummary.clicked.toLocaleString()}</h3>
-                <p className="text-sm font-medium text-indigo-500 mt-1">{(campaignSummary.clicked/campaignSummary.opened * 100).toFixed(1)}%</p>
+                <h3 className="text-3xl font-bold text-slate-900 dark:text-slate-50">{summary.clicked.toLocaleString()}</h3>
+                <p className="text-sm font-medium text-indigo-500 mt-1">{rates.click}%</p>
               </CardContent>
             </Card>
             <Card className="border-red-100 bg-red-50/50 dark:border-red-900/30 dark:bg-red-900/10">
@@ -111,8 +126,8 @@ export default function CampaignAnalytics() {
                   <p className="font-medium text-sm text-red-500">Bounced</p>
                   <AlertCircle className="h-5 w-5" />
                 </div>
-                <h3 className="text-3xl font-bold text-slate-900 dark:text-slate-50">{campaignSummary.bounced.toLocaleString()}</h3>
-                <p className="text-sm font-medium text-slate-500 mt-1">{(campaignSummary.bounced/campaignSummary.sent * 100).toFixed(1)}%</p>
+                <h3 className="text-3xl font-bold text-slate-900 dark:text-slate-50">{summary.bounced.toLocaleString()}</h3>
+                <p className="text-sm font-medium text-slate-500 mt-1">{rates.bounce}%</p>
               </CardContent>
             </Card>
           </div>
@@ -125,7 +140,7 @@ export default function CampaignAnalytics() {
               <CardContent>
                 <div className="h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={hourlyOpensData}>
+                    <LineChart data={hourlyOpens}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                       <XAxis dataKey="time" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                       <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
@@ -144,7 +159,7 @@ export default function CampaignAnalytics() {
               <CardContent>
                 <div className="h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={linkPerformanceData} layout="vertical" margin={{ left: -20, right: 30 }}>
+                    <BarChart data={linkPerformance} layout="vertical" margin={{ left: -20, right: 30 }}>
                       <XAxis type="number" hide />
                       <YAxis dataKey="url" type="category" hide />
                       <Tooltip 
@@ -153,7 +168,7 @@ export default function CampaignAnalytics() {
                         labelFormatter={(url) => url}
                       />
                       <Bar dataKey="clicks" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={24}>
-                        {linkPerformanceData.map((entry, index) => (
+                        {linkPerformance.map((entry, index) => (
                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Bar>
@@ -161,7 +176,7 @@ export default function CampaignAnalytics() {
                   </ResponsiveContainer>
                 </div>
                 <div className="mt-2 text-sm text-slate-500">
-                  {linkPerformanceData.map((link, i) => (
+                  {linkPerformance.map((link, i) => (
                     <div key={link.url} className="flex justify-between items-center py-1">
                       <div className="flex items-center gap-2 truncate pr-4">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>
@@ -189,7 +204,7 @@ export default function CampaignAnalytics() {
               <CardContent>
                 <div className="h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={locationData}>
+                    <BarChart data={regionBreakdown}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                       <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                       <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />

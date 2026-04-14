@@ -110,7 +110,7 @@ export default function CreateCampaign() {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="name">Campaign Name</Label>
-              <Input id="name" defaultValue={selectedTemplate ? `${selectedTemplate.name} Campaign` : ''} placeholder="e.g. Summer Sale 2026" required />
+              <Input id="name" name="name" defaultValue={selectedTemplate ? `${selectedTemplate.name} Campaign` : ''} placeholder="e.g. Summer Sale 2026" required />
             </div>
 
             {isABTest && abTestType === 'subject' ? (
@@ -119,27 +119,27 @@ export default function CreateCampaign() {
                   <Label htmlFor="subjectA" className="flex items-center gap-2">
                     <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md text-xs font-bold dark:bg-indigo-900/50 dark:text-indigo-400">Variant A</span> Subject Line
                   </Label>
-                  <Input id="subjectA" placeholder="Open for a surprise!" required className="border-indigo-200 focus-visible:ring-indigo-500 dark:border-indigo-900" />
+                  <Input id="subjectA" name="subject_a" placeholder="Open for a surprise!" required className="border-indigo-200 focus-visible:ring-indigo-500 dark:border-indigo-900" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="subjectB" className="flex items-center gap-2">
                     <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md text-xs font-bold dark:bg-purple-900/50 dark:text-purple-400">Variant B</span> Subject Line
                   </Label>
-                  <Input id="subjectB" placeholder="You won't believe this deal..." required className="border-purple-200 focus-visible:ring-purple-500 dark:border-purple-900" />
+                  <Input id="subjectB" name="subject_b" placeholder="You won't believe this deal..." required className="border-purple-200 focus-visible:ring-purple-500 dark:border-purple-900" />
                 </div>
               </div>
             ) : (
               <div className="space-y-2">
                 <Label htmlFor="subject">Subject Line</Label>
-                <Input id="subject" placeholder="Open for a surprise!" required />
+                <Input id="subject" name="subject" placeholder="Open for a surprise!" required />
               </div>
             )}
 
             <div className="space-y-2">
               <Label htmlFor="senderConfig">Sender Configuration</Label>
-              <Select id="senderConfig" required className="bg-white dark:bg-slate-950">
+              <Select id="senderConfig" name="sender_config_id" required className="bg-white dark:bg-slate-950">
                 <option value="">Select a sender configuration...</option>
-                <option value="managed_shared">EmailTracker Shared IPs (via emailtracker.io)</option>
+                <option value="1">EmailTracker Shared IPs (via emailtracker.io)</option>
                 {smtpConfigurations.map(config => (
                   <option key={config.id} value={config.id}>
                     {config.provider} - {config.fromName} ({config.fromAddress})
@@ -167,7 +167,7 @@ export default function CreateCampaign() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Select Segment or Upload CSV</Label>
-              <Select className="mb-4">
+              <Select name="audience_segment" className="mb-4">
                 <option value="">Upload new CSV...</option>
                 <option value="s1">Active Users (Last 30 Days)</option>
                 <option value="s2">High Value Customers (LTV &gt; $500)</option>
@@ -198,6 +198,7 @@ export default function CreateCampaign() {
                   </Label>
                   <textarea 
                     id="bodyA" 
+                    name="body_a"
                     className="flex min-h-[200px] w-full rounded-md border border-indigo-200 bg-white dark:bg-slate-950 px-3 py-2 text-sm shadow-sm placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 dark:border-indigo-900/50"
                     placeholder="Short and punchy variant..."
                     required
@@ -209,6 +210,7 @@ export default function CreateCampaign() {
                   </Label>
                   <textarea 
                     id="bodyB" 
+                    name="body_b"
                     className="flex min-h-[200px] w-full rounded-md border border-purple-200 bg-white dark:bg-slate-950 px-3 py-2 text-sm shadow-sm placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-purple-500 dark:border-purple-900/50"
                     placeholder="Long-form storytelling variant..."
                     required
@@ -220,6 +222,7 @@ export default function CreateCampaign() {
                 <Label htmlFor="body">Email Body (Simple HTML/Text)</Label>
                 <textarea 
                   id="body" 
+                  name="body"
                   className="flex min-h-[200px] w-full rounded-md border border-slate-200 bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:placeholder:text-slate-400 dark:focus-visible:ring-slate-300"
                   placeholder="Hi {{first_name}},&#10;&#10;Welcome to..."
                   defaultValue={selectedTemplate ? `<!-- Using Template: ${selectedTemplate.name} -->\n\n` : ''}
@@ -230,7 +233,7 @@ export default function CreateCampaign() {
             
             <div className="space-y-2">
               <Label htmlFor="ctaLink">Primary CTA Link (for Click Tracking)</Label>
-              <Input id="ctaLink" type="url" placeholder="https://example.com/promo" required />
+              <Input id="ctaLink" name="cta_link" type="url" placeholder="https://example.com/promo" required />
             </div>
           </CardContent>
         </Card>

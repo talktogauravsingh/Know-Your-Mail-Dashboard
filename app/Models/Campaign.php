@@ -15,7 +15,9 @@ class Campaign extends Model
         'name',
         'subject',
         'body',
-        'status'
+        'status',
+        'sender_config_id',
+        'cta_url'
     ];
 
     /**
