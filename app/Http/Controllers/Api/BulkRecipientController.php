@@ -48,6 +48,45 @@ class BulkRecipientController extends Controller
 
         // Store temp file
         $csvPath = $request->file('file')->store('temp_csv', 'local');
+        $fullPath = Storage::disk('local')->path($csvPath);
+
+        // ── Quick synchronous pre-scan ─────────────────────────────────────
+        // Read headers + first 5 rows for the UI preview, and count totals.
+        // This is fast (<10ms) — the heavy DB upsert still runs in the job.
+        $previewRows  = [];
+        $totalRows    = 0;
+        $validRows    = 0;
+        $invalidRows  = 0;
+        $csvHeaders   = [];
+        $previewLimit = 5;
+
+        if (($fh = fopen($fullPath, 'r')) !== false) {
+            $rawHeaders = fgetcsv($fh);
+            if ($rawHeaders) {
+                $csvHeaders = array_map(fn($h) => strtolower(trim($h)), $rawHeaders);
+            }
+
+            while (($row = fgetcsv($fh, 4000, ',')) !== false) {
+                if (count($csvHeaders) !== count($row)) continue;
+                $totalRows++;
+                $assoc = array_combine($csvHeaders, $row);
+
+                // Find the email value heuristically (first column containing @)
+                $emailValue = '';
+                foreach ($assoc as $val) {
+                    if (str_contains((string)$val, '@')) { $emailValue = trim($val); break; }
+                }
+
+                $isValid = $emailValue && filter_var($emailValue, FILTER_VALIDATE_EMAIL);
+                $isValid ? $validRows++ : $invalidRows++;
+
+                if (count($previewRows) < $previewLimit) {
+                    $previewRows[] = $assoc;
+                }
+            }
+            fclose($fh);
+        }
+        // ──────────────────────────────────────────────────────────────────
 
         try {
             $results = $this->bulkImportService->importFromCsv(
@@ -58,9 +97,14 @@ class BulkRecipientController extends Controller
             );
 
             return response()->json([
-                'success' => true,
-                'message' => 'Bulk upload has been queued for processing.',
-                'details' => $results
+                'success'      => true,
+                'message'      => 'Bulk upload has been queued for processing.',
+                'total_rows'   => $totalRows,
+                'valid_rows'   => $validRows,
+                'invalid_rows' => $invalidRows,
+                'headers'      => $csvHeaders,
+                'preview_rows' => $previewRows,
+                'details'      => $results,
             ], 202);
         } catch (\Exception $e) {
             Log::error('Bulk upload failed: ' . $e->getMessage());

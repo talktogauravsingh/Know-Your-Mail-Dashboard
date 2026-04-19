@@ -89,7 +89,6 @@ class ProcessCsvImportJob implements ShouldQueue
             $rowData = [
                 'organization_id' => $this->organizationId,
                 'agent_id' => $this->agentId,
-                'campaign_id' => $this->campaignId,
                 'email' => $email,
                 'name' => $rowAssoc['name'] ?? null,
                 'is_valid' => true,

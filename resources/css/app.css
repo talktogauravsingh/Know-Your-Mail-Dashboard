@@ -9,3 +9,43 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/* ─── Skeleton shimmer animation ────────────────────────────────────────────
+   Uses a translateX sweep on a ::after pseudo-element so only
+   `transform` is composited — no layout or paint triggers.
+   The `animation-delay` inline style on individual cells staggers the
+   shimmer for a more organic, wave-like feel.
+   ─────────────────────────────────────────────────────────────────────────── */
+@keyframes skeleton-sweep {
+  0%   { transform: translateX(-100%); }
+  60%  { transform: translateX(100%); }
+  100% { transform: translateX(100%); }
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 100%
+  );
+  animation: skeleton-sweep 1.8s ease-in-out infinite;
+}
+
+/* Dark-mode shimmer — subtler highlight so it doesn't look washed out */
+.dark .skeleton-shimmer::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.07) 50%,
+    transparent 100%
+  );
+}

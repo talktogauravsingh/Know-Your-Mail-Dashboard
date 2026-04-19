@@ -6,6 +6,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../co
 import { Select } from '../components/ui/Select';
 import { ArrowLeft, Save, Send, SplitSquareVertical, FlaskConical } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { CsvPreviewPanel } from '../components/CsvPreview';
+import api from '../lib/api.js';
 
 export default function CreateCampaign() {
   const navigate = useNavigate();
@@ -16,8 +18,11 @@ export default function CreateCampaign() {
   const [isABTest, setIsABTest] = useState(false);
   const [abTestType, setAbTestType] = useState('subject'); // 'subject' or 'content'
   
-  const [uploadStatus, setUploadStatus] = useState('idle'); // idle, uploading, success, error
+  // 'idle' | 'loading' | 'success' | 'error'
+  const [uploadStatus, setUploadStatus] = useState('idle');
   const [uploadMessage, setUploadMessage] = useState('');
+  const [csvResult, setCsvResult] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
 
   const handleFileUpload = async (event) => {
@@ -27,22 +32,45 @@ export default function CreateCampaign() {
     const formData = new FormData();
     formData.append('file', file);
 
-    setUploadStatus('uploading');
-    setUploadMessage('Uploading...');
+    setSelectedFile(file);
+    setCsvResult(null);
+    setUploadStatus('loading');   // triggers skeleton
+    setUploadMessage('');
 
     try {
-      const response = await window.axios.post('/api/recipients/bulk-upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+      const response = await api.post('/recipients/bulk-upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-      
+
+      // Normalise the API payload into the shape CsvPreviewResult expects.
+      // Adjust the field names below if your API returns different keys.
+      const data = response.data;
+      setCsvResult({
+        fileName:    file.name,
+        totalRows:   data.total_rows   ?? data.totalRows   ?? '—',
+        validRows:   data.valid_rows   ?? data.validRows   ?? '—',
+        invalidRows: data.invalid_rows ?? data.invalidRows ?? '—',
+        headers:     data.headers      ?? [],
+        rows:        data.preview_rows ?? data.rows        ?? [],
+        errors:      data.errors       ?? [],
+      });
       setUploadStatus('success');
-      setUploadMessage(response.data.message || 'File queued successfully!');
+      setUploadMessage(data.message || 'File processed successfully!');
     } catch (error) {
       setUploadStatus('error');
-      setUploadMessage(error.response?.data?.message || error.message || 'Upload failed');
+      setUploadMessage(
+        error.response?.data?.message || error.message || 'Upload failed'
+      );
     }
+  };
+
+  const handleRetry = () => {
+    setUploadStatus('idle');
+    setCsvResult(null);
+    setSelectedFile(null);
+    setUploadMessage('');
+    // Reset the file input so the same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const smtpConfigurations = useStore((state) => state.smtpConfigurations);
@@ -225,10 +253,10 @@ export default function CreateCampaign() {
                   </>
                 )}
 
-                {uploadStatus === 'uploading' && (
+                {uploadStatus === 'loading' && (
                   <div className="flex flex-col items-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-3"></div>
-                    <p className="font-medium text-slate-900 dark:text-slate-50">{uploadMessage}</p>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-3" />
+                    <p className="font-medium text-slate-900 dark:text-slate-50">Processing file…</p>
                   </div>
                 )}
 
@@ -238,7 +266,8 @@ export default function CreateCampaign() {
                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                     </div>
                     <p className="font-medium text-slate-900 dark:text-slate-50">{uploadMessage}</p>
-                    <p className="text-sm mt-2 text-indigo-600 hover:underline cursor-pointer" onClick={(e) => { e.stopPropagation(); setUploadStatus('idle'); }}>Upload another</p>
+                    <p className="text-sm mt-2 text-indigo-600 hover:underline cursor-pointer"
+                       onClick={(e) => { e.stopPropagation(); handleRetry(); }}>Upload another</p>
                   </div>
                 )}
 
@@ -248,11 +277,21 @@ export default function CreateCampaign() {
                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                     </div>
                     <p className="font-medium text-slate-900 dark:text-slate-50">{uploadMessage}</p>
-                    <p className="text-sm mt-2 text-slate-500 hover:underline cursor-pointer" onClick={(e) => { e.stopPropagation(); setUploadStatus('idle'); }}>Try again</p>
+                    <p className="text-sm mt-2 text-slate-500 hover:underline cursor-pointer"
+                       onClick={(e) => { e.stopPropagation(); handleRetry(); }}>Try again</p>
                   </div>
                 )}
               </div>
             </div>
+
+            {/* ── CSV Preview Panel (skeleton → result → error) ── */}
+            <CsvPreviewPanel
+              status={uploadStatus}
+              fileName={selectedFile?.name}
+              result={csvResult}
+              error={uploadMessage}
+              onRetry={handleRetry}
+            />
           </CardContent>
         </Card>
 
