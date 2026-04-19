@@ -12,6 +12,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable(['name', 'email', 'password', 'role_id', 'organization_id', 'created_by'])]
 #[Hidden(['password', 'remember_token'])]
@@ -19,6 +20,27 @@ class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, HasApiTokens;
+
+    /**
+     * Get subordinate user IDs recursively (include self)
+     */
+    public function getSubordinateIds(bool $includeSelf = true): array
+    {
+        $userId = $this->id;
+        
+        $subIds = DB::select("
+            WITH RECURSIVE subordinate_tree AS (
+                SELECT id FROM users WHERE id = ?
+                UNION ALL
+                SELECT u.id FROM users u
+                INNER JOIN subordinate_tree st ON u.created_by = st.id
+                WHERE u.id != ?
+            )
+            SELECT DISTINCT id FROM subordinate_tree
+        ", [$userId, $userId]);
+        
+        return array_column($subIds, 'id');
+    }
 
     /**
      * Get the attributes that should be cast.

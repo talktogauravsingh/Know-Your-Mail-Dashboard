@@ -1,18 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { mockCampaigns } from '../lib/mockData';
+import { useStore } from '../store/useStore';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Search, Filter, Loader2 } from 'lucide-react';
 
 export default function Campaigns() {
   const [searchTerm, setSearchTerm] = useState('');
+  const { campaigns, campaignsLoading, fetchCampaigns } = useStore();
 
-  const filteredCampaigns = mockCampaigns.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase())
+  useEffect(() => {
+    fetchCampaigns();
+  }, [fetchCampaigns]);
+
+  const filteredCampaigns = campaigns.filter(c => 
+    c.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (campaignsLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -67,22 +80,28 @@ export default function Campaigns() {
                 </TableCell>
                 <TableCell>
                   <Badge variant={
-                    campaign.status === 'Completed' ? 'success' :
-                    campaign.status === 'Sent' ? 'default' : 'secondary'
+                    campaign.status === 'completed' ? 'success' :
+                    campaign.status === 'sent' ? 'default' : 'secondary'
                   }>
-                    {campaign.status}
+                    {campaign.status?.toUpperCase()}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-slate-600 dark:text-slate-400">{campaign.sent.toLocaleString()}</TableCell>
-                <TableCell className="text-slate-600 dark:text-slate-400">{campaign.openRate}</TableCell>
-                <TableCell className="text-slate-600 dark:text-slate-400">{campaign.clickRate}</TableCell>
-                <TableCell className="text-right text-slate-500 dark:text-slate-400">{new Date(campaign.date).toLocaleDateString()}</TableCell>
+                <TableCell className="text-slate-600 dark:text-slate-400">{campaign.sent_count || 0}</TableCell>
+                <TableCell className="text-slate-600 dark:text-slate-400">
+                  {campaign.sent_count > 0 ? `${((campaign.opened_count / campaign.sent_count) * 100).toFixed(1)}%` : '0%'}
+                </TableCell>
+                <TableCell className="text-slate-600 dark:text-slate-400">
+                  {campaign.sent_count > 0 ? `${((Number(campaign.clicks_count) / campaign.sent_count) * 100).toFixed(1)}%` : '0%'}
+                </TableCell>
+                <TableCell className="text-right text-slate-500 dark:text-slate-400">
+                  {campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : '-'}
+                </TableCell>
               </TableRow>
             ))}
-            {filteredCampaigns.length === 0 && (
+            {filteredCampaigns.length === 0 && !campaignsLoading && (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center">
-                  No campaigns found.
+                  No campaigns found. <Link to="/campaigns/new" className="text-indigo-600 hover:underline">Create one</Link>
                 </TableCell>
               </TableRow>
             )}

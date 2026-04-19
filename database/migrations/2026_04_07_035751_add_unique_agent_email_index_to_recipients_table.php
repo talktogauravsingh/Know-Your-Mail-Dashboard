@@ -16,13 +16,5 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::table('recipients', function (Blueprint $table) {
-            $table->dropUnique('recipients_agent_email_unique');
-        });
-    }
+
 };

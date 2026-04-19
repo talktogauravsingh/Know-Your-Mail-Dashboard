@@ -20,14 +20,4 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::table('recipients', function (Blueprint $table) {
-            $table->dropForeign(['agent_id']);
-            $table->dropColumn(['agent_id', 'name', 'phone', 'additional_detail', 'organization_id']);
-        });
-    }
 };

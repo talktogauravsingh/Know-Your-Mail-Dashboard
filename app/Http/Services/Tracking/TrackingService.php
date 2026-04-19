@@ -69,6 +69,17 @@ class TrackingService
         return $request->header('Referer', 'Unknown');
     }
 
+    public function getRegion($ip)
+    {
+        try {
+            $response = file_get_contents('http://ip-api.com/json/' . $ip . '?fields=country,regionName');
+            $data = json_decode($response, true);
+            return $data['country'] ?? $data['regionName'] ?? 'Unknown';
+        } catch (\Exception $e) {
+            return 'Unknown';
+        }
+    }
+
     public function getTrackingData($request)
     {
         $userAgent = $request->header('User-Agent');
@@ -77,9 +88,11 @@ class TrackingService
         $os = $this->getOSName($userAgent);
         $deviceType = $this->getDeviceType($userAgent);
         $referrer = $this->getReferrer($request);
+        $region = $this->getRegion($ipAddress);
 
         return [
             'ip_address' => $ipAddress,
+            'region' => $region,
             'browser' => $browser,
             'os' => $os,
             'device_type' => $deviceType,
@@ -87,4 +100,16 @@ class TrackingService
             'referrer' => $referrer
         ];
     }
+
+    public function logTracking(\App\Models\SendLog $sendLog, \Illuminate\Http\Request $request, $event = null)
+    {
+        $data = $this->getTrackingData($request);
+        $sendLog->update([
+            'tracking_data' => $data,
+            'last_activity_at' => now(),
+            'region' => $data['region']
+        ]);
+        return $data;
+    }
 }
+

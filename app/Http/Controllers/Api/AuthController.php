@@ -31,11 +31,9 @@ class AuthController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
-        $user = $this->authRepo->createUser($validated);
+$user = $this->authRepo->createUser($validated);
 
         $token = $user->createToken('auth-token')->plainTextToken;
-
-        event(new Registered($user));
 
         return response()->json([
             'user' => $user->load('role'),
@@ -82,9 +80,10 @@ class AuthController extends Controller
     /**
      * Create Manager
      */
-    public function createManager(Request $request)
+public function createManager(Request $request)
     {
         $user = $request->user();
+        $user->load('role.permissions');
 
         if (!$user->hasPermission('create_manager')) {
             return response()->json([
