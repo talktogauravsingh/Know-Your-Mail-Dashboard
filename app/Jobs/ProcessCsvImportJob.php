@@ -128,8 +128,24 @@ class ProcessCsvImportJob implements ShouldQueue
         
         Log::info("Completed CSV import job for org {$this->organizationId}", ['insights' => $insights]);
         
-        // Here we could save insights to DB if a table existed, 
-        // but as requested, they are fully calculated and logged for now.
+        // Save insights to DB
+        foreach ($insights as $col => $data) {
+            DB::table('campaign_csv_insights')->updateOrInsert(
+                [
+                    'campaign_id' => $this->campaignId,
+                    'organization_id' => $this->organizationId,
+                    'field_name' => $col
+                ],
+                [
+                    'unique_count' => $data['unique_count'],
+                    'distribution' => json_encode($data['distribution']),
+                    'is_recommended' => $data['recommended'] ? 1 : 0,
+                    'field_type' => $data['type'],
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        }
         
         Storage::disk('local')->delete($this->filePath);
     }

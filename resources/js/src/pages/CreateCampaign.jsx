@@ -4,9 +4,10 @@ import { Button } from '../components/ui/Button';
 import { Input, Label } from '../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import { Select } from '../components/ui/Select';
-import { ArrowLeft, Save, Send, SplitSquareVertical, FlaskConical } from 'lucide-react';
+import { ArrowLeft, Save, Send, SplitSquareVertical, FlaskConical, Layers } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { CsvPreviewPanel } from '../components/CsvPreview';
+import { SegmentationEngine } from '../components/SegmentationEngine';
 import api from '../lib/api.js';
 
 export default function CreateCampaign() {
@@ -22,19 +23,51 @@ export default function CreateCampaign() {
   const [uploadStatus, setUploadStatus] = useState('idle');
   const [uploadMessage, setUploadMessage] = useState('');
   const [csvResult, setCsvResult] = useState(null);
+  const [segmentationMode, setSegmentationMode] = useState('single');
+  const [segments, setSegments] = useState([]);
+  const [insights, setInsights] = useState([]);
+  const [campaignId, setCampaignId] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
+
+  const fetchInsights = async (id) => {
+    try {
+      const response = await api.get(`/campaigns/${id}/insights`);
+      setInsights(response.data.insights);
+    } catch (error) {
+      console.error('Failed to fetch insights', error);
+    }
+  };
 
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
+    let currentCampaignId = campaignId;
+
+    // If no campaignId, create a quick draft first so we can link the CSV and insights
+    if (!currentCampaignId) {
+      try {
+        const campaignResponse = await api.post('/campaigns', {
+          name: `Draft ${new Date().toLocaleTimeString()}`,
+          subject: 'Draft Subject',
+          body: 'Draft Body',
+          sender_config_id: 1, // Fallback
+        });
+        currentCampaignId = campaignResponse.data.id;
+        setCampaignId(currentCampaignId);
+      } catch (err) {
+        console.error('Failed to create draft campaign', err);
+      }
+    }
+
     const formData = new FormData();
     formData.append('file', file);
+    if (currentCampaignId) formData.append('campaign_id', currentCampaignId);
 
     setSelectedFile(file);
     setCsvResult(null);
-    setUploadStatus('loading');   // triggers skeleton
+    setUploadStatus('loading');
     setUploadMessage('');
 
     try {
@@ -42,8 +75,6 @@ export default function CreateCampaign() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      // Normalise the API payload into the shape CsvPreviewResult expects.
-      // Adjust the field names below if your API returns different keys.
       const data = response.data;
       setCsvResult({
         fileName:    file.name,
@@ -56,6 +87,19 @@ export default function CreateCampaign() {
       });
       setUploadStatus('success');
       setUploadMessage(data.message || 'File processed successfully!');
+      
+      if (currentCampaignId) {
+        // Poll for insights every 3 seconds, up to 5 times
+        let attempts = 0;
+        const interval = setInterval(async () => {
+          attempts++;
+          const insightsResponse = await api.get(`/campaigns/${currentCampaignId}/insights`);
+          if (insightsResponse.data.insights.length > 0 || attempts > 5) {
+            setInsights(insightsResponse.data.insights);
+            clearInterval(interval);
+          }
+        }, 3000);
+      }
     } catch (error) {
       setUploadStatus('error');
       setUploadMessage(
@@ -283,6 +327,38 @@ export default function CreateCampaign() {
                 )}
               </div>
             </div>
+
+            {/* Segmentation Mode Toggle */}
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-800 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-lg">
+                  <Layers className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-50">Multi-Variant Segmentation</h4>
+                  <p className="text-xs text-slate-500">Target different users with different variants</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => {
+                  setSegmentationMode(segmentationMode === 'single' ? 'segmented' : 'single');
+                }}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${segmentationMode === 'segmented' ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'}`}
+              >
+                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${segmentationMode === 'segmented' ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
+            </div>
+
+            {segmentationMode === 'segmented' && (
+              <div className="mb-8 border-b border-slate-100 dark:border-slate-800 pb-8">
+                <SegmentationEngine 
+                  campaignId={campaignId} 
+                  insights={insights}
+                  onSegmentsChange={(segs) => setSegments(segs)}
+                />
+              </div>
+            )}
 
             {/* ── CSV Preview Panel (skeleton → result → error) ── */}
             <CsvPreviewPanel

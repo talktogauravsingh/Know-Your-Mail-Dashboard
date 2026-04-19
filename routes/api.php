@@ -71,6 +71,8 @@ Route::middleware(['auth:sanctum'])->prefix('analysis')->group(function () {
 Route::middleware('auth:sanctum')->prefix('campaigns')->group(function () {
     Route::get('/', [CampaignController::class, 'index']);
     Route::post('/', [CampaignController::class, 'store']);
+    Route::get('/{campaign}/insights', [\App\Http\Controllers\Api\SegmentationController::class, 'getInsights']);
+    Route::post('/{campaign}/segments/validate-count', [\App\Http\Controllers\Api\SegmentationController::class, 'validateCount']);
 });
 
 Route::get('/o/{requestUserId}', [TrackingController::class, 'OpenMailTrack']);

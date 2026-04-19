@@ -16,9 +16,20 @@ class Campaign extends Model
         'subject',
         'body',
         'status',
+        'segmentation_mode', // 'single' or 'segmented'
         'sender_config_id',
         'cta_url'
     ];
+
+    public function variants()
+    {
+        return $this->hasMany(CampaignVariant::class);
+    }
+
+    public function assignments()
+    {
+        return $this->hasMany(RecipientSegmentAssignment::class);
+    }
 
     /**
      * Scope for campaigns visible to user (org level)
