@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Input, Label } from '../components/ui/Input';
@@ -15,6 +15,35 @@ export default function CreateCampaign() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isABTest, setIsABTest] = useState(false);
   const [abTestType, setAbTestType] = useState('subject'); // 'subject' or 'content'
+  
+  const [uploadStatus, setUploadStatus] = useState('idle'); // idle, uploading, success, error
+  const [uploadMessage, setUploadMessage] = useState('');
+  const fileInputRef = useRef(null);
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    setUploadStatus('uploading');
+    setUploadMessage('Uploading...');
+
+    try {
+      const response = await window.axios.post('/api/recipients/bulk-upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      setUploadStatus('success');
+      setUploadMessage(response.data.message || 'File queued successfully!');
+    } catch (error) {
+      setUploadStatus('error');
+      setUploadMessage(error.response?.data?.message || error.message || 'Upload failed');
+    }
+  };
 
   const smtpConfigurations = useStore((state) => state.smtpConfigurations);
   const templates = useStore((state) => state.templates);
@@ -165,12 +194,55 @@ export default function CreateCampaign() {
                 <option value="s2">High Value Customers (LTV &gt; $500)</option>
                 <option value="s3">Churn Risk (No login &gt; 60 days)</option>
               </Select>
-              <div className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg p-8 flex flex-col items-center justify-center text-center hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors cursor-pointer">
-                <div className="rounded-full bg-slate-100 p-3 dark:bg-slate-800 mb-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><path d="M21 15v4a2 2 0 0 1-2-2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-                </div>
-                <p className="font-medium text-slate-900 dark:text-slate-50">Upload a CSV file</p>
-                <p className="text-sm text-slate-500 mt-1">or drag and drop here</p>
+              <div 
+                className={`relative border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg p-8 flex flex-col items-center justify-center text-center transition-colors ${uploadStatus === 'idle' ? 'hover:bg-slate-50 dark:hover:bg-slate-900/50 cursor-pointer' : ''}`}
+                onClick={() => uploadStatus === 'idle' && fileInputRef.current?.click()}
+              >
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                  disabled={uploadStatus === 'uploading'}
+                />
+                
+                {uploadStatus === 'idle' && (
+                  <>
+                    <div className="rounded-full bg-slate-100 p-3 dark:bg-slate-800 mb-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><path d="M21 15v4a2 2 0 0 1-2-2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                    </div>
+                    <p className="font-medium text-slate-900 dark:text-slate-50">Upload a CSV file</p>
+                    <p className="text-sm text-slate-500 mt-1">Click to select a file</p>
+                  </>
+                )}
+
+                {uploadStatus === 'uploading' && (
+                  <div className="flex flex-col items-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-3"></div>
+                    <p className="font-medium text-slate-900 dark:text-slate-50">{uploadMessage}</p>
+                  </div>
+                )}
+
+                {uploadStatus === 'success' && (
+                  <div className="flex flex-col items-center text-emerald-600 dark:text-emerald-400">
+                    <div className="rounded-full bg-emerald-100 p-3 dark:bg-emerald-900/50 mb-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                    <p className="font-medium text-slate-900 dark:text-slate-50">{uploadMessage}</p>
+                    <p className="text-sm mt-2 text-indigo-600 hover:underline cursor-pointer" onClick={(e) => { e.stopPropagation(); setUploadStatus('idle'); }}>Upload another</p>
+                  </div>
+                )}
+
+                {uploadStatus === 'error' && (
+                  <div className="flex flex-col items-center text-red-600 dark:text-red-400">
+                    <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/50 mb-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    </div>
+                    <p className="font-medium text-slate-900 dark:text-slate-50">{uploadMessage}</p>
+                    <p className="text-sm mt-2 text-slate-500 hover:underline cursor-pointer" onClick={(e) => { e.stopPropagation(); setUploadStatus('idle'); }}>Try again</p>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
