@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { ArrowUpRight, ArrowDownRight, Clock, Smartphone, MapPin, Loader2 } from 'lucide-react';
 
-const COLORS = ['#6366f1', '#a855f7', '#ec4899', '#14b8a6'];
+const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6']; // KnowYourEmail Theme
 
 const defaultKPIs = [
   { name: 'Total Emails Sent', value: '0', change: '+0%', trend: 'up' },
@@ -51,17 +51,9 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-slate-900 dark:text-slate-50">{kpi.value}</div>
-              <p className="flex items-center text-xs mt-1">
-                {kpi.trend === 'up' ? (
-                  <ArrowUpRight className="mr-1 h-3 w-3 text-emerald-500" />
-                ) : (
-                  <ArrowDownRight className="mr-1 h-3 w-3 text-red-500" />
-                )}
-                <span className={kpi.trend === 'up' ? (kpi.name.includes('Bounce') || kpi.name.includes('Unsubscribe') ? "text-red-500" : "text-emerald-500") : (kpi.name.includes('Bounce') || kpi.name.includes('Unsubscribe') ? "text-emerald-500" : "text-red-500")}>
-                  {kpi.change}
+                <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold ml-1", kpi.trend === 'up' ? (kpi.name.includes('Bounce') || kpi.name.includes('Unsubscribe') ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400" : "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400") : (kpi.name.includes('Bounce') || kpi.name.includes('Unsubscribe') ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"))}>
+                  {kpi.trend === 'up' ? '↑' : '↓'} {kpi.change}
                 </span>
-                <span className="ml-1 text-slate-500 dark:text-slate-400">from last month</span>
-              </p>
             </CardContent>
           </Card>
         ))}
@@ -69,19 +61,17 @@ export default function Dashboard() {
 
       {/* Quick Insights - Static for now */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="bg-indigo-50 dark:bg-indigo-950/20 border-indigo-100 dark:border-indigo-900/40">
+        <Card className="bg-blue-50/50 dark:bg-blue-900/10 border-blue-100/50 dark:border-blue-900/30">
           <CardContent className="flex items-center p-6 gap-4">
-            <div className="rounded-full bg-indigo-100 p-3 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400">
+            <div className="rounded-[16px] bg-white shadow-sm p-3 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400">
                <Clock className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">Best Open Time</p>
-              <p className="text-2xl font-bold text-slate-900 dark:text-slate-50">Loading...</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">-</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-blue-600/80 dark:text-blue-400/80">Best Open Time</p>
+              <p className="text-2xl font-black text-slate-900 dark:text-slate-50">10:00 AM</p>
             </div>
           </CardContent>
         </Card>
-        {/* Similar for other insights */}
       </div>
 
       {/* Charts */}
@@ -97,8 +87,8 @@ export default function Dashboard() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}%`} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="openRate" stroke="#6366f1" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }} />
+                  <Line type="monotone" dataKey="openRate" stroke="#3b82f6" strokeWidth={4} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -116,8 +106,8 @@ export default function Dashboard() {
                   <BarChart data={clickPerformanceData.length > 0 ? clickPerformanceData : [{name: 'No data', clicks: 0}]} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                     <XAxis type="number" hide />
                     <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} stroke="#64748b" fontSize={12} width={80} />
-                    <Tooltip />
-                    <Bar dataKey="clicks" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={16}>
+                    <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                    <Bar dataKey="clicks" fill="#3b82f6" radius={[0, 8, 8, 0]} barSize={20}>
                       {clickPerformanceData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}

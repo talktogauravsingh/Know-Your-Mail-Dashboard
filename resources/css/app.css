@@ -6,8 +6,22 @@
 @source '../**/*.js';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    --font-sans: 'Instrument Sans', 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* KnowYourEmail Brand Identity */
+    --color-primary-500: #3b82f6; /* Cyber Blue */
+    --color-primary-600: #2563eb;
+    --color-primary-700: #1d4ed8;
+    
+    --color-accent-500: #8b5cf6; /* Electric Violet */
+    --color-accent-600: #7c3aed;
+    
+    --color-slate-850: #162032; /* Deep Graphite custom shade for backgrounds */
+
+    /* Soft UI Radii */
+    --radius-soft: 16px;
+    --radius-softer: 24px;
 }
 
 /* ─── Skeleton shimmer animation ────────────────────────────────────────────
