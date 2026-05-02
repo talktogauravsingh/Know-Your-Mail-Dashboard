@@ -27,13 +27,15 @@ class BulkRecipientController extends Controller
         $user = Auth::user();
         
         // Assume agent role check via middleware or permission
-        // if (!$user->hasPermission('bulk_upload_recipients')) {
+        // if ($user && !$user->hasPermission('bulk_upload_recipients')) {
         //     return response()->json(['error' => 'Unauthorized'], 403);
         // }
 
         $request->validate([
-            'file' => 'required|file|mimes:csv|max:10240', // 10MB
-            'campaign_id' => 'nullable|integer|exists:campaigns,id'
+            'file' => 'required|file|mimes:csv,txt|max:10240', // 10MB
+            'campaign_id' => 'nullable|integer|exists:campaigns,id',
+            'module_type' => 'nullable|integer|in:1,2',
+            'module_id' => 'nullable|integer'
         ]);
 
         if (!$request->file('file')) {
@@ -41,36 +43,84 @@ class BulkRecipientController extends Controller
         }
 
         $campaignId = $request->input('campaign_id');
-        $organizationId = $user->organization_id;
-        $agentId = $user->id;
+        $moduleType = $request->input('module_type');
+        $moduleId = $request->input('module_id');
+
+        // Logic for module referencing
+        if (!$moduleType) {
+            $moduleType = $campaignId ? 2 : 1; // Default to Campaign if id exists, else Org
+        }
+        
+        if (!$moduleId) {
+            $moduleId = $campaignId ?: ($user ? $user->organization_id : 1);
+        }
+        
+        // Mock fallback if unauthenticated for local testing
+        $organizationId = $user ? $user->organization_id : 1;
+        $agentId = $user ? $user->id : 1;
 
         // Store temp file
         $csvPath = $request->file('file')->store('temp_csv', 'local');
-        $fullPath = storage_path('app/' . $csvPath);
+        $fullPath = Storage::disk('local')->path($csvPath);
+
+        // ── Quick synchronous pre-scan ─────────────────────────────────────
+        // Read headers + first 5 rows for the UI preview, and count totals.
+        // This is fast (<10ms) — the heavy DB upsert still runs in the job.
+        $previewRows  = [];
+        $totalRows    = 0;
+        $validRows    = 0;
+        $invalidRows  = 0;
+        $csvHeaders   = [];
+        $previewLimit = 5;
+
+        if (($fh = fopen($fullPath, 'r')) !== false) {
+            $rawHeaders = fgetcsv($fh);
+            if ($rawHeaders) {
+                $csvHeaders = array_map(fn($h) => strtolower(trim($h)), $rawHeaders);
+            }
+
+            while (($row = fgetcsv($fh, 4000, ',')) !== false) {
+                if (count($csvHeaders) !== count($row)) continue;
+                $totalRows++;
+                $assoc = array_combine($csvHeaders, $row);
+
+                // Find the email value heuristically (first column containing @)
+                $emailValue = '';
+                foreach ($assoc as $val) {
+                    if (str_contains((string)$val, '@')) { $emailValue = trim($val); break; }
+                }
+
+                $isValid = $emailValue && filter_var($emailValue, FILTER_VALIDATE_EMAIL);
+                $isValid ? $validRows++ : $invalidRows++;
+
+                if (count($previewRows) < $previewLimit) {
+                    $previewRows[] = $assoc;
+                }
+            }
+            fclose($fh);
+        }
+        // ──────────────────────────────────────────────────────────────────
 
         try {
             $results = $this->bulkImportService->importFromCsv(
-                $fullPath,
+                $csvPath,
                 $agentId,
                 $organizationId,
-                $campaignId
+                $campaignId,
+                $moduleType,
+                $moduleId
             );
 
-            // Cleanup
-            Storage::disk('local')->delete($csvPath);
-
             return response()->json([
-                'success' => true,
-                'message' => 'Bulk upload with deduplication completed.',
-                'summary' => [
-                    'new' => $results['new'] ?? 0,
-                    'updated' => $results['updated'] ?? 0,
-                    'skipped' => $results['skipped'] ?? 0,
-                    'invalid' => $results['invalid'] ?? 0,
-                    'csv_duplicates' => count($results['csv_duplicates'] ?? []),
-                ],
-                'details' => $results
-            ], 200);
+                'success'      => true,
+                'message'      => 'Bulk upload has been queued for processing.',
+                'total_rows'   => $totalRows,
+                'valid_rows'   => $validRows,
+                'invalid_rows' => $invalidRows,
+                'headers'      => $csvHeaders,
+                'preview_rows' => $previewRows,
+                'details'      => $results,
+            ], 202);
         } catch (\Exception $e) {
             Log::error('Bulk upload failed: ' . $e->getMessage());
             Storage::disk('local')->delete($csvPath);

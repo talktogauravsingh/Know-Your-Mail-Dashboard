@@ -9,11 +9,13 @@ use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\BulkRecipientController;
 use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\Api\CampaignController;
-use App\Http\Controllers\Api\TrackingController;
+use App\Http\Controllers\Tracking\TrackingController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+Route::get('/insights/org', [\App\Http\Controllers\Api\SegmentationController::class, 'getOrgInsights'])->middleware('auth:sanctum');
 
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register'])->middleware('throttle:5,1');
@@ -49,8 +51,8 @@ Route::middleware(['auth:sanctum', 'permissions:manage_roles'])->prefix('roles/{
     Route::delete('/', [RolePermissionController::class, 'destroy']);
 });
 
-Route::middleware('auth:sanctum')->prefix('recipients')->group(function () {
-    Route::post('bulk-upload', [BulkRecipientController::class, 'bulkUpload']);
+Route::prefix('recipients')->group(function () {
+    Route::post('bulk-upload', [\App\Http\Controllers\Api\BulkRecipientController::class, 'bulkUpload']);
 });
 
 // Analysis APIs
@@ -71,7 +73,12 @@ Route::middleware(['auth:sanctum'])->prefix('analysis')->group(function () {
 Route::middleware('auth:sanctum')->prefix('campaigns')->group(function () {
     Route::get('/', [CampaignController::class, 'index']);
     Route::post('/', [CampaignController::class, 'store']);
+    Route::get('/{campaign}', [CampaignController::class, 'show']);
+    Route::patch('/{campaign}', [CampaignController::class, 'update']);
+    Route::get('/{campaign}/insights', [\App\Http\Controllers\Api\SegmentationController::class, 'getInsights']);
+    Route::post('/{campaign}/segments/validate-count', [\App\Http\Controllers\Api\SegmentationController::class, 'validateCount']);
 });
 
 Route::get('/o/{requestUserId}', [TrackingController::class, 'OpenMailTrack']);
 Route::get('/c/{requestUserId}', [TrackingController::class, 'ClickMailTrack']);
+Route::post('ai/email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate']);

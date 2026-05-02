@@ -13,13 +13,13 @@ class Recipient extends Model
         'email',
         'name',
         'phone',
-        'additional_detail',
+        'attributes',
         'is_valid',
         'validation_reason'
     ];
 
     protected $casts = [
-        'additional_detail' => 'array',
+        'attributes' => 'array',
     ];
 
     public function scopeForAgent($query, $agentId)

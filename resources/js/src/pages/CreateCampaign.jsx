@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Input, Label } from '../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import { Select } from '../components/ui/Select';
-import { ArrowLeft, Save, Send, SplitSquareVertical, FlaskConical } from 'lucide-react';
+import { ArrowLeft, Save, Send, SplitSquareVertical, FlaskConical, Layers, CheckCircle2, AlertCircle, Upload } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { CsvPreviewPanel } from '../components/CsvPreview';
+import { SegmentationEngine } from '../components/SegmentationEngine';
+import api from '../lib/api';
+import { cn } from '../lib/utils';
 
 export default function CreateCampaign() {
   const navigate = useNavigate();
@@ -15,23 +19,154 @@ export default function CreateCampaign() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isABTest, setIsABTest] = useState(false);
   const [abTestType, setAbTestType] = useState('subject'); // 'subject' or 'content'
+  
+  // 'idle' | 'loading' | 'success' | 'error'
+  const [uploadStatus, setUploadStatus] = useState('idle');
+  const [uploadMessage, setUploadMessage] = useState('');
+  const [csvResult, setCsvResult] = useState(null);
+  const [segmentationMode, setSegmentationMode] = useState('single');
+  const [segments, setSegments] = useState([{ id: 'default', name: 'Default', isDefault: true }]);
+  const [insights, setInsights] = useState([]);
+  const [campaignId, setCampaignId] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [recipientSource, setRecipientSource] = useState('campaign'); // 'campaign' or 'org'
+  const [variants, setVariants] = useState({}); // { [segmentId]: { subject, body, cta_url } }
+  const fileInputRef = useRef(null);
+
+  const fetchInsights = async (id) => {
+    try {
+      const response = await api.get(`/campaigns/${id}/insights`);
+      setInsights(response.data.insights);
+    } catch (error) {
+      console.error('Failed to fetch insights', error);
+    }
+  };
 
   const smtpConfigurations = useStore((state) => state.smtpConfigurations);
   const templates = useStore((state) => state.templates);
+  const user = useStore((state) => state.user);
   const selectedTemplate = templates.find(t => t.id === templateId);
 
   const createCampaign = useStore((state) => state.createCampaign);
+  const updateCampaign = useStore((state) => state.updateCampaign);
   
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    let currentCampaignId = campaignId;
+
+    // If no campaignId, create a quick draft first so we can link the CSV and insights
+    if (!currentCampaignId) {
+      try {
+        const campaignResponse = await api.post('/campaigns', {
+          name: `Draft: ${file.name.split('.')[0]}`,
+          subject: 'Campaign Subject',
+          body: 'Email content goes here...',
+          sender_config_id: smtpConfigurations[0]?.id || 1,
+        });
+        currentCampaignId = campaignResponse.data.id;
+        setCampaignId(currentCampaignId);
+      } catch (err) {
+        console.error('Failed to create draft campaign', err);
+        return;
+      }
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    if (currentCampaignId) {
+      formData.append('campaign_id', currentCampaignId);
+      formData.append('module_type', 2); // Campaign level
+      formData.append('module_id', currentCampaignId);
+    }
+
+    setSelectedFile(file);
+    setCsvResult(null);
+    setUploadStatus('loading');
+    setUploadMessage('');
+
+    try {
+      const response = await api.post('/recipients/bulk-upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      const data = response.data;
+      setCsvResult({
+        fileName:    file.name,
+        totalRows:   data.total_rows   ?? data.totalRows   ?? '—',
+        validRows:   data.valid_rows   ?? data.validRows   ?? '—',
+        invalidRows: data.invalid_rows ?? data.invalidRows ?? '—',
+        headers:     data.headers      ?? [],
+        rows:        data.preview_rows ?? data.rows        ?? [],
+        errors:      data.errors       ?? [],
+      });
+      setUploadStatus('success');
+      setUploadMessage(data.message || 'File processed successfully!');
+      
+      if (currentCampaignId) {
+        // Poll for insights every 2 seconds, up to 10 times
+        let attempts = 0;
+        const interval = setInterval(async () => {
+          attempts++;
+          try {
+            const insightsResponse = await api.get(`/campaigns/${currentCampaignId}/insights`);
+            if (insightsResponse.data.insights?.length > 0 || attempts > 10) {
+              setInsights(insightsResponse.data.insights);
+              clearInterval(interval);
+            }
+          } catch (e) {
+            if (attempts > 10) clearInterval(interval);
+          }
+        }, 2000);
+      }
+    } catch (error) {
+      setUploadStatus('error');
+      setUploadMessage(
+        error.response?.data?.message || error.message || 'Upload failed'
+      );
+    }
+  };
+
+  const handleRetry = () => {
+    setUploadStatus('idle');
+    setCsvResult(null);
+    setSelectedFile(null);
+    setUploadMessage('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
       const formData = new FormData(e.target);
       const data = Object.fromEntries(formData);
-      await createCampaign(data);
+      
+      // Include additional state data
+      data.segments = segments;
+      data.is_ab_test = isABTest;
+      data.ab_test_type = abTestType;
+      data.segmentation_mode = segmentationMode;
+      data.variants = variants;
+
+      // Always use the 'default' variant's content as the main campaign content fallback
+      // This is because we removed the global subject/body fields
+      const defaultVar = variants['default'] || {};
+      data.subject = defaultVar.subject || '';
+      data.body = defaultVar.body || '';
+      data.cta_link = defaultVar.cta_link || data.cta_link || '';
+      
+      // If we have an existing draft campaignId, update it. Otherwise create.
+      if (campaignId) {
+        await updateCampaign(campaignId, data);
+      } else {
+        await createCampaign(data);
+      }
+      
       navigate('/campaigns');
     } catch (error) {
-      console.error('Campaign creation failed:', error);
+      console.error('Campaign submission failed:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -102,6 +237,50 @@ export default function CreateCampaign() {
           </Card>
         )}
 
+        {/* Segmentation Strategy Selection */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setSegmentationMode('single')}
+            className={cn(
+              "p-4 rounded-xl border-2 text-left transition-all",
+              segmentationMode === 'single'
+                ? "border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20"
+                : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:border-slate-300"
+            )}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <div className={cn("p-2 rounded-lg", segmentationMode === 'single' ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500")}>
+                <Send className="h-5 w-5" />
+              </div>
+              <span className="font-bold text-slate-900 dark:text-slate-50">Single Message</span>
+            </div>
+            <p className="text-xs text-slate-500">Send one message to your entire list.</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSegmentationMode('segmented')}
+            className={cn(
+              "p-4 rounded-xl border-2 text-left transition-all",
+              segmentationMode === 'segmented'
+                ? "border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20"
+                : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:border-slate-300"
+            )}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-3">
+                <div className={cn("p-2 rounded-lg", segmentationMode === 'segmented' ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500")}>
+                  <Layers className="h-5 w-5" />
+                </div>
+                <span className="font-bold text-slate-900 dark:text-slate-50">Multi-Segment</span>
+              </div>
+              <div className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-wider">Up to 3</div>
+            </div>
+            <p className="text-xs text-slate-500">Personalize content for different user groups.</p>
+          </button>
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>Campaign Details</CardTitle>
@@ -113,27 +292,7 @@ export default function CreateCampaign() {
               <Input id="name" name="name" defaultValue={selectedTemplate ? `${selectedTemplate.name} Campaign` : ''} placeholder="e.g. Summer Sale 2026" required />
             </div>
 
-            {isABTest && abTestType === 'subject' ? (
-              <div className="grid gap-6 sm:grid-cols-2 p-4 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
-                <div className="space-y-2">
-                  <Label htmlFor="subjectA" className="flex items-center gap-2">
-                    <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md text-xs font-bold dark:bg-indigo-900/50 dark:text-indigo-400">Variant A</span> Subject Line
-                  </Label>
-                  <Input id="subjectA" name="subject_a" placeholder="Open for a surprise!" required className="border-indigo-200 focus-visible:ring-indigo-500 dark:border-indigo-900" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="subjectB" className="flex items-center gap-2">
-                    <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md text-xs font-bold dark:bg-purple-900/50 dark:text-purple-400">Variant B</span> Subject Line
-                  </Label>
-                  <Input id="subjectB" name="subject_b" placeholder="You won't believe this deal..." required className="border-purple-200 focus-visible:ring-purple-500 dark:border-purple-900" />
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label htmlFor="subject">Subject Line</Label>
-                <Input id="subject" name="subject" placeholder="Open for a surprise!" required />
-              </div>
-            )}
+            {/* Removed Global Subject Line - now handled per segment in Content card */}
 
             <div className="space-y-2">
               <Label htmlFor="senderConfig">Sender Configuration</Label>
@@ -156,84 +315,207 @@ export default function CreateCampaign() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Audience</CardTitle>
-              <CardDescription>Who are you sending this campaign to?</CardDescription>
+              <CardDescription>Select who will receive this campaign. CSV upload is optional if using existing segments.</CardDescription>
             </div>
             <Link to="/audience">
               <Button type="button" variant="outline" size="sm" className="gap-2 bg-white dark:bg-slate-950">
-                Browse Segments
+                Manage All Segments
               </Button>
             </Link>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Select Segment or Upload CSV</Label>
-              <Select name="audience_segment" className="mb-4">
-                <option value="">Upload new CSV...</option>
-                <option value="s1">Active Users (Last 30 Days)</option>
-                <option value="s2">High Value Customers (LTV &gt; $500)</option>
-                <option value="s3">Churn Risk (No login &gt; 60 days)</option>
-              </Select>
-              <div className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg p-8 flex flex-col items-center justify-center text-center hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors cursor-pointer">
-                <div className="rounded-full bg-slate-100 p-3 dark:bg-slate-800 mb-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><path d="M21 15v4a2 2 0 0 1-2-2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-                </div>
-                <p className="font-medium text-slate-900 dark:text-slate-50">Upload a CSV file</p>
-                <p className="text-sm text-slate-500 mt-1">or drag and drop here</p>
+          <CardContent className="space-y-6">
+            {/* Recipient Source Selector */}
+            <div className="grid gap-6 md:grid-cols-2 p-4 bg-indigo-50/30 dark:bg-indigo-900/10 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
+              <div className="space-y-1">
+                <Label className="text-indigo-900 dark:text-indigo-200">Recipient Source</Label>
+                <p className="text-xs text-indigo-600/70 dark:text-indigo-400/70">Choose where to pull audience data from</p>
+              </div>
+              <div className="flex bg-white dark:bg-slate-900 p-1 rounded-lg border border-indigo-100 dark:border-indigo-900/50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecipientSource('campaign');
+                    setInsights([]); // Clear to force reload for new source
+                  }}
+                  className={cn(
+                    "flex-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-all",
+                    recipientSource === 'campaign' 
+                      ? "bg-indigo-600 text-white shadow-sm" 
+                      : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-300"
+                  )}
+                >
+                  Campaign Specific
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecipientSource('org');
+                    setInsights([]); // Clear to force reload for new source
+                  }}
+                  className={cn(
+                    "flex-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-all",
+                    recipientSource === 'org' 
+                      ? "bg-indigo-600 text-white shadow-sm" 
+                      : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-300"
+                  )}
+                >
+                  Organization Wide
+                </button>
               </div>
             </div>
+
+            <div className="grid gap-6">
+              {recipientSource === 'campaign' && (
+                <div className="space-y-2">
+                  <Label>Campaign Audience (CSV)</Label>
+                  <div 
+                    className={`relative border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all ${uploadStatus === 'idle' ? 'hover:bg-slate-50 dark:hover:bg-slate-900/50 cursor-pointer' : ''}`}
+                    onClick={() => uploadStatus === 'idle' && fileInputRef.current?.click()}
+                  >
+                    <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileUpload} disabled={uploadStatus === 'loading'} />
+                    
+                    <div className="mb-3 p-3 bg-indigo-50 dark:bg-slate-900 rounded-full text-indigo-600">
+                      <Upload className="h-6 w-6" />
+                    </div>
+
+                    {uploadStatus === 'idle' && (
+                      <>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">Upload Recipient CSV</p>
+                        <p className="text-xs text-slate-500 mt-1">Select the file for this campaign</p>
+                      </>
+                    )}
+
+                    {uploadStatus === 'loading' && (
+                      <div className="flex items-center gap-3">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600" />
+                        <p className="text-sm font-semibold">Processing...</p>
+                      </div>
+                    )}
+
+                    {uploadStatus === 'success' && (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="flex items-center gap-2 text-emerald-600">
+                          <CheckCircle2 className="h-5 w-5" />
+                          <p className="text-sm font-semibold">{csvResult?.totalRows} Recipients Loaded</p>
+                        </div>
+                        <button type="button" className="text-xs text-indigo-600 hover:underline" onClick={(e) => { e.stopPropagation(); handleRetry(); }}>Change file</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {(insights.length > 0 || (recipientSource === 'org' && !campaignId)) && (
+              <div className="space-y-6 pt-4 border-t border-slate-100 dark:border-slate-800 mt-6">
+                <div className="flex flex-col gap-1">
+                  <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {segmentationMode === 'segmented' ? 'Multi-Segment Rules' : 'Targeting Filters (Optional)'}
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    {segmentationMode === 'segmented' 
+                      ? 'Define rules for each of your 3 segments.' 
+                      : 'Apply filters to target specific recipients from your list.'}
+                  </p>
+                </div>
+                <SegmentationEngine 
+                  campaignId={campaignId} 
+                  insights={insights}
+                  onSegmentsChange={(segs) => setSegments(segs)}
+                  moduleType={recipientSource === 'org' ? 1 : 2}
+                  moduleId={recipientSource === 'org' ? (user?.organization_id || 1) : campaignId}
+                  maxSegments={3}
+                  isSingleMode={segmentationMode === 'single'}
+                />
+              </div>
+            )}
+
+            {/* ── CSV Preview Panel (only if we have a result) ── */}
+            {(csvResult || uploadStatus === 'loading' || uploadStatus === 'error') && recipientSource === 'campaign' && (
+              <CsvPreviewPanel
+                status={uploadStatus}
+                fileName={selectedFile?.name}
+                result={csvResult}
+                error={uploadMessage}
+                onRetry={handleRetry}
+              />
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>Content</CardTitle>
-            <CardDescription>Draft the email body and Call-To-Action.</CardDescription>
+            <CardDescription>
+              {segmentationMode === 'segmented' 
+                ? 'Personalize your message for each segment.' 
+                : 'Draft the email body and Call-To-Action.'}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {isABTest && abTestType === 'content' ? (
-               <div className="grid gap-6 md:grid-cols-2 p-4 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
-                 <div className="space-y-2">
-                  <Label htmlFor="bodyA" className="flex items-center gap-2">
-                    <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md text-xs font-bold dark:bg-indigo-900/50 dark:text-indigo-400">Variant A</span> Body
-                  </Label>
-                  <textarea 
-                    id="bodyA" 
-                    name="body_a"
-                    className="flex min-h-[200px] w-full rounded-md border border-indigo-200 bg-white dark:bg-slate-950 px-3 py-2 text-sm shadow-sm placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 dark:border-indigo-900/50"
-                    placeholder="Short and punchy variant..."
-                    required
-                  ></textarea>
+            <div className="space-y-8">
+              {segments.map((segment) => (
+                <div key={segment.id} className={cn(
+                  "p-5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-5",
+                  segment.isDefault ? "bg-white dark:bg-slate-950" : "bg-slate-50/30 dark:bg-slate-900/20"
+                )}>
+                  {segmentationMode === 'segmented' && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider", segment.isDefault ? "bg-slate-200 text-slate-700" : "bg-indigo-600 text-white")}>
+                          {segment.isDefault ? 'Default' : `Segment ${segment.priority}`}
+                        </div>
+                        <span className="text-sm font-bold text-slate-900 dark:text-slate-50">{segment.name}</span>
+                      </div>
+                      {segment.isDefault && <p className="text-[10px] text-slate-400 italic">Fallback for everyone else</p>}
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Subject Line</Label>
+                      <Input 
+                        placeholder="What will they see in their inbox?"
+                        value={variants[segment.id]?.subject || ''}
+                        onChange={(e) => setVariants({
+                          ...variants,
+                          [segment.id]: { ...variants[segment.id], subject: e.target.value }
+                        })}
+                        required
+                        className="bg-white dark:bg-slate-950"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Email Content</Label>
+                      <textarea 
+                        className="flex min-h-[200px] w-full rounded-md border border-slate-200 bg-white dark:bg-slate-950 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 dark:border-slate-800"
+                        placeholder="Your message goes here..."
+                        value={variants[segment.id]?.body || ''}
+                        onChange={(e) => setVariants({
+                          ...variants,
+                          [segment.id]: { ...variants[segment.id], body: e.target.value }
+                        })}
+                        required
+                      ></textarea>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">CTA Link</Label>
+                      <Input 
+                        placeholder="https://example.com/target"
+                        value={variants[segment.id]?.cta_link || ''}
+                        onChange={(e) => setVariants({
+                          ...variants,
+                          [segment.id]: { ...variants[segment.id], cta_link: e.target.value }
+                        })}
+                        required
+                        className="bg-white dark:bg-slate-950"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="bodyB" className="flex items-center gap-2">
-                    <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md text-xs font-bold dark:bg-purple-900/50 dark:text-purple-400">Variant B</span> Body
-                  </Label>
-                  <textarea 
-                    id="bodyB" 
-                    name="body_b"
-                    className="flex min-h-[200px] w-full rounded-md border border-purple-200 bg-white dark:bg-slate-950 px-3 py-2 text-sm shadow-sm placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-purple-500 dark:border-purple-900/50"
-                    placeholder="Long-form storytelling variant..."
-                    required
-                  ></textarea>
-                </div>
-               </div>
-            ) : (
-              <div className="space-y-2">
-                <Label htmlFor="body">Email Body (Simple HTML/Text)</Label>
-                <textarea 
-                  id="body" 
-                  name="body"
-                  className="flex min-h-[200px] w-full rounded-md border border-slate-200 bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:placeholder:text-slate-400 dark:focus-visible:ring-slate-300"
-                  placeholder="Hi {{first_name}},&#10;&#10;Welcome to..."
-                  defaultValue={selectedTemplate ? `<!-- Using Template: ${selectedTemplate.name} -->\n\n` : ''}
-                  required
-                ></textarea>
-              </div>
-            )}
-            
-            <div className="space-y-2">
-              <Label htmlFor="ctaLink">Primary CTA Link (for Click Tracking)</Label>
-              <Input id="ctaLink" name="cta_link" type="url" placeholder="https://example.com/promo" required />
+              ))}
             </div>
           </CardContent>
         </Card>

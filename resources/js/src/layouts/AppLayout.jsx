@@ -2,11 +2,12 @@ import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
-import { LayoutDashboard, Mail, LayoutList, Settings, LogOut, Search, Bell, Users } from 'lucide-react';
+import { LayoutDashboard, Mail, LayoutList, Settings, LogOut, Search, Bell, Users, Database } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Campaigns', href: '/campaigns', icon: Mail },
+  { name: 'Bulk Import', href: '/bulk-import', icon: Database },
   { name: 'Templates', href: '/templates', icon: LayoutList },
   { name: 'Audience', href: '/audience', icon: Users },
   { name: 'Settings', href: '/settings', icon: Settings },

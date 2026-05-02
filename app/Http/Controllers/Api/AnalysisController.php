@@ -301,9 +301,7 @@ class AnalysisController extends Controller
 
         // Top Campaigns
         $topCampaigns = Campaign::forUser($user)
-            ->withCount(['sendLogs as clicks' => function($q) {
-                $q->select(DB::raw('sum(clicks_count)'));
-            }])
+            ->withSum('sendLogs as clicks', 'clicks_count')
             ->orderBy('clicks', 'desc')
             ->take(5)
             ->get()
