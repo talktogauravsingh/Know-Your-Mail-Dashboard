@@ -13,6 +13,7 @@ class CampaignVariant extends Model
         'body',
         'is_default',
         'priority',
+        'cta_url',
     ];
 
     protected $casts = [

@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'nvidia' => [
+        'api_key' => env('NVIDIA_API_KEY'),
+    ],
+
 ];

@@ -22,7 +22,9 @@ class ProcessCsvImportJob implements ShouldQueue
         public string $filePath,
         public int $agentId,
         public int $organizationId,
-        public ?int $campaignId = null
+        public ?int $campaignId = null,
+        public int $moduleType = 1,
+        public ?int $moduleId = null
     ) {}
 
     public function handle(RecipientValidationService $validator): void
@@ -93,6 +95,8 @@ class ProcessCsvImportJob implements ShouldQueue
                 'name' => $rowAssoc['name'] ?? null,
                 'is_valid' => true,
                 'attributes' => json_encode($attributes),
+                'module_type' => $this->moduleType,
+                'module_id' => $this->moduleId,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
@@ -132,11 +136,12 @@ class ProcessCsvImportJob implements ShouldQueue
         foreach ($insights as $col => $data) {
             DB::table('campaign_csv_insights')->updateOrInsert(
                 [
-                    'campaign_id' => $this->campaignId,
-                    'organization_id' => $this->organizationId,
+                    'module_type' => $this->moduleType,
+                    'module_id' => $this->moduleId,
                     'field_name' => $col
                 ],
                 [
+                    'organization_id' => $this->organizationId,
                     'unique_count' => $data['unique_count'],
                     'distribution' => json_encode($data['distribution']),
                     'is_recommended' => $data['recommended'] ? 1 : 0,
@@ -154,7 +159,7 @@ class ProcessCsvImportJob implements ShouldQueue
     {
         DB::table('recipients')->upsert(
             $chunk,
-            ['organization_id', 'email'],
+            ['module_type', 'module_id', 'email'],
             ['name', 'attributes', 'updated_at']
         );
     }

@@ -14,10 +14,12 @@ class BulkImportService
         $csvPath,
         int $agentId,
         ?int $organizationId,
-        ?int $campaignId = null
+        ?int $campaignId = null,
+        int $moduleType = 1,
+        ?int $moduleId = null
     ): array {
         // Dispatch the background job
-        ProcessCsvImportJob::dispatch($csvPath, $agentId, $organizationId, $campaignId);
+        ProcessCsvImportJob::dispatch($csvPath, $agentId, $organizationId, $campaignId, $moduleType, $moduleId);
 
         Log::info('Bulk import job dispatched', [
             'agent_id' => $agentId,

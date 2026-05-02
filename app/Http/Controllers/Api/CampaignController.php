@@ -18,11 +18,9 @@ class CampaignController extends Controller
                 'sendLogs as sent_count',
                 'sendLogs as opened_count' => function ($query) {
                     $query->whereNotNull('opened_at');
-                },
-                'sendLogs as clicks_count' => function ($query) {
-                    $query->select(\DB::raw('sum(clicks_count)'));
                 }
             ])
+            ->withSum('sendLogs as total_clicks', 'clicks_count')
             ->latest()
             ->paginate(10);
 
@@ -36,24 +34,126 @@ class CampaignController extends Controller
             'subject' => 'required|string|max:255',
             'body' => 'required|string',
             'cta_link' => 'nullable|url',
-            'sender_config_id' => 'required|exists:smtp_configurations,id', // assume exists
-            'audience_segment' => 'nullable|string',
+            'sender_config_id' => 'nullable',
+            'segments' => 'nullable|array',
+            'variants' => 'nullable|array',
         ]);
 
         $campaign = Campaign::create([
             'organization_id' => Auth::user()->organization_id ?? 1,
             'name' => $validated['name'],
             'subject' => $validated['subject'],
-            'body_html' => $validated['body'],
-            'cta_url' => $validated['cta_link'],
-            'sender_config_id' => $validated['sender_config_id'],
+            'body' => $validated['body'],
+            'cta_url' => $validated['cta_link'] ?? null,
+            'sender_config_id' => $validated['sender_config_id'] ?? null,
+            'segmentation_mode' => $request->input('segmentation_mode', 'single'),
             'status' => 'draft',
             'user_id' => Auth::id(),
         ]);
 
+        if (!empty($validated['segments'])) {
+            $this->syncSegments($campaign, $validated['segments'], $validated['variants'] ?? []);
+        }
+
         return response()->json($campaign->load('sendLogs'), 201);
     }
 
-    // Add show, update, etc. later
+    public function show($id)
+    {
+        $campaign = Campaign::where('organization_id', Auth::user()->organization_id ?? 1)
+            ->findOrFail($id);
+        
+        return response()->json($campaign);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $campaign = Campaign::where('organization_id', Auth::user()->organization_id ?? 1)
+            ->findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'subject' => 'sometimes|required|string|max:255',
+            'body' => 'sometimes|required|string',
+            'cta_link' => 'nullable|url',
+            'sender_config_id' => 'nullable',
+            'audience_segment' => 'nullable|string',
+            'variants' => 'nullable|array',
+        ]);
+
+        $campaign->update([
+            'name' => $validated['name'] ?? $campaign->name,
+            'subject' => $validated['subject'] ?? $campaign->subject,
+            'body' => $validated['body'] ?? $campaign->body,
+            'cta_url' => $validated['cta_link'] ?? $campaign->cta_url,
+            'sender_config_id' => $validated['sender_config_id'] ?? $campaign->sender_config_id,
+            'segmentation_mode' => $request->input('segmentation_mode', $campaign->segmentation_mode),
+        ]);
+
+        if (isset($validated['segments'])) {
+            $this->syncSegments($campaign, $validated['segments'], $validated['variants'] ?? []);
+        }
+
+        return response()->json($campaign);
+    }
+
+    public function insights($id)
+    {
+        $campaign = Campaign::where('organization_id', Auth::user()->organization_id ?? 1)
+            ->findOrFail($id);
+            
+        return response()->json([
+            'insights' => $campaign->insights ?? []
+        ]);
+    }
+
+    protected function syncSegments($campaign, $segments, $variantData)
+    {
+        DB::transaction(function () use ($campaign, $segments, $variantData) {
+            // Remove existing variants that are NOT in the incoming segments list
+            $incomingIds = collect($segments)->pluck('id')->filter()->toArray();
+            $campaign->variants()->whereNotIn('id', $incomingIds)->delete();
+
+            foreach ($segments as $segment) {
+                $isDefault = $segment['isDefault'] ?? false;
+                
+                // 1. Create or Update Variant
+                // If it's a default segment, we often link it to the campaign's main content
+                // unless overrides are provided.
+                $custom = $variantData[$segment['id']] ?? [];
+                
+                $variant = $campaign->variants()->updateOrCreate(
+                    ['id' => is_numeric($segment['id']) ? $segment['id'] : null], // Use ID if it's numeric (saved before)
+                    [
+                        'name' => $segment['name'] ?? 'Untitled Segment',
+                        'subject' => $custom['subject'] ?? $campaign->subject,
+                        'body' => $custom['body'] ?? $campaign->body,
+                        'cta_url' => $custom['cta_link'] ?? $campaign->cta_url,
+                        'is_default' => $isDefault,
+                        'priority' => $segment['priority'] ?? 0,
+                    ]
+                );
+
+                // 2. Sync Filters (for non-default variants)
+                if (!$isDefault) {
+                    $variant->filterGroups()->delete(); // Simple clear and recreate
+                    
+                    if (!empty($segment['filters'])) {
+                        $group = $variant->filterGroups()->create(['group_index' => 0]);
+                        
+                        foreach ($segment['filters'] as $filter) {
+                            if (empty($filter['field'])) continue;
+                            
+                            $group->filters()->create([
+                                'field_name' => $filter['field'],
+                                'operator' => $filter['operator'] ?? '=',
+                                'field_value' => $filter['value'] ?? '',
+                            ]);
+                        }
+                    }
+                }
+            }
+        });
+    }
 }
 

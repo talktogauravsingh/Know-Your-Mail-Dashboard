@@ -18,7 +18,12 @@ class Campaign extends Model
         'status',
         'segmentation_mode', // 'single' or 'segmented'
         'sender_config_id',
-        'cta_url'
+        'cta_url',
+        'variants'
+    ];
+
+    protected $casts = [
+        'variants' => 'array'
     ];
 
     public function variants()

@@ -3,11 +3,8 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use App\Models\AiLog;
-use Prism\Prism\Facades\Prism;
-use Prism\Prism\ValueObjects\Messages\UserMessage;
-use Prism\Prism\ValueObjects\Messages\SystemMessage;
-use Prism\Prism\ValueObjects\Messages\AssistantMessage;
 
 class EmailAIService
 {
@@ -19,33 +16,83 @@ class EmailAIService
         $history = $this->getSessionHistory($sessionId);
 
         try {
-                $response = Prism::text()
-                    ->using('groq', 'llama-3.3-70b-versatile')
-                    ->withMessages([
-                        new SystemMessage($this->systemPrompt()),
-                        ...$this->mapHistoryToMessages($history),
-                        new UserMessage($userPrompt),
-                    ])
-                    ->asText();
+            $messages = $this->buildMessages($history, $userPrompt);
 
-                $text = $this->formatResponse($response->text);
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . config('services.nvidia.api_key'),
+                'Content-Type' => 'application/json',
+            ])->post('https://integrate.api.nvidia.com/v1/chat/completions', [
+                'model' => 'mistralai/mixtral-8x7b-instruct-v0.1',
+                'messages' => $messages,
+                'temperature' => 0.7,
+            ]);
 
-            } catch (\Exception $e) {
-                return [
-                    'subject' => '',
-                    'content' => 'AI service temporarily unavailable',
-                    'error' => true,
-                    'message' => $e->getMessage()
-                ];
+            if (!$response->successful()) {
+                throw new \Exception($response->body());
             }
 
+            $result = $response->json();
+
+            $assistantText = $result['choices'][0]['message']['content'] ?? '';
+
+            $text = $this->formatResponse($assistantText);
+
+        } catch (\Exception $e) {
+            return [
+                'subject' => '',
+                'content' => 'AI service temporarily unavailable',
+                'error' => true,
+                'message' => $e->getMessage()
+            ];
+        }
+
         $this->storeInSession($sessionId, 'user', $userPrompt);
-        $this->storeInSession($sessionId, 'assistant', $response->text);
+        $this->storeInSession($sessionId, 'assistant', $assistantText);
 
         $this->storeLog($sessionId, 'user', $userPrompt, $userId);
-        $this->storeLog($sessionId, 'assistant', $response->text, $userId);
+        $this->storeLog($sessionId, 'assistant', $assistantText, $userId);
 
         return $text;
+    }
+
+    private function buildMessages($history, $userPrompt)
+    {
+        $messages = [
+            [
+                'role' => 'system',
+                'content' => $this->systemPrompt()
+            ]
+        ];
+
+        $lastRole = null;
+
+        foreach ($history as $msg) {
+            if (!in_array($msg['role'], ['user', 'assistant'])) {
+                continue;
+            }
+
+            if ($msg['role'] === $lastRole) {
+                continue;
+            }
+
+            $messages[] = [
+                'role' => $msg['role'],
+                'content' => $msg['content']
+            ];
+
+            $lastRole = $msg['role'];
+        }
+
+        if ($lastRole === 'user') {
+            $messages[count($messages) - 1]['content'] .= "\n\n" . $userPrompt;
+        } else {
+            $messages[] = [
+                'role' => 'user',
+                'content' => $userPrompt
+            ];
+        }
+
+        return $messages;
     }
 
     private function systemPrompt()
@@ -82,12 +129,15 @@ class EmailAIService
     {
         $history = Cache::get("ai_session_$sessionId", []);
 
+        if (!empty($history) && end($history)['role'] === $role) {
+            return;
+        }
+
         $history[] = [
             'role' => $role,
             'content' => $content
         ];
 
-        // Keep last N messages
         $history = array_slice($history, -$this->maxHistory);
 
         Cache::put("ai_session_$sessionId", $history, $this->ttl);
@@ -105,7 +155,6 @@ class EmailAIService
 
     private function formatResponse($text)
     {
-
         $decoded = json_decode($text, true);
 
         if (json_last_error() === JSON_ERROR_NONE) {
@@ -130,11 +179,8 @@ class EmailAIService
 
     private function repairJson($text)
     {
-        // Extract JSON-like structure
         if (preg_match('/\{.*\}/s', $text, $matches)) {
-            $json = $matches[0];
-
-            $decoded = json_decode($json, true);
+            $decoded = json_decode($matches[0], true);
 
             if (json_last_error() === JSON_ERROR_NONE) {
                 return [
@@ -150,20 +196,5 @@ class EmailAIService
     public function clearSession($sessionId)
     {
         Cache::forget("ai_session_$sessionId");
-    }
-
-    private function mapHistoryToMessages($history)
-    {
-        $messages = [];
-
-        foreach ($history as $msg) {
-            if ($msg['role'] === 'user') {
-                $messages[] = new UserMessage($msg['content']);
-            } elseif ($msg['role'] === 'assistant') {
-                $messages[] = new AssistantMessage($msg['content']);
-            }
-        }
-
-        return $messages;
     }
 }

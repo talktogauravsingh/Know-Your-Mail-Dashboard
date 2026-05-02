@@ -141,6 +141,16 @@ toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : '
       set({ isLoading: false });
     }
   },
+  updateCampaign: async (id, campaignData) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.patch(`/campaigns/${id}`, campaignData);
+      get().fetchCampaigns(); // refresh list
+      return data;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
 
 // Analytics/Dashboard
   dashboardData: null,

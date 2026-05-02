@@ -17,6 +17,7 @@ import CreateCampaign from './pages/CreateCampaign';
 import CampaignAnalytics from './pages/CampaignAnalytics';
 import Templates from './pages/Templates';
 import Audience from './pages/Audience';
+import BulkImport from './pages/BulkImport';
 import Settings from './pages/Settings';
 
 // Protected Route Wrapper
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="/campaigns/:id" element={<CampaignAnalytics />} />
           <Route path="/templates" element={<Templates />} />
           <Route path="/audience" element={<Audience />} />
+          <Route path="/bulk-import" element={<BulkImport />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
       </Routes>

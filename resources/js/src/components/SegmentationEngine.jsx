@@ -5,8 +5,9 @@ import { Input, Label } from './ui/Input';
 import { Select } from './ui/Select';
 import { Plus, Trash2, Users, AlertCircle, CheckCircle2, ChevronRight, Filter } from 'lucide-react';
 import api from '../lib/api';
+import { cn } from '../lib/utils';
 
-export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange }) {
+export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange, moduleType, moduleId, maxSegments = 3, isSingleMode = false }) {
   const [segments, setSegments] = useState([
     { id: 'default', name: 'Default Segment', isDefault: true, priority: 100, filters: [] }
   ]);
@@ -14,6 +15,8 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
   const [loading, setLoading] = useState({});
 
   const addSegment = () => {
+    if (segments.length >= maxSegments) return;
+    
     const id = Math.random().toString(36).substr(2, 9);
     setSegments([...segments, { 
       id, 
@@ -69,6 +72,8 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
     setLoading(prev => ({ ...prev, [segment.id]: true }));
     try {
       const response = await api.post(`/campaigns/${campaignId}/segments/validate-count`, {
+        module_type: moduleType,
+        module_id: moduleId,
         groups: [{ filters: segment.filters.map(f => ({
           field_name: f.field,
           operator: f.operator,
@@ -83,26 +88,68 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
     }
   };
 
+  const [internalInsights, setInternalInsights] = useState([]);
+
   useEffect(() => {
     onSegmentsChange?.(segments);
   }, [segments]);
 
+  // Fallback: fetch insights if not provided via props
+  useEffect(() => {
+    if (insights.length === 0) {
+      const fetchInsights = async () => {
+        try {
+          let url = null;
+          if (campaignId) {
+            url = `/campaigns/${campaignId}/insights`;
+          } else if (moduleType === 1) {
+            url = `/insights/org`;
+          }
+
+          if (url) {
+            const res = await api.get(url);
+            if (res.data.insights) {
+              setInternalInsights(res.data.insights);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch fallback insights', err);
+        }
+      };
+      fetchInsights();
+    }
+  }, [campaignId, moduleType, insights.length]);
+
+  const activeInsights = insights.length > 0 ? insights : internalInsights;
+
   return (
     <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Multi-Variant Segmentation</h3>
-          <p className="text-sm text-slate-500">Define rules to send different content to different groups.</p>
+      {!isSingleMode && (
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Multi-Variant Segmentation</h3>
+            <p className="text-sm text-slate-500">Define rules to send different content to different groups.</p>
+          </div>
+          <Button 
+            onClick={addSegment} 
+            disabled={segments.length >= maxSegments}
+            variant="outline" 
+            className="gap-2 bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900 dark:text-indigo-400 disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" />
+            {segments.length >= maxSegments ? `Limit: ${maxSegments} Segments` : 'Add Segment'}
+          </Button>
         </div>
-        <Button onClick={addSegment} variant="outline" className="gap-2 bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900 dark:text-indigo-400">
-          <Plus className="h-4 w-4" /> Add Segment
-        </Button>
-      </div>
+      )}
 
       <div className="space-y-4">
-        {segments.sort((a, b) => a.priority - b.priority).map((segment, sIdx) => (
-          <Card key={segment.id} className={`border-l-4 ${segment.isDefault ? 'border-l-slate-400' : 'border-l-indigo-500'} overflow-hidden shadow-sm transition-all hover:shadow-md`}>
-            <CardHeader className="py-4 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
+        {[...segments].sort((a, b) => a.priority - b.priority).map((segment, sIdx) => (
+          <Card key={segment.id} className={cn(
+            "overflow-hidden shadow-sm transition-all hover:shadow-md",
+            isSingleMode ? "border-none shadow-none" : (segment.isDefault ? "border-l-4 border-l-slate-400" : "border-l-4 border-l-indigo-500")
+          )}>
+            {!isSingleMode && (
+              <CardHeader className="py-4 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`p-1.5 rounded-md ${segment.isDefault ? 'bg-slate-200 text-slate-600' : 'bg-indigo-100 text-indigo-700'} dark:bg-indigo-900/30 dark:text-indigo-400`}>
@@ -128,12 +175,13 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
                 )}
               </div>
             </CardHeader>
-            <CardContent className="py-5">
-              {segment.isDefault ? (
-                <p className="text-sm text-slate-500 italic">This segment will receive Variant A by default if they don't match any other rules.</p>
+            )}
+            <CardContent className={isSingleMode ? "p-0" : "py-5"}>
+              {segment.isDefault && !isSingleMode ? (
+                <p className="text-sm text-slate-500 italic">This segment will receive the default variant if they don't match any other rules.</p>
               ) : (
                 <div className="space-y-4">
-                  {insights.length === 0 ? (
+                  {activeInsights.length === 0 ? (
                     <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 flex items-center gap-3">
                       <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                       <p className="text-sm text-amber-700 dark:text-amber-400">
@@ -147,10 +195,11 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
                         <Select 
                           value={filter.field} 
                           onChange={(e) => updateFilter(segment.id, fIdx, { field: e.target.value })}
+                          onBlur={() => fetchLiveCount(segment)}
                           className="h-9 min-w-[140px]"
                         >
                           <option value="">Select Field</option>
-                          {insights.map(insight => (
+                          {activeInsights.map(insight => (
                             <option key={insight.field_name} value={insight.field_name}>
                               {insight.field_name.charAt(0).toUpperCase() + insight.field_name.slice(1)}
                             </option>
@@ -160,6 +209,7 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
                         <Select 
                           value={filter.operator} 
                           onChange={(e) => updateFilter(segment.id, fIdx, { operator: e.target.value })}
+                          onBlur={() => fetchLiveCount(segment)}
                           className="h-9 w-32"
                         >
                           <option value="=">equals</option>

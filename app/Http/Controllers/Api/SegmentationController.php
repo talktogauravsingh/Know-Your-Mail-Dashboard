@@ -18,30 +18,58 @@ class SegmentationController extends Controller
     {
         Log::info("Fetching insights for campaign {$campaign->id}");
 
-        $insights = DB::table('campaign_csv_insights')
-            ->where('campaign_id', $campaign->id)
+        // Get campaign-specific insights (module_type 2)
+        $campaignInsights = DB::table('campaign_csv_insights')
+            ->where('module_type', 2)
+            ->where('module_id', $campaign->id)
             ->get();
 
-        if ($insights->isEmpty()) {
-            Log::info("No campaign-specific insights found, checking organization-level insights for org {$campaign->organization_id}");
-            $insights = DB::table('campaign_csv_insights')
-                ->where('organization_id', $campaign->organization_id)
-                ->whereNull('campaign_id')
-                ->get();
-        }
+        // Get organization-level insights (module_type 1)
+        $orgInsights = DB::table('campaign_csv_insights')
+            ->where('module_type', 1)
+            ->where('module_id', $campaign->organization_id)
+            ->get();
+
+        // Merge them, campaign insights take priority
+        $merged = $campaignInsights->keyBy('field_name')
+            ->union($orgInsights->keyBy('field_name'))
+            ->values();
 
         return response()->json([
             'success' => true,
-            'insights' => $insights->map(function($item) {
-                return [
-                    'field_name' => $item->field_name,
-                    'unique_count' => $item->unique_count,
-                    'distribution' => json_decode($item->distribution),
-                    'is_recommended' => (bool)$item->is_recommended,
-                    'field_type' => $item->field_type,
-                ];
-            })
+            'insights' => $this->formatInsights($merged)
         ]);
+    }
+
+    /**
+     * Get insights for the entire organization.
+     */
+    public function getOrgInsights(Request $request)
+    {
+        $organizationId = $request->user() ? $request->user()->organization_id : 1;
+
+        $insights = DB::table('campaign_csv_insights')
+            ->where('module_type', 1)
+            ->where('module_id', $organizationId)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'insights' => $this->formatInsights($insights)
+        ]);
+    }
+
+    protected function formatInsights($insights)
+    {
+        return $insights->map(function($item) {
+            return [
+                'field_name' => $item->field_name,
+                'unique_count' => $item->unique_count,
+                'distribution' => json_decode($item->distribution),
+                'is_recommended' => (bool)$item->is_recommended,
+                'field_type' => $item->field_type,
+            ];
+        });
     }
 
     /**
@@ -55,9 +83,17 @@ class SegmentationController extends Controller
             'groups.*.filters.*.field_name' => 'required|string',
             'groups.*.filters.*.operator' => 'required|string',
             'groups.*.filters.*.field_value' => 'required',
+            'module_type' => 'nullable|integer|in:1,2',
+            'module_id' => 'nullable|integer',
         ]);
 
         $query = Recipient::where('organization_id', $campaign->organization_id);
+
+        // Filter by module if specified
+        if ($request->has('module_type') && $request->has('module_id')) {
+            $query->where('module_type', $request->module_type)
+                  ->where('module_id', $request->module_id);
+        }
 
         $query->where(function ($q) use ($request) {
             foreach ($request->groups as $group) {
@@ -83,6 +119,11 @@ class SegmentationController extends Controller
         $value = $filter['field_value'];
         $op = $filter['operator'];
 
+        // Normalize value to lowercase since import process lowercases everything
+        if (is_string($value)) {
+            $value = strtolower(trim($value));
+        }
+
         $column = "attributes->'$.{$field}'";
 
         switch ($op) {
@@ -93,11 +134,11 @@ class SegmentationController extends Controller
                 $query->whereRaw("JSON_UNQUOTE({$column}) != ?", [$value]);
                 break;
             case 'in':
-                $values = is_array($value) ? $value : array_map('trim', explode(',', $value));
+                $values = is_array($value) ? $value : array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
                 $query->whereRaw("JSON_UNQUOTE({$column}) IN (" . implode(',', array_fill(0, count($values), '?')) . ")", $values);
                 break;
             case 'not_in':
-                $values = is_array($value) ? $value : array_map('trim', explode(',', $value));
+                $values = is_array($value) ? $value : array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
                 $query->whereRaw("JSON_UNQUOTE({$column}) NOT IN (" . implode(',', array_fill(0, count($values), '?')) . ")", $values);
                 break;
             case 'contains':

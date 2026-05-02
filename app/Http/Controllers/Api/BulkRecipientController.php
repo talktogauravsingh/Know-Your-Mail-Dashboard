@@ -33,7 +33,9 @@ class BulkRecipientController extends Controller
 
         $request->validate([
             'file' => 'required|file|mimes:csv,txt|max:10240', // 10MB
-            'campaign_id' => 'nullable|integer|exists:campaigns,id'
+            'campaign_id' => 'nullable|integer|exists:campaigns,id',
+            'module_type' => 'nullable|integer|in:1,2',
+            'module_id' => 'nullable|integer'
         ]);
 
         if (!$request->file('file')) {
@@ -41,6 +43,17 @@ class BulkRecipientController extends Controller
         }
 
         $campaignId = $request->input('campaign_id');
+        $moduleType = $request->input('module_type');
+        $moduleId = $request->input('module_id');
+
+        // Logic for module referencing
+        if (!$moduleType) {
+            $moduleType = $campaignId ? 2 : 1; // Default to Campaign if id exists, else Org
+        }
+        
+        if (!$moduleId) {
+            $moduleId = $campaignId ?: ($user ? $user->organization_id : 1);
+        }
         
         // Mock fallback if unauthenticated for local testing
         $organizationId = $user ? $user->organization_id : 1;
@@ -93,7 +106,9 @@ class BulkRecipientController extends Controller
                 $csvPath,
                 $agentId,
                 $organizationId,
-                $campaignId
+                $campaignId,
+                $moduleType,
+                $moduleId
             );
 
             return response()->json([
