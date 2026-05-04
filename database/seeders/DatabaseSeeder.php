@@ -81,6 +81,13 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $this->call(DummyDataSeeder::class);
+        $this->call([
+            OrganizationSeeder::class,
+            UserSeeder::class,
+            CampaignSeeder::class,
+            RecipientSeeder::class,
+            TrackingSeeder::class,
+            DummyDataSeeder::class,
+        ]);
     }
 }
