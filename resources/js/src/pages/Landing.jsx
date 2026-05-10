@@ -64,7 +64,7 @@ export default function Landing() {
   ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-950 font-sans selection:bg-indigo-500/30 selection:text-indigo-900 dark:selection:text-indigo-50">
+    <div className="min-h-screen bg-white dark:bg-slate-950 font-sans selection:bg-emerald-500/30 selection:text-emerald-900 dark:selection:text-emerald-50">
       
       {/* Navigation */}
       <nav className={`fixed top-0 z-50 w-full transition-all duration-300 ${
@@ -75,15 +75,15 @@ export default function Landing() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 font-bold text-xl text-slate-900 dark:text-white tracking-tight">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 shadow-sm shadow-indigo-500/20">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 shadow-sm shadow-emerald-500/20">
                 <Mail className="h-4 w-4 text-white" />
               </div>
               EmailTracker
             </div>
             <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-white transition-colors">Features</a>
-              <a href="#integrations" className="text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-white transition-colors">Integrations</a>
-              <a href="#faq" className="text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-white transition-colors">FAQ</a>
+              <a href="#features" className="text-sm font-medium text-slate-600 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-white transition-colors">Features</a>
+              <a href="#integrations" className="text-sm font-medium text-slate-600 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-white transition-colors">Integrations</a>
+              <a href="#faq" className="text-sm font-medium text-slate-600 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-white transition-colors">FAQ</a>
             </div>
             <div className="flex items-center gap-4">
               <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors">
@@ -107,13 +107,13 @@ export default function Landing() {
           </div>
           
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-sm font-medium mb-8 border border-indigo-100 dark:border-indigo-500/20">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-medium mb-8 border border-emerald-100 dark:border-emerald-500/20">
               <Zap className="h-3.5 w-3.5" /> High-Performance Email Marketing
             </div>
             
             <h1 className="mx-auto max-w-4xl font-extrabold tracking-tight text-slate-900 dark:text-white text-5xl sm:text-6xl lg:text-7xl">
               Send better emails.<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-500 dark:from-indigo-400 dark:to-violet-400">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500 dark:from-emerald-400 dark:to-teal-400">
                 Scale your impact.
               </span>
             </h1>
@@ -123,7 +123,7 @@ export default function Landing() {
             </p>
             
             <div className="mt-10 max-w-md mx-auto">
-              <div className="flex flex-col sm:flex-row gap-3 p-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl shadow-indigo-500/10">
+              <div className="flex flex-col sm:flex-row gap-3 p-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl shadow-emerald-500/10">
                 <Input 
                   type="email" 
                   placeholder="name@company.com" 
@@ -132,7 +132,7 @@ export default function Landing() {
                   className="flex-1 h-12 rounded-xl border-none bg-transparent focus-visible:ring-0 text-base"
                 />
                 <Link to={`/signup?email=${heroEmail}`} className="w-full sm:w-auto">
-                  <Button className="h-12 w-full px-8 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-base font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]">
+                  <Button className="h-12 w-full px-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-base font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]">
                     Start Free
                   </Button>
                 </Link>
@@ -179,7 +179,7 @@ export default function Landing() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="lg:grid lg:grid-cols-2 lg:items-center lg:gap-24">
               <div className="animate-in fade-in slide-in-from-left-8 duration-700">
-                <div className="h-12 w-12 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-6">
+                <div className="h-12 w-12 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-6">
                   <LayoutTemplate className="h-6 w-6" />
                 </div>
                 <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl mb-6">
@@ -191,16 +191,16 @@ export default function Landing() {
                 <ul className="space-y-4">
                   {['Drag-and-drop easy interface', 'Mobile-responsive by design', 'Custom component sections'].map((f) => (
                     <li key={f} className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
-                      <CheckCircle2 className="h-5 w-5 text-indigo-500" />
+                      <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                       <span className="font-medium">{f}</span>
                     </li>
                   ))}
                 </ul>
               </div>
               <div className="mt-16 lg:mt-0 relative group">
-                 <div className="absolute -inset-4 bg-indigo-500/10 rounded-[2.5rem] blur-2xl group-hover:bg-indigo-500/20 transition-all duration-500"></div>
-                 <div className="relative aspect-[4/3] rounded-3xl bg-gradient-to-br from-indigo-50 to-slate-100 dark:from-indigo-900/20 dark:to-slate-900 overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-center">
-                    <MousePointer2 className="h-32 w-32 text-indigo-600/20 dark:text-indigo-400/20" />
+                 <div className="absolute -inset-4 bg-emerald-500/10 rounded-[2.5rem] blur-2xl group-hover:bg-emerald-500/20 transition-all duration-500"></div>
+                 <div className="relative aspect-[4/3] rounded-3xl bg-gradient-to-br from-emerald-50 to-slate-100 dark:from-emerald-900/20 dark:to-slate-900 overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-center">
+                    <MousePointer2 className="h-32 w-32 text-emerald-600/20 dark:text-emerald-400/20" />
                  </div>
               </div>
             </div>
@@ -210,7 +210,7 @@ export default function Landing() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="lg:grid lg:grid-cols-2 lg:items-center lg:gap-24">
               <div className="lg:order-2">
-                <div className="h-12 w-12 rounded-xl bg-violet-100 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400 flex items-center justify-center mb-6">
+                <div className="h-12 w-12 rounded-xl bg-teal-100 dark:bg-teal-500/20 text-teal-600 dark:text-teal-400 flex items-center justify-center mb-6">
                   <SplitSquareVertical className="h-6 w-6" />
                 </div>
                 <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl mb-6">
@@ -221,19 +221,19 @@ export default function Landing() {
                 </p>
                 <div className="grid grid-cols-2 gap-6">
                   <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
-                     <span className="block text-2xl font-bold text-violet-600">+24%</span>
+                     <span className="block text-2xl font-bold text-teal-600">+24%</span>
                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-tighter">Avg Open Increase</span>
                   </div>
                   <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
-                     <span className="block text-2xl font-bold text-violet-600">8.4k</span>
+                     <span className="block text-2xl font-bold text-teal-600">8.4k</span>
                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-tighter">Tests Run Monthly</span>
                   </div>
                 </div>
               </div>
               <div className="mt-16 lg:mt-0 lg:order-1 relative group">
-                 <div className="absolute -inset-4 bg-violet-500/10 rounded-[2.5rem] blur-2xl group-hover:bg-violet-500/20 transition-all duration-500"></div>
-                 <div className="relative aspect-[4/3] rounded-3xl bg-gradient-to-br from-violet-50 to-slate-100 dark:from-indigo-900/20 dark:to-slate-900 overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-center">
-                    <Zap className="h-32 w-32 text-violet-600/20 dark:text-violet-400/20 animate-pulse" />
+                 <div className="absolute -inset-4 bg-teal-500/10 rounded-[2.5rem] blur-2xl group-hover:bg-teal-500/20 transition-all duration-500"></div>
+                 <div className="relative aspect-[4/3] rounded-3xl bg-gradient-to-br from-teal-50 to-slate-100 dark:from-emerald-900/20 dark:to-slate-900 overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-center">
+                    <Zap className="h-32 w-32 text-teal-600/20 dark:text-teal-400/20 animate-pulse" />
                  </div>
               </div>
             </div>
@@ -249,7 +249,7 @@ export default function Landing() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
               {integrations.map((item) => (
-                <div key={item.name} className="flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-indigo-500 transition-colors shadow-sm">
+                <div key={item.name} className="flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500 transition-colors shadow-sm">
                   <item.icon className={`h-10 w-10 mb-4 ${item.color}`} />
                   <span className="text-sm font-semibold text-slate-900 dark:text-white">{item.name}</span>
                 </div>
@@ -270,7 +270,7 @@ export default function Landing() {
                    <thead>
                       <tr className="bg-slate-50 dark:bg-slate-900/50">
                          <th className="px-6 py-5 font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800">Feature</th>
-                         <th className="px-6 py-5 font-bold text-indigo-600 dark:text-indigo-400 border-b border-slate-200 dark:border-slate-800">EmailTracker</th>
+                         <th className="px-6 py-5 font-bold text-emerald-600 dark:text-emerald-400 border-b border-slate-200 dark:border-slate-800">EmailTracker</th>
                          <th className="px-6 py-5 font-bold text-slate-400 border-b border-slate-200 dark:border-slate-800">Legacy Tools</th>
                       </tr>
                    </thead>
@@ -279,7 +279,7 @@ export default function Landing() {
                          <tr key={row.feature} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors">
                             <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{row.feature}</td>
                             <td className="px-6 py-4">
-                               <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-semibold">
+                               <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold">
                                   <CheckCircle2 className="h-4 w-4" /> {row.us}
                                </div>
                             </td>
@@ -293,7 +293,7 @@ export default function Landing() {
         </section>
 
         {/* Testimonials Section */}
-        <section className="py-24 bg-indigo-600 dark:bg-indigo-900/40 relative overflow-hidden">
+        <section className="py-24 bg-emerald-600 dark:bg-emerald-900/40 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle_at_30%_20%,_white_0%,_transparent_60%)]"></div>
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
             <div className="text-center mb-16">
@@ -314,7 +314,7 @@ export default function Landing() {
                     <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center font-bold text-white border border-white/30">{t.name[0]}</div>
                     <div>
                       <p className="font-bold text-white text-sm">{t.name}</p>
-                      <p className="text-indigo-200 text-xs">{t.role}</p>
+                      <p className="text-emerald-200 text-xs">{t.role}</p>
                     </div>
                   </div>
                 </div>
@@ -355,18 +355,18 @@ export default function Landing() {
         {/* Final CTA Push */}
         <section className="py-24 bg-white dark:bg-slate-950">
            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              <div className="relative rounded-[3rem] bg-slate-900 px-6 py-20 text-center shadow-2xl sm:px-12 sm:py-32 overflow-hidden dark:bg-indigo-600">
-                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20"></div>
+              <div className="relative rounded-[3rem] bg-slate-900 px-6 py-20 text-center shadow-2xl sm:px-12 sm:py-32 overflow-hidden dark:bg-emerald-600">
+                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-emerald-500/20"></div>
                  <div className="relative max-w-2xl mx-auto">
                     <h2 className="text-3xl font-bold tracking-tight text-white sm:text-5xl mb-6">
                       Ready to hit the inbox?
                     </h2>
-                    <p className="text-lg text-slate-300 dark:text-indigo-100 mb-10 leading-relaxed font-medium">
+                    <p className="text-lg text-slate-300 dark:text-emerald-100 mb-10 leading-relaxed font-medium">
                       Join thousands of elite marketers using our unified platform to drive exceptional results. Start your 14-day free trial today.
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                       <Link to="/signup" className="w-full sm:w-auto">
-                         <Button className="h-14 px-10 w-full rounded-2xl bg-white hover:bg-slate-100 text-slate-900 border-none shadow-xl font-bold text-lg dark:text-indigo-600">
+                         <Button className="h-14 px-10 w-full rounded-2xl bg-white hover:bg-slate-100 text-slate-900 border-none shadow-xl font-bold text-lg dark:text-emerald-600">
                            Get Started Free
                          </Button>
                       </Link>
@@ -387,7 +387,7 @@ export default function Landing() {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-12 gap-12 mb-16">
             <div className="lg:col-span-4">
               <div className="flex items-center gap-2 font-bold text-xl text-slate-900 dark:text-white mb-6">
-                <Mail className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+                <Mail className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
                 EmailTracker
               </div>
               <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed max-w-xs">
@@ -397,37 +397,37 @@ export default function Landing() {
             <div className="lg:col-span-2">
               <h4 className="font-bold text-slate-900 dark:text-white mb-6 text-sm">Product</h4>
               <ul className="space-y-4">
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Features</a></li>
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Integrations</a></li>
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">API</a></li>
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Pricing</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">Features</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">Integrations</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">API</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">Pricing</a></li>
               </ul>
             </div>
             <div className="lg:col-span-2">
               <h4 className="font-bold text-slate-900 dark:text-white mb-6 text-sm">Solutions</h4>
               <ul className="space-y-4">
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">SaaS</a></li>
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Agencies</a></li>
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">E-commerce</a></li>
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Indie Hackers</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">SaaS</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">Agencies</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">E-commerce</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">Indie Hackers</a></li>
               </ul>
             </div>
             <div className="lg:col-span-2">
               <h4 className="font-bold text-slate-900 dark:text-white mb-6 text-sm">Company</h4>
               <ul className="space-y-4">
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">About Us</a></li>
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Careers</a></li>
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Privacy</a></li>
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Terms</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">About Us</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">Careers</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">Privacy</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">Terms</a></li>
               </ul>
             </div>
             <div className="lg:col-span-2">
               <h4 className="font-bold text-slate-900 dark:text-white mb-6 text-sm">Resources</h4>
               <ul className="space-y-4">
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Blog</a></li>
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Documentation</a></li>
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Community</a></li>
-                <li><a href="#" className="text-sm text-slate-500 hover:text-indigo-600 transition-colors">Help Center</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">Blog</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">Documentation</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">Community</a></li>
+                <li><a href="#" className="text-sm text-slate-500 hover:text-emerald-600 transition-colors">Help Center</a></li>
               </ul>
             </div>
           </div>
@@ -436,9 +436,9 @@ export default function Landing() {
               &copy; {new Date().getFullYear()} EmailTracker Inc. Built with ❤️ for high-performance teams.
             </p>
             <div className="flex gap-6">
-              <a href="#" className="text-slate-400 hover:text-indigo-600 transition-colors"><Globe className="h-5 w-5" /></a>
-              <a href="#" className="text-slate-400 hover:text-indigo-600 transition-colors"><MessageSquare className="h-5 w-5" /></a>
-              <a href="#" className="text-slate-400 hover:text-indigo-600 transition-colors"><BarChart3 className="h-5 w-5" /></a>
+              <a href="#" className="text-slate-400 hover:text-emerald-600 transition-colors"><Globe className="h-5 w-5" /></a>
+              <a href="#" className="text-slate-400 hover:text-emerald-600 transition-colors"><MessageSquare className="h-5 w-5" /></a>
+              <a href="#" className="text-slate-400 hover:text-emerald-600 transition-colors"><BarChart3 className="h-5 w-5" /></a>
             </div>
           </div>
         </div>

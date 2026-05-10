@@ -39,10 +39,10 @@ export const mockCampaigns = [
 ];
 
 export const mockTemplates = [
-  { id: 't1', name: 'SaaS Welcome Series', category: 'Onboarding', avgOpenRate: '54%', description: 'Best for 1st-day signups. High conversion layout focused on product value.', color: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400' },
+  { id: 't1', name: 'SaaS Welcome Series', category: 'Onboarding', avgOpenRate: '54%', description: 'Best for 1st-day signups. High conversion layout focused on product value.', color: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' },
   { id: 't2', name: 'Monthly Newsletter', category: 'Newsletter', avgOpenRate: '32%', description: 'Clean text-heavy layout for company updates and blog summaries.', color: 'bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400' },
   { id: 't3', name: 'Flash Sale Promo', category: 'Promotion', avgOpenRate: '48%', description: 'Urgency-driven design with big CTA buttons and countdown placeholder.', color: 'bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400' },
-  { id: 't4', name: 'Feature Announcement', category: 'Product', avgOpenRate: '41%', description: 'Highlight new features with screenshot placeholders and bullet points.', color: 'bg-purple-50 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400' },
+  { id: 't4', name: 'Feature Announcement', category: 'Product', avgOpenRate: '41%', description: 'Highlight new features with screenshot placeholders and bullet points.', color: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' },
   { id: 't5', name: 'Churn Win-back', category: 'Retention', avgOpenRate: '22%', description: 'Personalized plain-text feel to re-engage users who are slipping away.', color: 'bg-rose-50 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400' },
   { id: 't6', name: 'Webinar Invite', category: 'Event', avgOpenRate: '38%', description: 'Structured layout with calendar links, speaker bios, and RSVP buttons.', color: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' },
 ];

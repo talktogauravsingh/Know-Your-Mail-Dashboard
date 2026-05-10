@@ -81,11 +81,11 @@ value={password}
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
-          <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" isLoading={isLoading}>
+          <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" isLoading={isLoading}>
             Create Account
           </Button>
           <div className="text-center text-sm text-slate-500">
-            Already have an account? <Link to="/login" className="font-semibold text-indigo-600 hover:text-indigo-500">Sign in</Link>
+            Already have an account? <Link to="/login" className="font-semibold text-emerald-600 hover:text-emerald-500">Sign in</Link>
           </div>
         </CardFooter>
       </form>

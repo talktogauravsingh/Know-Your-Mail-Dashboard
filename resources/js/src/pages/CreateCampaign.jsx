@@ -189,7 +189,7 @@ export default function CreateCampaign() {
           </div>
         </div>
         <div className="flex items-center gap-3 bg-white dark:bg-slate-950 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
-          <FlaskConical className={`h-5 w-5 ${isABTest ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
+          <FlaskConical className={`h-5 w-5 ${isABTest ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
           <div className="flex flex-col">
             <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">A/B Testing</span>
             <span className="text-xs text-slate-500">Optimize performance</span>
@@ -197,7 +197,7 @@ export default function CreateCampaign() {
           <button 
             type="button"
             onClick={() => setIsABTest(!isABTest)}
-            className={`ml-4 relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${isABTest ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'}`}
+            className={`ml-4 relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 ${isABTest ? 'bg-emerald-600' : 'bg-slate-200 dark:bg-slate-700'}`}
           >
             <span className="sr-only">Toggle A/B Testing</span>
             <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isABTest ? 'translate-x-4' : 'translate-x-0'}`} />
@@ -207,10 +207,10 @@ export default function CreateCampaign() {
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {isABTest && (
-          <Card className="border-indigo-200 bg-indigo-50/50 dark:border-indigo-900/30 dark:bg-indigo-900/10">
+          <Card className="border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/30 dark:bg-emerald-900/10">
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-indigo-900 dark:text-indigo-100">
-                <SplitSquareVertical className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              <CardTitle className="flex items-center gap-2 text-emerald-900 dark:text-emerald-100">
+                <SplitSquareVertical className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 A/B Test Configuration
               </CardTitle>
             </CardHeader>
@@ -227,10 +227,10 @@ export default function CreateCampaign() {
                 <div className="space-y-2">
                   <Label>Test Audience Size</Label>
                   <div className="flex items-center gap-4">
-                    <input type="range" min="10" max="50" defaultValue="20" className="w-full accent-indigo-600" />
-                    <span className="font-semibold text-indigo-600 dark:text-indigo-400 min-w-[3rem]">20%</span>
+                    <input type="range" min="10" max="50" defaultValue="20" className="w-full accent-emerald-600" />
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 min-w-[3rem]">20%</span>
                   </div>
-                  <p className="text-xs text-indigo-600/70 dark:text-indigo-400/70 mt-1">20% get test variants, winner gets 80%</p>
+                  <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-1">20% get test variants, winner gets 80%</p>
                 </div>
               </div>
             </CardContent>
@@ -245,12 +245,12 @@ export default function CreateCampaign() {
             className={cn(
               "p-4 rounded-xl border-2 text-left transition-all",
               segmentationMode === 'single'
-                ? "border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20"
+                ? "border-emerald-600 bg-emerald-50/50 dark:bg-emerald-900/20"
                 : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:border-slate-300"
             )}
           >
             <div className="flex items-center gap-3 mb-2">
-              <div className={cn("p-2 rounded-lg", segmentationMode === 'single' ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500")}>
+              <div className={cn("p-2 rounded-lg", segmentationMode === 'single' ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500")}>
                 <Send className="h-5 w-5" />
               </div>
               <span className="font-bold text-slate-900 dark:text-slate-50">Single Message</span>
@@ -264,18 +264,18 @@ export default function CreateCampaign() {
             className={cn(
               "p-4 rounded-xl border-2 text-left transition-all",
               segmentationMode === 'segmented'
-                ? "border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20"
+                ? "border-emerald-600 bg-emerald-50/50 dark:bg-emerald-900/20"
                 : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:border-slate-300"
             )}
           >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
-                <div className={cn("p-2 rounded-lg", segmentationMode === 'segmented' ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500")}>
+                <div className={cn("p-2 rounded-lg", segmentationMode === 'segmented' ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500")}>
                   <Layers className="h-5 w-5" />
                 </div>
                 <span className="font-bold text-slate-900 dark:text-slate-50">Multi-Segment</span>
               </div>
-              <div className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-wider">Up to 3</div>
+              <div className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-wider">Up to 3</div>
             </div>
             <p className="text-xs text-slate-500">Personalize content for different user groups.</p>
           </button>
@@ -325,12 +325,12 @@ export default function CreateCampaign() {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Recipient Source Selector */}
-            <div className="grid gap-6 md:grid-cols-2 p-4 bg-indigo-50/30 dark:bg-indigo-900/10 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
+            <div className="grid gap-6 md:grid-cols-2 p-4 bg-emerald-50/30 dark:bg-emerald-900/10 rounded-xl border border-emerald-100 dark:border-emerald-900/30">
               <div className="space-y-1">
-                <Label className="text-indigo-900 dark:text-indigo-200">Recipient Source</Label>
-                <p className="text-xs text-indigo-600/70 dark:text-indigo-400/70">Choose where to pull audience data from</p>
+                <Label className="text-emerald-900 dark:text-emerald-200">Recipient Source</Label>
+                <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70">Choose where to pull audience data from</p>
               </div>
-              <div className="flex bg-white dark:bg-slate-900 p-1 rounded-lg border border-indigo-100 dark:border-indigo-900/50">
+              <div className="flex bg-white dark:bg-slate-900 p-1 rounded-lg border border-emerald-100 dark:border-emerald-900/50">
                 <button
                   type="button"
                   onClick={() => {
@@ -340,7 +340,7 @@ export default function CreateCampaign() {
                   className={cn(
                     "flex-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-all",
                     recipientSource === 'campaign' 
-                      ? "bg-indigo-600 text-white shadow-sm" 
+                      ? "bg-emerald-600 text-white shadow-sm" 
                       : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-300"
                   )}
                 >
@@ -355,7 +355,7 @@ export default function CreateCampaign() {
                   className={cn(
                     "flex-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-all",
                     recipientSource === 'org' 
-                      ? "bg-indigo-600 text-white shadow-sm" 
+                      ? "bg-emerald-600 text-white shadow-sm" 
                       : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-300"
                   )}
                 >
@@ -374,7 +374,7 @@ export default function CreateCampaign() {
                   >
                     <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileUpload} disabled={uploadStatus === 'loading'} />
                     
-                    <div className="mb-3 p-3 bg-indigo-50 dark:bg-slate-900 rounded-full text-indigo-600">
+                    <div className="mb-3 p-3 bg-emerald-50 dark:bg-slate-900 rounded-full text-emerald-600">
                       <Upload className="h-6 w-6" />
                     </div>
 
@@ -387,7 +387,7 @@ export default function CreateCampaign() {
 
                     {uploadStatus === 'loading' && (
                       <div className="flex items-center gap-3">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600" />
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-emerald-600" />
                         <p className="text-sm font-semibold">Processing...</p>
                       </div>
                     )}
@@ -398,7 +398,7 @@ export default function CreateCampaign() {
                           <CheckCircle2 className="h-5 w-5" />
                           <p className="text-sm font-semibold">{csvResult?.totalRows} Recipients Loaded</p>
                         </div>
-                        <button type="button" className="text-xs text-indigo-600 hover:underline" onClick={(e) => { e.stopPropagation(); handleRetry(); }}>Change file</button>
+                        <button type="button" className="text-xs text-emerald-600 hover:underline" onClick={(e) => { e.stopPropagation(); handleRetry(); }}>Change file</button>
                       </div>
                     )}
                   </div>
@@ -462,7 +462,7 @@ export default function CreateCampaign() {
                   {segmentationMode === 'segmented' && (
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider", segment.isDefault ? "bg-slate-200 text-slate-700" : "bg-indigo-600 text-white")}>
+                        <div className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider", segment.isDefault ? "bg-slate-200 text-slate-700" : "bg-emerald-600 text-white")}>
                           {segment.isDefault ? 'Default' : `Segment ${segment.priority}`}
                         </div>
                         <span className="text-sm font-bold text-slate-900 dark:text-slate-50">{segment.name}</span>
@@ -489,7 +489,7 @@ export default function CreateCampaign() {
                     <div className="space-y-2">
                       <Label className="text-sm font-semibold">Email Content</Label>
                       <textarea 
-                        className="flex min-h-[200px] w-full rounded-md border border-slate-200 bg-white dark:bg-slate-950 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 dark:border-slate-800"
+                        className="flex min-h-[200px] w-full rounded-md border border-slate-200 bg-white dark:bg-slate-950 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 dark:border-slate-800"
                         placeholder="Your message goes here..."
                         value={variants[segment.id]?.body || ''}
                         onChange={(e) => setVariants({

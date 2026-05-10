@@ -91,8 +91,8 @@ export default function Templates() {
               onClick={() => setActiveFilter(filter)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 activeFilter === filter 
-                  ? 'bg-slate-900 text-white shadow-sm dark:bg-slate-50 dark:text-slate-900' 
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/50'
+                  ? 'bg-[#B7D67A] text-[#234e44] shadow-sm' 
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-[#B7D67A] dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/50'
               }`}
             >
               {filter}

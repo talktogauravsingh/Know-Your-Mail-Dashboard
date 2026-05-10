@@ -82,8 +82,8 @@ export function CsvPreviewSkeleton({
     >
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-5 py-4 flex items-center gap-4">
-        <div className="flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-lg bg-indigo-50 dark:bg-indigo-900/20">
-          <FileText className="h-5 w-5 text-indigo-400 dark:text-indigo-500" />
+        <div className="flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
+          <FileText className="h-5 w-5 text-emerald-400 dark:text-emerald-500" />
         </div>
         <div className="flex-1 space-y-2 min-w-0">
           {fileName ? (
@@ -127,7 +127,7 @@ export function CsvPreviewSkeleton({
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STAT_VARIANTS = {
-  total:   { icon: FileText,       bg: 'bg-indigo-50 dark:bg-indigo-900/20',  icon_color: 'text-indigo-600 dark:text-indigo-400',  label_color: 'text-indigo-600 dark:text-indigo-400' },
+  total:   { icon: FileText,       bg: 'bg-emerald-50 dark:bg-emerald-900/20',  icon_color: 'text-emerald-600 dark:text-emerald-400',  label_color: 'text-emerald-600 dark:text-emerald-400' },
   valid:   { icon: CheckCircle2,   bg: 'bg-emerald-50 dark:bg-emerald-900/20', icon_color: 'text-emerald-600 dark:text-emerald-400', label_color: 'text-emerald-600 dark:text-emerald-400' },
   invalid: { icon: XCircle,        bg: 'bg-red-50 dark:bg-red-900/20',         icon_color: 'text-red-600 dark:text-red-400',         label_color: 'text-red-600 dark:text-red-400' },
   warning: { icon: AlertCircle,    bg: 'bg-amber-50 dark:bg-amber-900/20',     icon_color: 'text-amber-600 dark:text-amber-400',     label_color: 'text-amber-600 dark:text-amber-400' },
@@ -301,7 +301,7 @@ export function CsvPreviewError({ message, onRetry }) {
         <button
           type="button"
           onClick={onRetry}
-          className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 rounded"
+          className="text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 rounded"
         >
           Try uploading again
         </button>

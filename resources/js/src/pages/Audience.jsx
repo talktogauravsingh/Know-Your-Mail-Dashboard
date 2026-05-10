@@ -26,7 +26,7 @@ export default function Audience() {
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">Audience Segments</h2>
           <p className="text-slate-500 dark:text-slate-400 mt-1">Build complex visual queries to target specific user subsets.</p>
         </div>
-        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 shadow-sm">
+        <Button className="bg-[#234e44] hover:bg-emerald-700 text-white gap-2 shadow-sm">
           <Save className="h-4 w-4" />
           Save Segment
         </Button>
@@ -38,16 +38,16 @@ export default function Audience() {
           <Card>
             <CardHeader className="border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/20">
               <CardTitle className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-indigo-500" />
+                <Filter className="h-4 w-4 text-emerald-500" />
                 Query Builder
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
-              <div className="text-sm font-medium text-slate-900 dark:text-slate-50 mb-2">Include users who match <span className="text-indigo-600 dark:text-indigo-400 font-bold">ALL</span> of the following:</div>
-              
+              <div className="text-sm font-medium text-slate-900 dark:text-slate-50 mb-2">Include users who match <span className="text-emerald-600 dark:text-emerald-400 font-bold">ALL</span> of the following:</div>
+
               <div className="space-y-4 relative">
                 {conditions.map((condition, idx) => (
-                  <div key={condition.id} className="group flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50 transition-colors hover:border-indigo-300 dark:hover:border-indigo-700/50 relative">
+                  <div key={condition.id} className="group flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50 transition-colors hover:border-emerald-300 dark:hover:border-emerald-700/50 relative">
                     {idx > 0 && (
                       <div className="absolute -top-4 left-6 w-px h-4 bg-slate-300 dark:bg-slate-700"></div>
                     )}
@@ -65,7 +65,7 @@ export default function Audience() {
                       <option value="contains">contains</option>
                     </Select>
                     <Input className="w-full sm:w-[180px] bg-white dark:bg-slate-950" defaultValue={condition.value} />
-                    
+
                     <button onClick={() => removeCondition(condition.id)} className="p-2 text-slate-400 hover:text-red-500 transition-colors rounded-md sm:ml-auto">
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -84,13 +84,13 @@ export default function Audience() {
 
         {/* Audience Preview Area */}
         <div className="lg:col-span-1 space-y-6">
-          <Card className="border-indigo-100 bg-indigo-50/30 dark:border-indigo-900/30 dark:bg-indigo-900/10">
+          <Card className="border-emerald-100 bg-emerald-50/30 dark:border-emerald-900/30 dark:bg-emerald-900/10">
             <CardHeader>
               <CardTitle className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Matched Audience</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-3">
-                <Users className="h-10 w-10 text-indigo-500 p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg" />
+                <Users className="h-10 w-10 text-emerald-500 p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg" />
                 <h3 className="text-4xl font-bold text-slate-900 dark:text-slate-50">14,290</h3>
               </div>
               <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium mt-4">~22% of total subscribers</p>
@@ -102,19 +102,19 @@ export default function Audience() {
               <CardTitle className="text-sm font-medium text-slate-900 dark:text-slate-50">Recent Saved Segments</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="p-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">
+              <div className="p-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold text-sm text-slate-900 dark:text-slate-50">Active Users (30d)</span>
                   <Badge variant="secondary">14.2k</Badge>
                 </div>
               </div>
-              <div className="p-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">
+              <div className="p-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold text-sm text-slate-900 dark:text-slate-50">High Value Customers</span>
                   <Badge variant="secondary">2.8k</Badge>
                 </div>
               </div>
-              <div className="p-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">
+              <div className="p-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold text-sm text-slate-900 dark:text-slate-50">Churn Risk (&gt;60d)</span>
                   <Badge variant="secondary">8.4k</Badge>

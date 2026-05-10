@@ -40,11 +40,11 @@ export default function Settings() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                   activeTab === tab.id
-                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
-                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                    ? 'bg-[#B7D67A] text-[#234e44] dark:bg-emerald-900/50 dark:text-emerald-300'
+                    : 'text-slate-600 hover:bg-[#B7D67A] dark:text-slate-400 dark:hover:bg-slate-800'
                 }`}
               >
-                <Icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
+                <Icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
                 {tab.label}
               </button>
             )
@@ -61,13 +61,13 @@ export default function Settings() {
                     <CardTitle>Team Members</CardTitle>
                     <CardDescription>Manage who has access to this workspace.</CardDescription>
                   </div>
-                  <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">Invite User</Button>
+                  <Button className="bg-[#234e44] hover:bg-emerald-700 text-white">Invite User</Button>
                 </CardHeader>
                 <CardContent>
                   <div className="divide-y divide-slate-200 dark:divide-slate-800 border-t border-slate-200 dark:border-slate-800">
                     <div className="flex items-center justify-between py-4">
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold dark:bg-indigo-900/50 dark:text-indigo-300">GS</div>
+                        <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold dark:bg-emerald-900/50 dark:text-emerald-300">GS</div>
                         <div>
                           <p className="font-semibold text-sm text-slate-900 dark:text-slate-50">Gaurav Singh <Badge variant="secondary" className="ml-1 text-[10px] py-0">You</Badge></p>
                           <p className="text-xs text-slate-500">gaurav@emailtracker.io</p>
@@ -93,10 +93,10 @@ export default function Settings() {
 
           {activeTab === 'billing' && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <Card className="border-indigo-100 bg-indigo-50/30 dark:border-indigo-900/30 dark:bg-indigo-900/10">
+              <Card className="border-emerald-100 bg-emerald-50/30 dark:border-emerald-900/30 dark:bg-emerald-900/10">
                 <CardHeader>
                   <CardTitle className="flex justify-between items-center">
-                    <span>Current Plan: <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">Pro</span></span>
+                    <span>Current Plan: <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">Pro</span></span>
                     <Badge variant="success" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 border-none">$99 / month</Badge>
                   </CardTitle>
                 </CardHeader>
@@ -107,7 +107,7 @@ export default function Settings() {
                       <span className="font-bold text-slate-900 dark:text-slate-50">45k / 100k</span>
                     </div>
                     <div className="w-full bg-white dark:bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-200 dark:border-slate-800">
-                      <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: '45%' }}></div>
+                      <div className="bg-emerald-600 h-2.5 rounded-full" style={{ width: '45%' }}></div>
                     </div>
                   </div>
                   <Button variant="outline" className="mt-4 bg-white dark:bg-slate-950">Manage Subscription</Button>
@@ -124,7 +124,7 @@ export default function Settings() {
                     <CardTitle>Sender Domains</CardTitle>
                     <CardDescription>Authenticate your domains to improve deliverability.</CardDescription>
                   </div>
-                  <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"><Globe className="w-4 h-4"/> Add Domain</Button>
+                  <Button className="bg-[#234e44] hover:bg-emerald-700 text-white gap-2"><Globe className="w-4 h-4"/> Add Domain</Button>
                 </CardHeader>
                 <CardContent>
                   <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
@@ -156,10 +156,10 @@ export default function Settings() {
 
           {activeTab === 'integrations' && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <Card className="border-indigo-100 bg-indigo-50/30 dark:border-indigo-900/30 dark:bg-indigo-900/10">
+              <Card className="border-emerald-100 bg-emerald-50/30 dark:border-emerald-900/30 dark:bg-emerald-900/10">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Server className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    <Server className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                     Managed Configurations
                   </CardTitle>
                   <CardDescription>Domain configurations provided by us. You can use these immediately without setup.</CardDescription>
@@ -182,7 +182,7 @@ export default function Settings() {
                     <CardDescription>Connect third-party providers like SendGrid, AWS SES, or Gmail.</CardDescription>
                   </div>
                   {!isAddingSmtp && (
-                    <Button onClick={() => setIsAddingSmtp(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"><Plus className="w-4 h-4"/> Add Setup</Button>
+                    <Button onClick={() => setIsAddingSmtp(true)} className="bg-[#234e44] hover:bg-emerald-700 text-white gap-2"><Plus className="w-4 h-4"/> Add Setup</Button>
                   )}
                 </CardHeader>
                 <CardContent>
@@ -191,7 +191,7 @@ export default function Settings() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <label className="text-sm font-medium text-slate-900 dark:text-slate-50">Provider</label>
-                          <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500" value={newSmtp.provider} onChange={(e) => setNewSmtp({...newSmtp, provider: e.target.value})}>
+                          <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500" value={newSmtp.provider} onChange={(e) => setNewSmtp({...newSmtp, provider: e.target.value})}>
                             <option value="Custom SMTP">Custom SMTP</option>
                             <option value="AWS SES">AWS SES</option>
                             <option value="SendGrid">SendGrid</option>
@@ -231,7 +231,7 @@ export default function Settings() {
                             setIsAddingSmtp(false);
                             setNewSmtp({ provider: 'Custom SMTP', host: '', port: 587, username: '', password: '', fromName: '', fromAddress: '' });
                           }
-                        }} className="bg-indigo-600 hover:bg-indigo-700 text-white">Save Configuration</Button>
+                        }} className="bg-[#234e44] hover:bg-emerald-700 text-white">Save Configuration</Button>
                       </div>
                     </div>
                   ) : (

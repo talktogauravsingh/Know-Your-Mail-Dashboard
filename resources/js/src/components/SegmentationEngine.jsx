@@ -134,7 +134,7 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
             onClick={addSegment} 
             disabled={segments.length >= maxSegments}
             variant="outline" 
-            className="gap-2 bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900 dark:text-indigo-400 disabled:opacity-50"
+            className="gap-2 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900 dark:text-emerald-400 disabled:opacity-50"
           >
             <Plus className="h-4 w-4" />
             {segments.length >= maxSegments ? `Limit: ${maxSegments} Segments` : 'Add Segment'}
@@ -146,13 +146,13 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
         {[...segments].sort((a, b) => a.priority - b.priority).map((segment, sIdx) => (
           <Card key={segment.id} className={cn(
             "overflow-hidden shadow-sm transition-all hover:shadow-md",
-            isSingleMode ? "border-none shadow-none" : (segment.isDefault ? "border-l-4 border-l-slate-400" : "border-l-4 border-l-indigo-500")
+            isSingleMode ? "border-none shadow-none" : (segment.isDefault ? "border-l-4 border-l-slate-400" : "border-l-4 border-l-emerald-500")
           )}>
             {!isSingleMode && (
               <CardHeader className="py-4 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`p-1.5 rounded-md ${segment.isDefault ? 'bg-slate-200 text-slate-600' : 'bg-indigo-100 text-indigo-700'} dark:bg-indigo-900/30 dark:text-indigo-400`}>
+                  <div className={`p-1.5 rounded-md ${segment.isDefault ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'} dark:bg-emerald-900/30 dark:text-emerald-400`}>
                     <Users className="h-4 w-4" />
                   </div>
                   {segment.isDefault ? (
@@ -235,18 +235,18 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
                     ))}
                     
                     <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
-                      <Button variant="ghost" size="sm" onClick={() => addFilter(segment.id)} className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 gap-1.5 h-8">
+                      <Button variant="ghost" size="sm" onClick={() => addFilter(segment.id)} className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 gap-1.5 h-8">
                         <Plus className="h-3.5 w-3.5" /> Add Condition
                       </Button>
                       
                       <div className="flex items-center gap-2">
                         {loading[segment.id] ? (
                           <div className="flex items-center gap-2 text-xs text-slate-400">
-                            <div className="h-3 w-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                            <div className="h-3 w-3 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
                             Calculating...
                           </div>
                         ) : (
-                          <div className="px-2 py-1 bg-indigo-50 dark:bg-indigo-950/30 rounded text-xs font-semibold text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
+                          <div className="px-2 py-1 bg-emerald-50 dark:bg-emerald-950/30 rounded text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
                             <Users className="h-3 w-3" />
                             {counts[segment.id] ?? 0} Recipients
                           </div>

@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
-import { LayoutDashboard, Mail, LayoutList, Settings, LogOut, Search, Bell, Users, Database, Sun, Moon, ChevronDown, Bot, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Mail, Sparkles, Users, Bot, Settings, Search, Bell, Gift, ChevronDown, LogOut } from 'lucide-react';
 
 const navigation = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
@@ -27,19 +27,26 @@ export default function AppLayout() {
   }, [theme]);
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-850 font-sans transition-colors duration-200">
+    <div className="flex h-screen bg-[#eef6f0] font-sans transition-colors duration-200">
       {/* Sidebar */}
-      <div className="hidden w-64 flex-col border-r border-slate-200/60 bg-white dark:border-slate-800/50 dark:bg-slate-900 md:flex">
+      <div className="hidden w-[260px] flex-col border-r border-slate-200/40 bg-transparent md:flex">
+        {/* Logo */}
+        <div className="flex h-20 items-center px-6">
+          <span className="text-2xl font-black text-[#234e44] tracking-tighter">emitly</span>
+        </div>
+
         {/* Workspace Switcher */}
-        <div className="flex h-20 items-center px-4 py-4">
-          <div className="flex w-full items-center justify-between rounded-xl border border-slate-200/60 bg-slate-50 px-3 py-2 dark:border-slate-800/50 dark:bg-slate-850 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+        <div className="px-4 mb-2">
+          <div className="flex w-full items-center justify-between rounded-xl p-2 cursor-pointer hover:bg-[#B7D67A] transition-colors">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500 text-white shadow-sm">
-                <span className="font-bold text-sm">KYE</span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white shadow-sm">
+                <span className="text-slate-400">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M9 14v1"/><path d="M9 19v2"/><path d="M9 3v2"/><path d="M9 9v1"/></svg>
+                </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-bold text-slate-900 dark:text-slate-50 leading-none">My Workspace</span>
-                <span className="text-[10px] text-slate-500 font-medium mt-1">Free plan</span>
+                <span className="text-sm font-bold text-[#234e44] leading-none">My Workspace</span>
+                <span className="text-[11px] text-slate-500 font-medium mt-1">Free plan</span>
               </div>
             </div>
             <ChevronDown className="h-4 w-4 text-slate-400" />
@@ -55,14 +62,14 @@ export default function AppLayout() {
                   key={item.name}
                   to={item.disabled ? '#' : item.href}
                   className={cn(
-                    "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200",
+                    "group flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200",
                     item.disabled ? "opacity-50 cursor-not-allowed" : "",
                     isActive 
-                      ? "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400" 
-                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-50"
+                      ? "bg-[#B7D67A] text-[#234e44]" 
+                      : "text-slate-500 hover:bg-[#B7D67A] hover:text-[#234e44]"
                   )}
                 >
-                  <item.icon className={cn("h-[18px] w-[18px]", isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300")} />
+                  <item.icon className={cn("h-[18px] w-[18px]", isActive ? "text-[#234e44]" : "text-slate-400 group-hover:text-[#234e44]")} />
                   {item.name}
                   {item.disabled && <span className="ml-auto text-[9px] uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Soon</span>}
                 </Link>
@@ -73,15 +80,17 @@ export default function AppLayout() {
         
         {/* User Profile */}
         <div className="p-4 mt-auto">
-          <div className="flex items-center gap-3 rounded-xl p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer">
-            <div className="h-10 w-10 overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-sm font-bold text-blue-600 dark:text-blue-400">
-              {user?.name?.charAt(0) || 'A'}
+          <div className="flex items-center gap-3 rounded-xl p-2 hover:bg-[#B7D67A] transition-colors cursor-pointer justify-between group">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-9 w-9 overflow-hidden rounded-full bg-[#eef6f0] flex items-center justify-center text-sm font-bold text-[#234e44]">
+                {user?.name?.charAt(0) || 'A'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="truncate text-sm font-bold text-[#234e44] leading-tight">{user?.name || 'Admin User'}</p>
+                <p className="truncate text-xs text-slate-500">ID: 4827682</p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-50 leading-tight">{user?.name || 'Admin User'}</p>
-              <p className="truncate text-xs text-slate-500 dark:text-slate-400">ID: 4827682</p>
-            </div>
-            <button onClick={logout} className="text-slate-400 hover:text-slate-900 dark:hover:text-slate-50 p-2">
+            <button onClick={logout} className="text-slate-400 hover:text-slate-900 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <LogOut className="h-4 w-4" />
             </button>
           </div>
@@ -89,31 +98,40 @@ export default function AppLayout() {
       </div>
 
       {/* Main content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden relative">
         {/* Top header */}
-        <header className="flex h-20 items-center justify-between border-b border-slate-200/60 bg-white/50 backdrop-blur-md px-4 lg:px-8 dark:border-slate-800/50 dark:bg-slate-900/50 sticky top-0 z-10">
+        <header className="flex h-20 items-center justify-between bg-transparent px-4 lg:px-8 top-0 z-10 pt-4">
           <div className="flex items-center gap-4">
             <div className="relative hidden md:block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
                 type="search"
-                placeholder="Search..."
-                className="h-10 w-80 rounded-full border border-slate-200/80 bg-white pl-10 pr-12 text-sm outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700/50 dark:bg-slate-850 dark:text-slate-50"
+                placeholder="Search"
+                className="h-10 w-96 rounded-full border-none bg-white shadow-sm pl-10 pr-12 text-sm outline-none transition-all focus:ring-2 focus:ring-[#10b981]/20 text-slate-900"
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
-                <kbd className="hidden rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400 sm:inline-block">⌘</kbd>
-                <kbd className="hidden rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400 sm:inline-block">K</kbd>
+                <kbd className="hidden rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 sm:inline-block">⌘</kbd>
+                <kbd className="hidden rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 sm:inline-block">K</kbd>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={toggleTheme} className="rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50 transition-colors">
-              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          <div className="flex items-center gap-4">
+            <button className="rounded-full p-2 text-slate-500 bg-white shadow-sm hover:bg-[#B7D67A] transition-colors">
+              <Gift className="h-4 w-4" />
             </button>
-            <button className="relative rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50 transition-colors">
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-2 top-2 flex h-2 w-2 rounded-full bg-red-500 shadow-[0_0_0_2px_white] dark:shadow-[0_0_0_2px_#0f172a]"></span>
+            <button className="relative rounded-full p-2 text-slate-500 bg-white shadow-sm hover:bg-[#B7D67A] transition-colors">
+              <Bell className="h-4 w-4" />
             </button>
+            <div className="flex items-center gap-2 pl-2 cursor-pointer">
+              <div className="h-8 w-8 overflow-hidden rounded-full bg-[#eef6f0] flex items-center justify-center text-sm font-bold text-[#234e44]">
+                {user?.name?.charAt(0) || 'A'}
+              </div>
+              <div className="flex-1 min-w-0 hidden md:block">
+                <p className="truncate text-[13px] font-bold text-[#234e44] leading-tight">{user?.name || 'Admin User'}</p>
+                <p className="truncate text-[11px] text-slate-500">ID: 4827682</p>
+              </div>
+              <ChevronDown className="h-4 w-4 text-slate-400 ml-1" />
+            </div>
           </div>
         </header>
 

@@ -74,7 +74,7 @@ export default function BulkImport() {
         <Card className="md:col-span-1">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Info className="h-4 w-4 text-indigo-500" />
+              <Info className="h-4 w-4 text-emerald-500" />
               Import Instructions
             </CardTitle>
           </CardHeader>
@@ -86,7 +86,7 @@ export default function BulkImport() {
               <li><strong>phone</strong> (optional)</li>
             </ul>
             <p>Any other columns (like <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">city</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">tier</code>, or <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">gender</code>) will be stored as attributes for advanced segmentation.</p>
-            <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300">
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300">
               <p className="flex items-center gap-2 font-semibold mb-1 text-xs uppercase tracking-wider">
                 <Database className="h-3 w-3" /> Note on Upserts
               </p>
@@ -114,9 +114,9 @@ export default function BulkImport() {
                 disabled={uploadStatus === 'loading'}
               />
               
-              <div className={`mb-4 p-4 rounded-full ${uploadStatus === 'error' ? 'bg-red-50 text-red-600' : 'bg-indigo-50 text-indigo-600'} dark:bg-slate-900`}>
+              <div className={`mb-4 p-4 rounded-full ${uploadStatus === 'error' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'} dark:bg-slate-900`}>
                 {uploadStatus === 'loading' ? (
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
                 ) : uploadStatus === 'success' ? (
                   <CheckCircle2 className="h-8 w-8 text-emerald-500" />
                 ) : uploadStatus === 'error' ? (

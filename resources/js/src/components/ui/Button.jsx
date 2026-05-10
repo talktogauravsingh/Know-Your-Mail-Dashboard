@@ -8,9 +8,9 @@ const Button = React.forwardRef(({ className, variant = 'default', size = 'defau
       ref={ref}
       disabled={isLoading || props.disabled}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-bold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:pointer-events-none disabled:opacity-50",
+        "cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-bold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 disabled:pointer-events-none disabled:opacity-50",
         {
-          'bg-blue-600 text-white shadow-md hover:bg-blue-700 hover:shadow-lg dark:bg-blue-500 dark:hover:bg-blue-600': variant === 'default',
+          'bg-[#234e44] text-white shadow-md hover:bg-emerald-700 hover:shadow-lg': variant === 'default',
           'bg-red-500 text-white shadow-sm hover:bg-red-600': variant === 'destructive',
           'border border-slate-200/80 bg-white/50 backdrop-blur-sm shadow-sm hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700/50 dark:bg-slate-800/50 dark:hover:bg-slate-700 dark:hover:text-slate-50': variant === 'outline',
           'hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800/80 dark:hover:text-slate-50': variant === 'ghost',

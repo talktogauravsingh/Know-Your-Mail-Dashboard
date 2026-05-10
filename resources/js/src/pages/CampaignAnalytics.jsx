@@ -24,7 +24,7 @@ export default function CampaignAnalytics() {
   if (isLoading || !currentCampaign) {
     return (
       <div className="flex items-center justify-center h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
       </div>
     );
   }
@@ -81,11 +81,11 @@ export default function CampaignAnalytics() {
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
           {/* Summary Cards */}
           <div className="grid gap-4 md:grid-cols-5">
-            <Card className="bg-indigo-600 border-indigo-500 text-white shadow-md">
+            <Card className="bg-emerald-600 border-emerald-500 text-white shadow-md">
               <CardContent className="p-6">
                 <div className="flex justify-between items-center mb-4">
-                   <p className="text-indigo-100 font-medium text-sm">Sent</p>
-                   <Send className="h-5 w-5 text-indigo-200" />
+                   <p className="text-emerald-100 font-medium text-sm">Sent</p>
+                   <Send className="h-5 w-5 text-emerald-200" />
                 </div>
                 <h3 className="text-3xl font-bold">{summary.sent.toLocaleString()}</h3>
               </CardContent>
@@ -117,7 +117,7 @@ export default function CampaignAnalytics() {
                   <MousePointer2 className="h-5 w-5" />
                 </div>
                 <h3 className="text-3xl font-bold text-slate-900 dark:text-slate-50">{summary.clicked.toLocaleString()}</h3>
-                <p className="text-sm font-medium text-indigo-500 mt-1">{rates.click}%</p>
+                <p className="text-sm font-medium text-emerald-500 mt-1">{rates.click}%</p>
               </CardContent>
             </Card>
             <Card className="border-red-100 bg-red-50/50 dark:border-red-900/30 dark:bg-red-900/10">
@@ -198,7 +198,7 @@ export default function CampaignAnalytics() {
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Globe className="h-5 w-5 text-indigo-500" /> Geographic Opens</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Globe className="h-5 w-5 text-emerald-500" /> Geographic Opens</CardTitle>
                 <CardDescription>Top locations where recipients opened emails.</CardDescription>
               </CardHeader>
               <CardContent>
@@ -218,7 +218,7 @@ export default function CampaignAnalytics() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Smartphone className="h-5 w-5 text-purple-500" /> Browser Distribution</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Smartphone className="h-5 w-5 text-emerald-500" /> Browser Distribution</CardTitle>
                 <CardDescription>Email clients used by the recipients.</CardDescription>
               </CardHeader>
               <CardContent className="flex items-center justify-center">

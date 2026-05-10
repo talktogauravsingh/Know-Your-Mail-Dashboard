@@ -15,14 +15,14 @@ export default function Campaigns() {
     fetchCampaigns();
   }, [fetchCampaigns]);
 
-  const filteredCampaigns = campaigns.filter(c => 
+  const filteredCampaigns = campaigns.filter(c =>
     c.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (campaignsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
       </div>
     );
   }
@@ -35,7 +35,7 @@ export default function Campaigns() {
           <p className="text-slate-500 dark:text-slate-400">Manage and track your email marketing campaigns.</p>
         </div>
         <Link to="/campaigns/new">
-          <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
+          <Button className="bg-[#234e44] hover:bg-emerald-700 text-white gap-2">
             <Plus className="h-4 w-4" />
             Create Campaign
           </Button>
@@ -45,9 +45,9 @@ export default function Campaigns() {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="relative w-full sm:w-96">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-          <Input 
-            placeholder="Search campaigns..." 
-            className="pl-9 bg-white dark:bg-slate-950" 
+          <Input
+            placeholder="Search campaigns..."
+            className="pl-9 bg-white dark:bg-slate-950"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -74,14 +74,14 @@ export default function Campaigns() {
             {filteredCampaigns.map((campaign) => (
               <TableRow key={campaign.id} className="cursor-pointer group border-slate-200 dark:border-slate-800">
                 <TableCell className="font-medium">
-                  <Link to={`/campaigns/${campaign.id}`} className="group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors block p-2 -m-2">
+                  <Link to={`/campaigns/${campaign.id}`} className="group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors block p-2 -m-2">
                     {campaign.name}
                   </Link>
                 </TableCell>
                 <TableCell>
                   <Badge variant={
                     campaign.status === 'completed' ? 'success' :
-                    campaign.status === 'sent' ? 'default' : 'secondary'
+                      campaign.status === 'sent' ? 'default' : 'secondary'
                   }>
                     {campaign.status?.toUpperCase()}
                   </Badge>
@@ -101,7 +101,7 @@ export default function Campaigns() {
             {filteredCampaigns.length === 0 && !campaignsLoading && (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center">
-                  No campaigns found. <Link to="/campaigns/new" className="text-indigo-600 hover:underline">Create one</Link>
+                  No campaigns found. <Link to="/campaigns/new" className="text-emerald-600 hover:underline">Create one</Link>
                 </TableCell>
               </TableRow>
             )}

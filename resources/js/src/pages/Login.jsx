@@ -49,7 +49,7 @@ export default function Login() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="password">Password</Label>
-              <Link to="#" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">Forgot password?</Link>
+              <Link to="#" className="text-sm font-medium text-emerald-600 hover:text-emerald-500">Forgot password?</Link>
             </div>
             <Input 
               id="password" 
@@ -61,11 +61,11 @@ export default function Login() {
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
-          <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" isLoading={isLoading}>
+          <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" isLoading={isLoading}>
             Sign In
           </Button>
           <div className="text-center text-sm text-slate-500">
-            Don&apos;t have an account? <Link to="/signup" className="font-semibold text-indigo-600 hover:text-indigo-500">Sign up</Link>
+            Don&apos;t have an account? <Link to="/signup" className="font-semibold text-emerald-600 hover:text-emerald-500">Sign up</Link>
           </div>
         </CardFooter>
       </form>

@@ -19,7 +19,7 @@ const TableBody = React.forwardRef(({ className, ...props }, ref) => (
 TableBody.displayName = "TableBody";
 
 const TableRow = React.forwardRef(({ className, ...props }, ref) => (
-  <tr ref={ref} className={cn("border-b border-slate-200 transition-colors hover:bg-slate-100/50 data-[state=selected]:bg-slate-100 dark:border-slate-800 dark:hover:bg-slate-800/50 dark:data-[state=selected]:bg-slate-800", className)} {...props} />
+  <tr ref={ref} className={cn("border-b border-slate-200 transition-colors hover:bg-[#B7D67A]/50 data-[state=selected]:bg-[#B7D67A] dark:border-slate-800 dark:hover:bg-slate-800/50 dark:data-[state=selected]:bg-slate-800", className)} {...props} />
 ));
 TableRow.displayName = "TableRow";
 
