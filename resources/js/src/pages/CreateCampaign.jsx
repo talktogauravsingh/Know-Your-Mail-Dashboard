@@ -1,10 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Input, Label } from '../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import { Select } from '../components/ui/Select';
-import { ArrowLeft, Save, Send, SplitSquareVertical, FlaskConical, Layers, CheckCircle2, AlertCircle, Upload } from 'lucide-react';
+import { ArrowLeft, Save, Send, SplitSquareVertical, FlaskConical, Layers, CheckCircle2, AlertCircle, Upload, Calendar, Clock } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { CsvPreviewPanel } from '../components/CsvPreview';
 import { SegmentationEngine } from '../components/SegmentationEngine';
@@ -19,19 +19,33 @@ export default function CreateCampaign() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isABTest, setIsABTest] = useState(false);
   const [abTestType, setAbTestType] = useState('subject'); // 'subject' or 'content'
+
+  // Scheduling State
+  const [scheduleType, setScheduleType] = useState('immediate');
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [scheduleFrequency, setScheduleFrequency] = useState('daily');
+  const [scheduleDays, setScheduleDays] = useState([]);
+  const [scheduleTime, setScheduleTime] = useState('');
+  const [submitAction, setSubmitAction] = useState('draft');
   
   // 'idle' | 'loading' | 'success' | 'error'
   const [uploadStatus, setUploadStatus] = useState('idle');
   const [uploadMessage, setUploadMessage] = useState('');
   const [csvResult, setCsvResult] = useState(null);
   const [segmentationMode, setSegmentationMode] = useState('single');
-  const [segments, setSegments] = useState([{ id: 'default', name: 'Default', isDefault: true }]);
+  const [segments, setSegments] = useState([{ id: 'default', name: 'Default', isDefault: true, filters: [] }]);
   const [insights, setInsights] = useState([]);
   const [campaignId, setCampaignId] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [recipientSource, setRecipientSource] = useState('campaign'); // 'campaign' or 'org'
   const [variants, setVariants] = useState({}); // { [segmentId]: { subject, body, cta_url } }
   const fileInputRef = useRef(null);
+
+  // CRITICAL: Reset campaignId on every fresh mount so stale IDs don't leak across sessions
+  useEffect(() => {
+    setCampaignId(null);
+    return () => setCampaignId(null); // also reset on unmount
+  }, []);
 
   const fetchInsights = async (id) => {
     try {
@@ -156,6 +170,17 @@ export default function CreateCampaign() {
       data.subject = defaultVar.subject || '';
       data.body = defaultVar.body || '';
       data.cta_link = defaultVar.cta_link || data.cta_link || '';
+
+      // Append scheduling
+      data.schedule_type = scheduleType;
+      data.status = submitAction === 'draft' ? 'draft' : 'scheduled';
+      if (scheduleType === 'once') {
+        data.scheduled_at = scheduledAt;
+      } else if (scheduleType === 'recurring') {
+        data.schedule_frequency = scheduleFrequency;
+        data.schedule_days = scheduleDays;
+        data.schedule_time = scheduleTime;
+      }
       
       // If we have an existing draft campaignId, update it. Otherwise create.
       if (campaignId) {
@@ -443,6 +468,149 @@ export default function CreateCampaign() {
           </CardContent>
         </Card>
 
+        {/* Scheduling Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              Scheduling & Delivery
+            </CardTitle>
+            <CardDescription>Control exactly when your audience receives this campaign.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <button
+                type="button"
+                onClick={() => setScheduleType('immediate')}
+                className={cn(
+                  "p-4 rounded-xl border-2 text-left transition-all flex flex-col items-start gap-2",
+                  scheduleType === 'immediate'
+                    ? "border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20"
+                    : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:border-slate-300"
+                )}
+              >
+                <div className={cn("p-2 rounded-lg", scheduleType === 'immediate' ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500")}>
+                  <Send className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-sm block text-slate-900 dark:text-slate-50">Send Now</span>
+                  <p className="text-xs text-slate-500">Dispatch immediately.</p>
+                </div>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => setScheduleType('once')}
+                className={cn(
+                  "p-4 rounded-xl border-2 text-left transition-all flex flex-col items-start gap-2",
+                  scheduleType === 'once'
+                    ? "border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20"
+                    : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:border-slate-300"
+                )}
+              >
+                <div className={cn("p-2 rounded-lg", scheduleType === 'once' ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500")}>
+                  <Clock className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-sm block text-slate-900 dark:text-slate-50">Schedule for Later</span>
+                  <p className="text-xs text-slate-500">Pick a specific date & time.</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setScheduleType('recurring')}
+                className={cn(
+                  "p-4 rounded-xl border-2 text-left transition-all flex flex-col items-start gap-2",
+                  scheduleType === 'recurring'
+                    ? "border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20"
+                    : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 hover:border-slate-300"
+                )}
+              >
+                <div className={cn("p-2 rounded-lg", scheduleType === 'recurring' ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500")}>
+                  <Calendar className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-sm block text-slate-900 dark:text-slate-50">Recurring</span>
+                  <p className="text-xs text-slate-500">Daily, weekly, or monthly.</p>
+                </div>
+              </button>
+            </div>
+
+            {/* Sub-options for Schedule Once */}
+            {scheduleType === 'once' && (
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="space-y-2">
+                  <Label>Date & Time</Label>
+                  <Input 
+                    type="datetime-local" 
+                    value={scheduledAt} 
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                    required
+                    className="bg-white dark:bg-slate-950 w-full md:w-1/2" 
+                  />
+                  <p className="text-xs text-slate-500">Campaign will be sent at this exact time in your local timezone.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Sub-options for Recurring */}
+            {scheduleType === 'recurring' && (
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800 space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="grid sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label>Frequency</Label>
+                    <Select value={scheduleFrequency} onChange={(e) => setScheduleFrequency(e.target.value)} className="bg-white dark:bg-slate-950">
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Time of Day</Label>
+                    <Input 
+                      type="time" 
+                      value={scheduleTime} 
+                      onChange={(e) => setScheduleTime(e.target.value)}
+                      required
+                      className="bg-white dark:bg-slate-950" 
+                    />
+                  </div>
+                </div>
+
+                {scheduleFrequency === 'weekly' && (
+                  <div className="space-y-3">
+                    <Label>Days of the week</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => {
+                        const isSelected = scheduleDays.includes(idx);
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) setScheduleDays(scheduleDays.filter(d => d !== idx));
+                              else setScheduleDays([...scheduleDays, idx]);
+                            }}
+                            className={cn(
+                              "px-4 py-2 rounded-full text-sm font-semibold transition-colors",
+                              isSelected 
+                                ? "bg-indigo-600 text-white" 
+                                : "bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-indigo-300"
+                            )}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Content</CardTitle>
@@ -524,11 +692,11 @@ export default function CreateCampaign() {
           <Button type="button" variant="outline" onClick={() => navigate('/campaigns')}>
             Cancel
           </Button>
-          <Button type="button" variant="secondary" className="gap-2 bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-800">
+          <Button type="submit" onClick={() => setSubmitAction('draft')} variant="secondary" className="gap-2 bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-800">
             <Save className="h-4 w-4" /> Save Draft
           </Button>
-          <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2" isLoading={isSubmitting}>
-            <Send className="h-4 w-4" /> Schedule Campaign
+          <Button type="submit" onClick={() => setSubmitAction('schedule')} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2" isLoading={isSubmitting && submitAction === 'schedule'}>
+            <Send className="h-4 w-4" /> {scheduleType === 'immediate' ? 'Send Now' : 'Schedule Campaign'}
           </Button>
         </div>
       </form>

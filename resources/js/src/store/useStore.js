@@ -75,6 +75,7 @@ export const useStore = create((set, get) => ({
       const { data } = await api.get('/user');
       const token = get().token;
       get().persistAuth(data, token);
+      get().fetchSmtpConfigurations();
     } catch {
       get().clearAuth();
     }
@@ -172,17 +173,54 @@ toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : '
   templates: mockTemplates,
   setTemplates: (templates) => set({ templates }),
 
-  // SMTP (keep mock for now)
-  smtpConfigurations: [
-    {
-      id: '1',
-      provider: 'AWS SES',
-      host: 'email-smtp.us-east-1.amazonaws.com',
-      port: 587,
-      username: 'AKIAIOSFODNN7EXAMPLE',
-      fromName: 'Marketing Team',
-      fromAddress: 'marketing@emailtracker.io',
-      isGlobal: false
+  // SMTP
+  smtpConfigurations: [],
+  fetchSmtpConfigurations: async () => {
+    try {
+      const { data } = await api.get('/smtp-configurations');
+      // Convert backend snake_case to camelCase for frontend where needed,
+      // or just keep them as snake_case. Let's map for consistency with UI.
+      const mapped = data.map(config => ({
+        id: config.id,
+        provider: config.provider,
+        host: config.host,
+        port: config.port,
+        username: config.username,
+        fromName: config.from_name,
+        fromAddress: config.from_address,
+        isGlobal: config.is_global
+      }));
+      set({ smtpConfigurations: mapped });
+    } catch (error) {
+      console.error('Failed to fetch SMTP configurations:', error);
     }
-  ],
+  },
+  addSmtpConfiguration: async (config) => {
+    try {
+      const { data } = await api.post('/smtp-configurations', {
+        provider: config.provider,
+        host: config.host,
+        port: config.port,
+        encryption: config.encryption,
+        username: config.username,
+        password: config.password,
+        from_name: config.fromName,
+        from_address: config.fromAddress,
+        is_global: false
+      });
+      get().fetchSmtpConfigurations();
+      get().addToast('SMTP configuration added successfully', 'success');
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to add SMTP configuration', 'error');
+    }
+  },
+  deleteSmtpConfiguration: async (id) => {
+    try {
+      await api.delete(`/smtp-configurations/${id}`);
+      get().fetchSmtpConfigurations();
+      get().addToast('SMTP configuration deleted successfully', 'success');
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to delete SMTP configuration', 'error');
+    }
+  },
 }));

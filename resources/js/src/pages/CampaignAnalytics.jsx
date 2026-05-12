@@ -36,6 +36,13 @@ export default function CampaignAnalytics() {
     r.status.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const browserData = [
+    { name: 'Chrome', value: 65 },
+    { name: 'Safari', value: 20 },
+    { name: 'Firefox', value: 10 },
+    { name: 'Edge', value: 5 },
+  ];
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-10">
       {/* Header */}

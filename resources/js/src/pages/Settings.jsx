@@ -9,7 +9,7 @@ import { useStore } from '../store/useStore';
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('team');
   const [isAddingSmtp, setIsAddingSmtp] = useState(false);
-  const [newSmtp, setNewSmtp] = useState({ provider: 'Custom SMTP', host: '', port: 587, username: '', password: '', fromName: '', fromAddress: '' });
+  const [newSmtp, setNewSmtp] = useState({ provider: 'Custom SMTP', host: '', port: 587, encryption: 'tls', username: '', password: '', fromName: '', fromAddress: '' });
   const smtpConfigurations = useStore((state) => state.smtpConfigurations);
   const deleteSmtpConfiguration = useStore((state) => state.deleteSmtpConfiguration);
   const addSmtpConfiguration = useStore((state) => state.addSmtpConfiguration);
@@ -207,6 +207,14 @@ export default function Settings() {
                           <Input type="number" value={newSmtp.port} onChange={(e) => setNewSmtp({...newSmtp, port: parseInt(e.target.value)})} className="bg-white dark:bg-slate-950" />
                         </div>
                         <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-900 dark:text-slate-50">Encryption</label>
+                          <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500" value={newSmtp.encryption} onChange={(e) => setNewSmtp({...newSmtp, encryption: e.target.value})}>
+                            <option value="">None</option>
+                            <option value="tls">TLS</option>
+                            <option value="ssl">SSL</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
                           <label className="text-sm font-medium text-slate-900 dark:text-slate-50">Username / API Key</label>
                           <Input value={newSmtp.username} onChange={(e) => setNewSmtp({...newSmtp, username: e.target.value})} className="bg-white dark:bg-slate-950" />
                         </div>
@@ -229,7 +237,7 @@ export default function Settings() {
                           if (newSmtp.host && newSmtp.username) {
                             addSmtpConfiguration(newSmtp);
                             setIsAddingSmtp(false);
-                            setNewSmtp({ provider: 'Custom SMTP', host: '', port: 587, username: '', password: '', fromName: '', fromAddress: '' });
+                            setNewSmtp({ provider: 'Custom SMTP', host: '', port: 587, encryption: 'tls', username: '', password: '', fromName: '', fromAddress: '' });
                           }
                         }} className="bg-indigo-600 hover:bg-indigo-700 text-white">Save Configuration</Button>
                       </div>

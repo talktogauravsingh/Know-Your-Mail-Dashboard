@@ -26,10 +26,6 @@ class AnalysisController extends Controller
     {
         $user = $request->user();
 
-        if (!$user->hasPermission('view_hierarchical_analysis')) {
-            abort(403, 'Insufficient permissions');
-        }
-
         $subordinateIds = $user->getSubordinateIds();
         $users = User::whereIn('id', $subordinateIds)
             ->select('id', 'name', 'email', 'role_id')
@@ -71,10 +67,6 @@ class AnalysisController extends Controller
         $user = $request->user();
         $campaign = Campaign::forUser($user)->findOrFail($id);
 
-        if (!$user->hasPermission('view_campaign_analysis')) {
-            abort(403, 'Insufficient permissions');
-        }
-
         $sendLogs = SendLog::where('campaign_id', $id);
 
         $sentCount = (clone $sendLogs)->count();
@@ -106,12 +98,13 @@ class AnalysisController extends Controller
 
         // Recipients sample
         $recipientList = (clone $sendLogs)
+            ->with('recipient')
             ->latest()
             ->take(20)
             ->get()
             ->map(fn($log) => [
                 'id' => $log->id,
-                'email' => $log->email,
+                'email' => $log->recipient ? $log->recipient->email : 'Unknown',
                 'status' => ucfirst($log->status),
                 'openCount' => $log->opened_at ? 1 : 0,
                 'clickCount' => (int)$log->clicks_count,
