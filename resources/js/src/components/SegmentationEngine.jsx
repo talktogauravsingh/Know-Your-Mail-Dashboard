@@ -64,14 +64,28 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
   };
 
   const fetchLiveCount = async (segment) => {
-    if (segment.isDefault || segment.filters.length === 0 || !campaignId) return;
+    // Only fetch if there are actual filters to apply
+    if (segment.filters.length === 0) {
+      setCounts(prev => ({ ...prev, [segment.id]: 0 }));
+      return;
+    }
     
     // Only fetch if all filters have a field and value
-    if (segment.filters.some(f => !f.field || !f.value)) return;
+    if (segment.filters.some(f => !f.field || !f.value)) {
+      setCounts(prev => ({ ...prev, [segment.id]: 0 }));
+      return;
+    }
 
+    console.log(`Fetching live count for segment ${segment.id}`, segment.filters);
     setLoading(prev => ({ ...prev, [segment.id]: true }));
+    
     try {
-      const response = await api.post(`/campaigns/${campaignId}/segments/validate-count`, {
+      // Use the new flexible route: /api/campaigns/segments/validate-count/{campaign?}
+      const url = campaignId 
+        ? `/campaigns/segments/validate-count/${campaignId}` 
+        : `/campaigns/segments/validate-count`;
+
+      const response = await api.post(url, {
         module_type: moduleType,
         module_id: moduleId,
         groups: [{ filters: segment.filters.map(f => ({
@@ -80,6 +94,8 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
           field_value: f.value
         })) }]
       });
+      
+      console.log(`Received count for segment ${segment.id}: ${response.data.count}`);
       setCounts(prev => ({ ...prev, [segment.id]: response.data.count }));
     } catch (error) {
       console.error('Failed to fetch count', error);
@@ -89,6 +105,20 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
   };
 
   const [internalInsights, setInternalInsights] = useState([]);
+
+  // Debounced effect for live counting whenever filters change
+  useEffect(() => {
+    const activeSegments = segments.filter(s => !s.isDefault || s.filters.length > 0);
+    if (activeSegments.length === 0) return;
+
+    const timer = setTimeout(() => {
+      activeSegments.forEach(segment => {
+        fetchLiveCount(segment);
+      });
+    }, 600); // 600ms debounce to avoid spamming the API
+
+    return () => clearTimeout(timer);
+  }, [JSON.stringify(segments), campaignId, moduleType, moduleId]);
 
   useEffect(() => {
     onSegmentsChange?.(segments);
@@ -131,6 +161,7 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
             <p className="text-sm text-slate-500">Define rules to send different content to different groups.</p>
           </div>
           <Button 
+            type="button"
             onClick={addSegment} 
             disabled={segments.length >= maxSegments}
             variant="outline" 
@@ -169,7 +200,7 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
                   )}
                 </div>
                 {!segment.isDefault && (
-                  <Button variant="ghost" size="icon" onClick={() => removeSegment(segment.id)} className="h-8 w-8 text-slate-400 hover:text-red-500">
+                  <Button type="button" variant="ghost" size="icon" onClick={() => removeSegment(segment.id)} className="h-8 w-8 text-slate-400 hover:text-red-500">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 )}
@@ -195,7 +226,6 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
                         <Select 
                           value={filter.field} 
                           onChange={(e) => updateFilter(segment.id, fIdx, { field: e.target.value })}
-                          onBlur={() => fetchLiveCount(segment)}
                           className="h-9 min-w-[140px]"
                         >
                           <option value="">Select Field</option>
@@ -209,7 +239,6 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
                         <Select 
                           value={filter.operator} 
                           onChange={(e) => updateFilter(segment.id, fIdx, { operator: e.target.value })}
-                          onBlur={() => fetchLiveCount(segment)}
                           className="h-9 w-32"
                         >
                           <option value="=">equals</option>
@@ -224,18 +253,17 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
                           placeholder="Value..." 
                           value={filter.value}
                           onChange={(e) => updateFilter(segment.id, fIdx, { value: e.target.value })}
-                          onBlur={() => fetchLiveCount(segment)}
                           className="h-9"
                         />
 
-                        <Button variant="ghost" size="icon" onClick={() => removeFilter(segment.id, fIdx)} className="h-8 w-8 text-slate-400 hover:text-red-500">
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeFilter(segment.id, fIdx)} className="h-8 w-8 text-slate-400 hover:text-red-500">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     ))}
                     
                     <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
-                      <Button variant="ghost" size="sm" onClick={() => addFilter(segment.id)} className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 gap-1.5 h-8">
+                      <Button type="button" variant="ghost" size="sm" onClick={() => addFilter(segment.id)} className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 gap-1.5 h-8">
                         <Plus className="h-3.5 w-3.5" /> Add Condition
                       </Button>
                       

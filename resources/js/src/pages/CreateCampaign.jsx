@@ -202,7 +202,7 @@ export default function CreateCampaign() {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Link to="/campaigns">
-            <Button variant="ghost" size="icon" className="rounded-full">
+            <Button type="button" variant="ghost" size="icon" className="rounded-full">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>

@@ -75,7 +75,7 @@ class SegmentationController extends Controller
     /**
      * Validate the count of recipients for a set of filters.
      */
-    public function validateCount(Request $request, Campaign $campaign)
+    public function validateCount(Request $request, $campaignId = null)
     {
         $request->validate([
             'groups' => 'required|array',
@@ -87,7 +87,16 @@ class SegmentationController extends Controller
             'module_id' => 'nullable|integer',
         ]);
 
-        $query = Recipient::where('organization_id', $campaign->organization_id);
+        $campaign = $campaignId ? Campaign::find($campaignId) : null;
+        $organizationId = $campaign ? $campaign->organization_id : ($request->user() ? $request->user()->organization_id : 1);
+
+        Log::info("Validating segment count for organization {$organizationId}", [
+            'campaign_id' => $campaignId,
+            'module_type' => $request->module_type,
+            'module_id' => $request->module_id
+        ]);
+
+        $query = Recipient::where('organization_id', $organizationId);
 
         // Filter by module if specified
         if ($request->has('module_type') && $request->has('module_id')) {
@@ -115,7 +124,7 @@ class SegmentationController extends Controller
 
     protected function applyFilter($query, $filter)
     {
-        $field = $filter['field_name'];
+        $field = strtolower(trim($filter['field_name']));
         $value = $filter['field_value'];
         $op = $filter['operator'];
 
@@ -124,28 +133,62 @@ class SegmentationController extends Controller
             $value = strtolower(trim($value));
         }
 
-        $column = "attributes->'$.{$field}'";
+        // Handle top-level columns vs JSON attributes
+        // These are actual columns in the recipients table
+        $topLevelColumns = ['email', 'name', 'phone', 'lead_type'];
+        
+        if (in_array($field, $topLevelColumns)) {
+            $column = $field;
+            $useJson = false;
+        } else {
+            $column = "attributes->'$.{$field}'";
+            $useJson = true;
+        }
 
         switch ($op) {
             case '=':
-                $query->whereRaw("JSON_UNQUOTE({$column}) = ?", [$value]);
+                if ($useJson) {
+                    $query->whereRaw("JSON_UNQUOTE({$column}) = ?", [$value]);
+                } else {
+                    $query->where($column, $value);
+                }
                 break;
             case '!=':
-                $query->whereRaw("JSON_UNQUOTE({$column}) != ?", [$value]);
+                if ($useJson) {
+                    $query->whereRaw("JSON_UNQUOTE({$column}) != ?", [$value]);
+                } else {
+                    $query->where($column, '!=', $value);
+                }
                 break;
             case 'in':
                 $values = is_array($value) ? $value : array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
-                $query->whereRaw("JSON_UNQUOTE({$column}) IN (" . implode(',', array_fill(0, count($values), '?')) . ")", $values);
+                if ($useJson) {
+                    $query->whereRaw("JSON_UNQUOTE({$column}) IN (" . implode(',', array_fill(0, count($values), '?')) . ")", $values);
+                } else {
+                    $query->whereIn($column, $values);
+                }
                 break;
             case 'not_in':
                 $values = is_array($value) ? $value : array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
-                $query->whereRaw("JSON_UNQUOTE({$column}) NOT IN (" . implode(',', array_fill(0, count($values), '?')) . ")", $values);
+                if ($useJson) {
+                    $query->whereRaw("JSON_UNQUOTE({$column}) NOT IN (" . implode(',', array_fill(0, count($values), '?')) . ")", $values);
+                } else {
+                    $query->whereNotIn($column, $values);
+                }
                 break;
             case 'contains':
-                $query->whereRaw("JSON_UNQUOTE({$column}) LIKE ?", ["%{$value}%"]);
+                if ($useJson) {
+                    $query->whereRaw("JSON_UNQUOTE({$column}) LIKE ?", ["%{$value}%"]);
+                } else {
+                    $query->where($column, 'LIKE', "%{$value}%");
+                }
                 break;
             case 'starts_with':
-                $query->whereRaw("JSON_UNQUOTE({$column}) LIKE ?", ["{$value}%"]);
+                if ($useJson) {
+                    $query->whereRaw("JSON_UNQUOTE({$column}) LIKE ?", ["{$value}%"]);
+                } else {
+                    $query->where($column, 'LIKE', "{$value}%");
+                }
                 break;
         }
     }
