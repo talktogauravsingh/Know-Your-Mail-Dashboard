@@ -157,10 +157,13 @@ class ProcessCsvImportJob implements ShouldQueue
     
     private function upsertChunk(array $chunk)
     {
+        // We use the unique index (agent_id, email) to detect duplicates.
+        // If a recipient already exists (e.g. from an Org-wide upload),
+        // we update their module association so they are now linked to this specific campaign.
         DB::table('recipients')->upsert(
             $chunk,
-            ['module_type', 'module_id', 'email'],
-            ['name', 'attributes', 'updated_at']
+            ['agent_id', 'email'],
+            ['name', 'attributes', 'module_type', 'module_id', 'updated_at']
         );
     }
 

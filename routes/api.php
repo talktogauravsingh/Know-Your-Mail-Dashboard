@@ -57,12 +57,10 @@ Route::prefix('recipients')->group(function () {
 
 // Analysis APIs
 Route::middleware(['auth:sanctum'])->prefix('analysis')->group(function () {
-    Route::middleware('permissions:view_campaign_analysis')->group(function () {
-        Route::get('dashboard', [AnalysisController::class, 'dashboard']);
-        Route::get('hierarchical', [AnalysisController::class, 'hierarchical']);
-        Route::get('campaign/{id}', [AnalysisController::class, 'campaignAnalysis']);
-        Route::get('template/{id}', [AnalysisController::class, 'templateAnalysis']);
-    });
+    Route::get('dashboard', [AnalysisController::class, 'dashboard']);
+    Route::get('hierarchical', [AnalysisController::class, 'hierarchical']);
+    Route::get('campaign/{id}', [AnalysisController::class, 'campaignAnalysis']);
+    Route::get('template/{id}', [AnalysisController::class, 'templateAnalysis']);
 
     Route::middleware('permissions:track_conversions')->group(function () {
         Route::post('conversion', [AnalysisController::class, 'recordConversion']);
@@ -76,9 +74,16 @@ Route::middleware('auth:sanctum')->prefix('campaigns')->group(function () {
     Route::get('/{campaign}', [CampaignController::class, 'show']);
     Route::patch('/{campaign}', [CampaignController::class, 'update']);
     Route::get('/{campaign}/insights', [\App\Http\Controllers\Api\SegmentationController::class, 'getInsights']);
-    Route::post('/{campaign}/segments/validate-count', [\App\Http\Controllers\Api\SegmentationController::class, 'validateCount']);
+    Route::post('/segments/validate-count/{campaign?}', [\App\Http\Controllers\Api\SegmentationController::class, 'validateCount']);
 });
 
 Route::get('/o/{requestUserId}', [TrackingController::class, 'OpenMailTrack']);
 Route::get('/c/{requestUserId}', [TrackingController::class, 'ClickMailTrack']);
 Route::post('ai/email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate']);
+
+Route::middleware('auth:sanctum')->prefix('smtp-configurations')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'store']);
+    Route::put('/{smtpConfiguration}', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'update']);
+    Route::delete('/{smtpConfiguration}', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'destroy']);
+});

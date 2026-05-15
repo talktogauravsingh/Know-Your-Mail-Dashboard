@@ -19,11 +19,18 @@ class Campaign extends Model
         'segmentation_mode', // 'single' or 'segmented'
         'sender_config_id',
         'cta_url',
-        'variants'
+        'variants',
+        'schedule_type',
+        'scheduled_at',
+        'schedule_frequency',
+        'schedule_days',
+        'schedule_time',
     ];
 
     protected $casts = [
-        'variants' => 'array'
+        'variants' => 'array',
+        'schedule_days' => 'array',
+        'scheduled_at' => 'datetime',
     ];
 
     public function variants()

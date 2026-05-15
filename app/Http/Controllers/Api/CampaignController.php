@@ -33,10 +33,16 @@ class CampaignController extends Controller
             'name' => 'required|string|max:255',
             'subject' => 'required|string|max:255',
             'body' => 'required|string',
-            'cta_link' => 'nullable|url',
+            'cta_link' => 'nullable',
             'sender_config_id' => 'nullable',
             'segments' => 'nullable|array',
             'variants' => 'nullable|array',
+            'status' => 'nullable|string|in:draft,scheduled',
+            'schedule_type' => 'nullable|string|in:immediate,once,recurring',
+            'scheduled_at' => 'nullable|date',
+            'schedule_frequency' => 'nullable|string|in:daily,weekly,monthly',
+            'schedule_days' => 'nullable|array',
+            'schedule_time' => 'nullable|string',
         ]);
 
         $campaign = Campaign::create([
@@ -44,10 +50,15 @@ class CampaignController extends Controller
             'name' => $validated['name'],
             'subject' => $validated['subject'],
             'body' => $validated['body'],
-            'cta_url' => $validated['cta_link'] ?? null,
+            'cta_url' => $this->formatUrl($validated['cta_link'] ?? null),
             'sender_config_id' => $validated['sender_config_id'] ?? null,
             'segmentation_mode' => $request->input('segmentation_mode', 'single'),
-            'status' => 'draft',
+            'status' => $validated['status'] ?? 'draft',
+            'schedule_type' => $validated['schedule_type'] ?? 'immediate',
+            'scheduled_at' => $validated['scheduled_at'] ?? null,
+            'schedule_frequency' => $validated['schedule_frequency'] ?? null,
+            'schedule_days' => $validated['schedule_days'] ?? null,
+            'schedule_time' => $validated['schedule_time'] ?? null,
             'user_id' => Auth::id(),
         ]);
 
@@ -75,19 +86,32 @@ class CampaignController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'subject' => 'sometimes|required|string|max:255',
             'body' => 'sometimes|required|string',
-            'cta_link' => 'nullable|url',
+            'cta_link' => 'nullable|string',
             'sender_config_id' => 'nullable',
             'audience_segment' => 'nullable|string',
+            'segments' => 'nullable|array',
             'variants' => 'nullable|array',
+            'status' => 'nullable|string|in:draft,scheduled',
+            'schedule_type' => 'nullable|string|in:immediate,once,recurring',
+            'scheduled_at' => 'nullable|date',
+            'schedule_frequency' => 'nullable|string|in:daily,weekly,monthly',
+            'schedule_days' => 'nullable|array',
+            'schedule_time' => 'nullable|string',
         ]);
 
         $campaign->update([
             'name' => $validated['name'] ?? $campaign->name,
             'subject' => $validated['subject'] ?? $campaign->subject,
             'body' => $validated['body'] ?? $campaign->body,
-            'cta_url' => $validated['cta_link'] ?? $campaign->cta_url,
+            'cta_url' => isset($validated['cta_link']) ? $this->formatUrl($validated['cta_link']) : $campaign->cta_url,
             'sender_config_id' => $validated['sender_config_id'] ?? $campaign->sender_config_id,
             'segmentation_mode' => $request->input('segmentation_mode', $campaign->segmentation_mode),
+            'status' => $validated['status'] ?? $campaign->status,
+            'schedule_type' => $validated['schedule_type'] ?? $campaign->schedule_type,
+            'scheduled_at' => isset($validated['scheduled_at']) ? $validated['scheduled_at'] : $campaign->scheduled_at,
+            'schedule_frequency' => $validated['schedule_frequency'] ?? $campaign->schedule_frequency,
+            'schedule_days' => isset($validated['schedule_days']) ? $validated['schedule_days'] : $campaign->schedule_days,
+            'schedule_time' => isset($validated['schedule_time']) ? $validated['schedule_time'] : $campaign->schedule_time,
         ]);
 
         if (isset($validated['segments'])) {
@@ -110,9 +134,15 @@ class CampaignController extends Controller
     protected function syncSegments($campaign, $segments, $variantData)
     {
         DB::transaction(function () use ($campaign, $segments, $variantData) {
-            // Remove existing variants that are NOT in the incoming segments list
-            $incomingIds = collect($segments)->pluck('id')->filter()->toArray();
-            $campaign->variants()->whereNotIn('id', $incomingIds)->delete();
+            $incomingIds = collect($segments)->pluck('id')->filter(function ($id) {
+                return is_numeric($id);
+            })->toArray();
+
+            if (empty($incomingIds)) {
+                $campaign->variants()->delete();
+            } else {
+                $campaign->variants()->whereNotIn('id', $incomingIds)->delete();
+            }
 
             foreach ($segments as $segment) {
                 $isDefault = $segment['isDefault'] ?? false;
@@ -128,32 +158,38 @@ class CampaignController extends Controller
                         'name' => $segment['name'] ?? 'Untitled Segment',
                         'subject' => $custom['subject'] ?? $campaign->subject,
                         'body' => $custom['body'] ?? $campaign->body,
-                        'cta_url' => $custom['cta_link'] ?? $campaign->cta_url,
+                        'cta_url' => $this->formatUrl($custom['cta_link'] ?? $campaign->cta_url),
                         'is_default' => $isDefault,
                         'priority' => $segment['priority'] ?? 0,
                     ]
                 );
 
-                // 2. Sync Filters (for non-default variants)
-                if (!$isDefault) {
-                    $variant->filterGroups()->delete(); // Simple clear and recreate
+                // 2. Sync Filters
+                $variant->filterGroups()->delete(); // Simple clear and recreate
+                
+                if (!empty($segment['filters'])) {
+                    $group = $variant->filterGroups()->create(['group_index' => 0]);
                     
-                    if (!empty($segment['filters'])) {
-                        $group = $variant->filterGroups()->create(['group_index' => 0]);
+                    foreach ($segment['filters'] as $filter) {
+                        if (empty($filter['field'])) continue;
                         
-                        foreach ($segment['filters'] as $filter) {
-                            if (empty($filter['field'])) continue;
-                            
-                            $group->filters()->create([
-                                'field_name' => $filter['field'],
-                                'operator' => $filter['operator'] ?? '=',
-                                'field_value' => $filter['value'] ?? '',
-                            ]);
-                        }
+                        $group->filters()->create([
+                            'field_name' => $filter['field'],
+                            'operator' => $filter['operator'] ?? '=',
+                            'field_value' => $filter['value'] ?? '',
+                        ]);
                     }
                 }
             }
         });
+    }
+
+    private function formatUrl($url)
+    {
+        if ($url && !preg_match('~^(?:f|ht)tps?://~i', $url)) {
+            return 'https://' . ltrim($url, '/');
+        }
+        return $url;
     }
 }
 

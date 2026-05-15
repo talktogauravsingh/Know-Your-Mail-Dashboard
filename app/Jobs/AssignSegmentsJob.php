@@ -28,8 +28,7 @@ class AssignSegmentsJob implements ShouldQueue
     public function handle()
     {
         if ($this->campaign->segmentation_mode !== 'segmented') {
-            Log::info("Campaign {$this->campaign->id} is not in segmented mode. Skipping.");
-            return;
+            Log::info("Campaign {$this->campaign->id} is in single mode. Proceeding with default assignment.");
         }
 
         // 1. Get all variants ordered by priority (descending so high priority overwrites low priority)
@@ -37,7 +36,7 @@ class AssignSegmentsJob implements ShouldQueue
         // Default -> Low Priority (High Number) -> High Priority (Low Number)
         $variants = $this->campaign->variants()
             ->with(['filterGroups.filters'])
-            ->orderBy('is_default', 'asc') // Default (0) first, then non-defaults
+            ->orderBy('is_default', 'desc') // Default (1) first, then non-defaults (0)
             ->orderBy('priority', 'desc') // Higher number (lower priority) first
             ->get();
 
@@ -58,17 +57,15 @@ class AssignSegmentsJob implements ShouldQueue
 
     protected function assignRecipientsToVariant(CampaignVariant $variant)
     {
-        $query = Recipient::where('organization_id', $this->campaign->organization_id);
-
-        if ($variant->is_default) {
-            // Assign ALL recipients to default first (other variants will overwrite)
-            // No extra filters needed
+        $hasCampaignRecipients = Recipient::where('module_type', 2)->where('module_id', $this->campaign->id)->exists();
+        if ($hasCampaignRecipients) {
+            $query = Recipient::where('module_type', 2)->where('module_id', $this->campaign->id);
         } else {
-            $filterGroups = $variant->filterGroups;
-            if ($filterGroups->isEmpty()) {
-                return;
-            }
+            $query = Recipient::where('module_type', 1)->where('module_id', $this->campaign->organization_id);
+        }
 
+        $filterGroups = $variant->filterGroups;
+        if (!$filterGroups->isEmpty()) {
             $query->where(function ($q) use ($filterGroups) {
                 foreach ($filterGroups as $group) {
                     $q->orWhere(function ($subQ) use ($group) {
@@ -78,6 +75,9 @@ class AssignSegmentsJob implements ShouldQueue
                     });
                 }
             });
+        } elseif (!$variant->is_default) {
+            // Non-default variant with no filters shouldn't match anyone
+            return;
         }
 
         // Perform batch insert/update (ON DUPLICATE KEY UPDATE variant_id)
@@ -92,7 +92,7 @@ class AssignSegmentsJob implements ShouldQueue
             ON DUPLICATE KEY UPDATE variant_id = VALUES(variant_id), updated_at = VALUES(updated_at)
         ";
 
-        DB::statement($sql, array_merge([$campaignId, $variantId, $now, $now], $query->getBindings()));
+        DB::statement($sql, $query->getBindings());
     }
 
     protected function applyFilter($query, $filter)
@@ -100,6 +100,11 @@ class AssignSegmentsJob implements ShouldQueue
         $field = $filter->field_name;
         $value = $filter->field_value;
         $op = $filter->operator;
+
+        // Lowercase for comparison to match imported data
+        if (is_string($value)) {
+            $value = strtolower(trim($value));
+        }
 
         // Attributes is a JSON column. We use JSON_UNQUOTE(JSON_EXTRACT(...)) or -> syntax
         $column = "attributes->'$.{$field}'";
@@ -112,11 +117,11 @@ class AssignSegmentsJob implements ShouldQueue
                 $query->whereRaw("JSON_UNQUOTE({$column}) != ?", [$value]);
                 break;
             case 'in':
-                $values = array_map('trim', explode(',', $value));
+                $values = array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
                 $query->whereRaw("JSON_UNQUOTE({$column}) IN (" . implode(',', array_fill(0, count($values), '?')) . ")", $values);
                 break;
             case 'not_in':
-                $values = array_map('trim', explode(',', $value));
+                $values = array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
                 $query->whereRaw("JSON_UNQUOTE({$column}) NOT IN (" . implode(',', array_fill(0, count($values), '?')) . ")", $values);
                 break;
             case 'contains':
