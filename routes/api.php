@@ -87,3 +87,9 @@ Route::middleware('auth:sanctum')->prefix('smtp-configurations')->group(function
     Route::put('/{smtpConfiguration}', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'update']);
     Route::delete('/{smtpConfiguration}', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'destroy']);
 });
+
+// Spam Detection Platform APIs
+Route::middleware([\App\Http\Middleware\RateLimitByPlan::class, \App\Http\Middleware\AdvancedAbuseProtection::class])->prefix('spam')->group(function () {
+    Route::post('/analyze-content', [\App\Http\Controllers\Api\SpamAnalysisController::class, 'analyzeContent']);
+    Route::post('/analyze-full', [\App\Http\Controllers\Api\SpamAnalysisController::class, 'analyzeFull']);
+});
