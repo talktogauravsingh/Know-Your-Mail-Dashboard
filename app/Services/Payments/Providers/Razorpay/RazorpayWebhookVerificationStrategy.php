@@ -3,8 +3,6 @@
 namespace App\Services\Payments\Providers\Razorpay;
 
 use App\Services\Payments\Contracts\WebhookVerificationStrategy;
-use App\Services\Payments\Exceptions\SignatureVerificationException;
-
 final class RazorpayWebhookVerificationStrategy implements WebhookVerificationStrategy
 {
     public function __construct(
@@ -17,12 +15,17 @@ final class RazorpayWebhookVerificationStrategy implements WebhookVerificationSt
      */
     public function validate(array $payload, ?string $receivedSignature): bool
     {
-        if (empty($receivedSignature)) {
+        $rawPayload = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if (!is_string($rawPayload)) {
             return false;
         }
 
-        $rawPayload = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        if (!is_string($rawPayload)) {
+        return $this->validateRawPayload($rawPayload, $receivedSignature);
+    }
+
+    public function validateRawPayload(string $rawPayload, ?string $receivedSignature): bool
+    {
+        if (empty($receivedSignature)) {
             return false;
         }
 

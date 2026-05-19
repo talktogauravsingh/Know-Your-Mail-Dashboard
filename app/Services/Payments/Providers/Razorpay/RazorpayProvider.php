@@ -7,6 +7,8 @@ use App\Services\Payments\DTO\CreateOrderInput;
 use App\Services\Payments\DTO\CreateOrderOutput;
 use App\Services\Payments\DTO\VerifyPaymentInput;
 use App\Services\Payments\DTO\VerifyPaymentOutput;
+use App\Services\Payments\Exceptions\PaymentException;
+use Illuminate\Support\Facades\Http;
 
 final class RazorpayProvider implements PaymentProviderInterface
 {
@@ -14,6 +16,7 @@ final class RazorpayProvider implements PaymentProviderInterface
         private readonly string $apiKey,
         private readonly string $apiSecret,
         private readonly RazorpayWebhookVerificationStrategy $webhookVerification,
+        private readonly string $baseUrl = 'https://api.razorpay.com/v1',
     ) {}
 
     public function providerKey(): string
@@ -23,19 +26,101 @@ final class RazorpayProvider implements PaymentProviderInterface
 
     public function createOrder(CreateOrderInput $input): CreateOrderOutput
     {
-        // TODO: Implement using Razorpay Standard Checkout orders API
-        // This method is intentionally left as production-safe scaffold: it must be implemented next.
-        throw new \RuntimeException('RazorpayProvider::createOrder not implemented yet');
+        $this->ensureConfigured();
+
+        $response = Http::withBasicAuth($this->apiKey, $this->apiSecret)
+            ->acceptJson()
+            ->asJson()
+            ->post(rtrim($this->baseUrl, '/') . '/orders', [
+                'amount' => $input->amountMinor,
+                'currency' => strtoupper($input->currency),
+                'receipt' => substr($input->idempotencyKey, 0, 40),
+                'notes' => $this->sanitizeNotes(array_merge(
+                    $input->customerMetadata,
+                    $input->orderNotes,
+                    [
+                        'organization_id' => (string) $input->organizationId,
+                        'user_id' => (string) $input->userId,
+                        'client_reference_id' => (string) ($input->clientReferenceId ?? ''),
+                    ],
+                )),
+            ]);
+
+        if ($response->failed()) {
+            throw new PaymentException('Razorpay order creation failed: ' . $response->body());
+        }
+
+        $payload = $response->json();
+        if (!is_array($payload) || empty($payload['id'])) {
+            throw new PaymentException('Razorpay order creation returned an invalid response.');
+        }
+
+        return new CreateOrderOutput(
+            providerOrderId: (string) $payload['id'],
+            currency: (string) ($payload['currency'] ?? $input->currency),
+            amountMinor: (int) ($payload['amount'] ?? $input->amountMinor),
+            providerRawResponse: $this->sanitizeProviderPayload($payload),
+        );
     }
 
     public function verifyPayment(VerifyPaymentInput $input): VerifyPaymentOutput
     {
-        // TODO: Implement using Razorpay signature verification for payment + order
-        throw new \RuntimeException('RazorpayProvider::verifyPayment not implemented yet');
+        $this->ensureConfigured();
+
+        if (empty($input->providerSignature)) {
+            return new VerifyPaymentOutput(
+                providerOrderId: $input->providerOrderId,
+                providerPaymentId: $input->providerPaymentId,
+                isVerified: false,
+                providerRawResponse: ['signature_present' => false],
+            );
+        }
+
+        $expected = hash_hmac(
+            'sha256',
+            $input->providerOrderId . '|' . $input->providerPaymentId,
+            $this->apiSecret,
+        );
+
+        $isVerified = hash_equals($expected, $input->providerSignature);
+
+        return new VerifyPaymentOutput(
+            providerOrderId: $input->providerOrderId,
+            providerPaymentId: $input->providerPaymentId,
+            isVerified: $isVerified,
+            providerRawResponse: ['signature_present' => true],
+        );
     }
 
     public function validateWebhookSignature(array $payload, ?string $receivedSignature): bool
     {
         return $this->webhookVerification->validate($payload, $receivedSignature);
+    }
+
+    public function validateRawWebhookSignature(string $rawPayload, ?string $receivedSignature): bool
+    {
+        return $this->webhookVerification->validateRawPayload($rawPayload, $receivedSignature);
+    }
+
+    private function sanitizeNotes(array $notes): array
+    {
+        return collect($notes)
+            ->filter(fn ($value) => is_scalar($value) || $value === null)
+            ->map(fn ($value) => substr((string) $value, 0, 255))
+            ->all();
+    }
+
+    private function sanitizeProviderPayload(array $payload): array
+    {
+        unset($payload['key_secret'], $payload['secret']);
+
+        return $payload;
+    }
+
+    private function ensureConfigured(): void
+    {
+        if ($this->apiKey === '' || $this->apiSecret === '') {
+            throw new PaymentException('Razorpay credentials are not configured.');
+        }
     }
 }

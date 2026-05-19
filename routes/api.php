@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\PermissionController;
+use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\BulkRecipientController;
 use App\Http\Controllers\Api\AnalysisController;
@@ -80,6 +81,14 @@ Route::middleware('auth:sanctum')->prefix('campaigns')->group(function () {
 Route::get('/o/{requestUserId}', [TrackingController::class, 'OpenMailTrack']);
 Route::get('/c/{requestUserId}', [TrackingController::class, 'ClickMailTrack']);
 Route::post('ai/email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate']);
+
+Route::post('/payments/webhooks/razorpay', [PaymentController::class, 'razorpayWebhook']);
+
+Route::middleware('auth:sanctum')->prefix('payments')->group(function () {
+    Route::post('/orders', [PaymentController::class, 'createOrder']);
+    Route::post('/verify', [PaymentController::class, 'verify']);
+    Route::get('/{transaction}/status', [PaymentController::class, 'status']);
+});
 
 Route::middleware('auth:sanctum')->prefix('smtp-configurations')->group(function () {
     Route::get('/', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'index']);

@@ -13,7 +13,7 @@ interface PaymentProviderInterface
 
     public function verifyPayment(VerifyPaymentInput $input): VerifyPaymentOutput;
 
-    public function validateWebhookSignature(array $payload, string $receivedSignature): bool;
+    public function validateWebhookSignature(array $payload, ?string $receivedSignature): bool;
 
     /**
      * Human-readable provider name key used internally (e.g. razorpay_standard).
