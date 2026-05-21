@@ -5,12 +5,15 @@ namespace App\Services\Payments;
 use App\Models\PaymentProviderEvent;
 use App\Models\PaymentTransaction;
 use App\Models\User;
+use App\Jobs\ProcessRazorpayWebhookEventJob;
 use App\Services\Payments\Contracts\PaymentProviderInterface;
 use App\Services\Payments\DTO\CreateOrderInput;
 use App\Services\Payments\DTO\IdempotencyKeyFactory;
 use App\Services\Payments\DTO\VerifyPaymentInput;
+use App\Services\Payments\Exceptions\PaymentException;
 use App\Services\Payments\Exceptions\SignatureVerificationException;
 use App\Services\Payments\Providers\Razorpay\RazorpayProvider;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -25,6 +28,10 @@ class PaymentService
         $provider = $data['provider'] ?? $this->provider->providerKey();
         $idempotencyKey = $requestIdempotencyKey ?: ($data['idempotency_key'] ?? (string) Str::uuid());
         $organizationId = (int) $user->organization_id;
+
+        if ($organizationId <= 0) {
+            throw new PaymentException('User is not attached to an organization.');
+        }
 
         return DB::transaction(function () use ($data, $idempotencyKey, $organizationId, $provider, $user) {
             $transaction = PaymentTransaction::where([
@@ -86,6 +93,10 @@ class PaymentService
         $organizationId = (int) $user->organization_id;
         $providerPaymentId = (string) $data['razorpay_payment_id'];
 
+        if ($organizationId <= 0) {
+            throw new PaymentException('User is not attached to an organization.');
+        }
+
         $result = DB::transaction(function () use ($data, $organizationId, $providerPaymentId) {
             $transaction = PaymentTransaction::where('organization_id', $organizationId)
                 ->where('provider_order_id', $data['razorpay_order_id'])
@@ -126,12 +137,27 @@ class PaymentService
 
     public function getStatus(User $user, int $transactionId): PaymentTransaction
     {
+        if ((int) $user->organization_id <= 0) {
+            throw new PaymentException('User is not attached to an organization.');
+        }
+
         return PaymentTransaction::where('organization_id', (int) $user->organization_id)
             ->whereKey($transactionId)
             ->firstOrFail();
     }
 
     public function processRazorpayWebhook(array $payload, string $rawPayload, ?string $signature): PaymentProviderEvent
+    {
+        $event = $this->storeRazorpayWebhookEvent($payload, $rawPayload, $signature);
+
+        if ($event->status === 'RECEIVED') {
+            ProcessRazorpayWebhookEventJob::dispatch($event->id);
+        }
+
+        return $event;
+    }
+
+    public function storeRazorpayWebhookEvent(array $payload, string $rawPayload, ?string $signature): PaymentProviderEvent
     {
         $isValid = $this->provider instanceof RazorpayProvider
             ? $this->provider->validateRawWebhookSignature($rawPayload, $signature)
@@ -150,11 +176,55 @@ class PaymentService
         $providerOrderId = $paymentEntity['order_id'] ?? $orderEntity['id'] ?? null;
         $providerPaymentId = $paymentEntity['id'] ?? null;
 
-        return DB::transaction(function () use ($payload, $signature, $eventType, $eventId, $providerOrderId, $providerPaymentId, $paymentEntity) {
-            $existing = PaymentProviderEvent::where('provider_event_id', $eventId)->lockForUpdate()->first();
+        try {
+            return DB::transaction(function () use ($payload, $signature, $eventType, $eventId, $providerOrderId, $providerPaymentId) {
+                $existing = PaymentProviderEvent::where('provider_event_id', $eventId)->lockForUpdate()->first();
+                if ($existing) {
+                    return $existing;
+                }
+
+                return PaymentProviderEvent::create([
+                    'organization_id' => 0,
+                    'user_id' => null,
+                    'provider' => 'razorpay',
+                    'event_type' => $eventType,
+                    'provider_event_id' => $eventId,
+                    'provider_order_id' => $providerOrderId,
+                    'provider_payment_id' => $providerPaymentId,
+                    'provider_signature' => $signature,
+                    'payload' => $this->sanitizeWebhookPayload($payload),
+                    'status' => 'RECEIVED',
+                ]);
+            });
+        } catch (QueryException $exception) {
+            $existing = PaymentProviderEvent::where('provider_event_id', $eventId)->first();
+
             if ($existing) {
                 return $existing;
             }
+
+            throw $exception;
+        }
+    }
+
+    public function processStoredRazorpayWebhookEvent(int $paymentProviderEventId): PaymentProviderEvent
+    {
+        return DB::transaction(function () use ($paymentProviderEventId) {
+            $event = PaymentProviderEvent::whereKey($paymentProviderEventId)->lockForUpdate()->firstOrFail();
+
+            if ($event->status === 'PROCESSED' || $event->status === 'IGNORED') {
+                return $event;
+            }
+
+            $event->update(['status' => 'PROCESSING', 'failure_reason' => null]);
+
+            $payload = $event->payload ?? [];
+            $paymentEntity = $payload['payload']['payment']['entity'] ?? [];
+            $orderEntity = $payload['payload']['order']['entity'] ?? [];
+            $paymentEntity = is_array($paymentEntity) ? $paymentEntity : [];
+            $orderEntity = is_array($orderEntity) ? $orderEntity : [];
+            $providerOrderId = $event->provider_order_id ?: ($paymentEntity['order_id'] ?? $orderEntity['id'] ?? null);
+            $providerPaymentId = $event->provider_payment_id ?: ($paymentEntity['id'] ?? null);
 
             $transaction = PaymentTransaction::where('provider', 'razorpay')
                 ->when($providerOrderId, fn ($query) => $query->where('provider_order_id', $providerOrderId))
@@ -162,24 +232,27 @@ class PaymentService
                 ->lockForUpdate()
                 ->first();
 
-            $event = PaymentProviderEvent::create([
-                'organization_id' => (int) ($transaction->organization_id ?? 0),
-                'user_id' => $transaction->user_id ?? null,
-                'provider' => 'razorpay',
-                'event_type' => $eventType,
-                'provider_event_id' => $eventId,
-                'provider_order_id' => $providerOrderId,
-                'provider_payment_id' => $providerPaymentId,
-                'provider_signature' => $signature,
-                'payload' => $this->sanitizeWebhookPayload($payload),
-                'status' => $transaction ? 'PROCESSED' : 'IGNORED',
-            ]);
+            if (!$transaction) {
+                $event->update(['status' => 'IGNORED']);
 
-            if ($transaction) {
-                $transaction->update($this->webhookTransactionUpdates($eventType, $providerPaymentId, $paymentEntity));
+                return $event->refresh();
             }
 
-            return $event;
+            $transaction->update($this->webhookTransactionUpdates(
+                (string) $event->event_type,
+                $providerPaymentId,
+                $paymentEntity,
+            ));
+
+            $event->update([
+                'organization_id' => (int) $transaction->organization_id,
+                'user_id' => $transaction->user_id,
+                'provider_order_id' => $providerOrderId,
+                'provider_payment_id' => $providerPaymentId,
+                'status' => 'PROCESSED',
+            ]);
+
+            return $event->refresh();
         });
     }
 

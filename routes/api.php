@@ -52,7 +52,7 @@ Route::middleware(['auth:sanctum', 'permissions:manage_roles'])->prefix('roles/{
     Route::delete('/', [RolePermissionController::class, 'destroy']);
 });
 
-Route::prefix('recipients')->group(function () {
+Route::middleware('auth:sanctum')->prefix('recipients')->group(function () {
     Route::post('bulk-upload', [\App\Http\Controllers\Api\BulkRecipientController::class, 'bulkUpload']);
 });
 
@@ -78,8 +78,10 @@ Route::middleware('auth:sanctum')->prefix('campaigns')->group(function () {
     Route::post('/segments/validate-count/{campaign?}', [\App\Http\Controllers\Api\SegmentationController::class, 'validateCount']);
 });
 
-Route::get('/o/{requestUserId}', [TrackingController::class, 'OpenMailTrack']);
-Route::get('/c/{requestUserId}', [TrackingController::class, 'ClickMailTrack']);
+Route::get('/track/open/{sendLog}', [TrackingController::class, 'OpenMailTrack']);
+Route::get('/track/click/{sendLog}', [TrackingController::class, 'ClickMailTrack']);
+Route::get('/o/{sendLog}', [TrackingController::class, 'OpenMailTrack']);
+Route::get('/c/{sendLog}', [TrackingController::class, 'ClickMailTrack']);
 Route::post('ai/email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate']);
 
 Route::post('/payments/webhooks/razorpay', [PaymentController::class, 'razorpayWebhook']);

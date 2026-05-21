@@ -16,6 +16,8 @@ class SegmentationController extends Controller
      */
     public function getInsights(Campaign $campaign)
     {
+        abort_unless(request()->user()?->organization_id === $campaign->organization_id, 404);
+
         Log::info("Fetching insights for campaign {$campaign->id}");
 
         // Get campaign-specific insights (module_type 2)
@@ -46,7 +48,7 @@ class SegmentationController extends Controller
      */
     public function getOrgInsights(Request $request)
     {
-        $organizationId = $request->user() ? $request->user()->organization_id : 1;
+        $organizationId = $request->user()->organization_id;
 
         $insights = DB::table('campaign_csv_insights')
             ->where('module_type', 1)
@@ -80,15 +82,18 @@ class SegmentationController extends Controller
         $request->validate([
             'groups' => 'required|array',
             'groups.*.filters' => 'required|array',
-            'groups.*.filters.*.field_name' => 'required|string',
+            'groups.*.filters.*.field_name' => ['required', 'string', 'regex:/^[A-Za-z0-9_]+$/'],
             'groups.*.filters.*.operator' => 'required|string',
             'groups.*.filters.*.field_value' => 'required',
             'module_type' => 'nullable|integer|in:1,2',
             'module_id' => 'nullable|integer',
         ]);
 
-        $campaign = $campaignId ? Campaign::find($campaignId) : null;
-        $organizationId = $campaign ? $campaign->organization_id : ($request->user() ? $request->user()->organization_id : 1);
+        $user = $request->user();
+        $campaign = $campaignId
+            ? Campaign::where('organization_id', $user->organization_id)->findOrFail($campaignId)
+            : null;
+        $organizationId = $campaign ? $campaign->organization_id : $user->organization_id;
 
         Log::info("Validating segment count for organization {$organizationId}", [
             'campaign_id' => $campaignId,

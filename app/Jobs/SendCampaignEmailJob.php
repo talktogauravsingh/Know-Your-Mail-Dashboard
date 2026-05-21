@@ -26,7 +26,6 @@ class SendCampaignEmailJob implements ShouldQueue
 
     public function handle()
     {
-        return;
         $assignment = $this->assignment;
         $recipient = $assignment->recipient;
         $variant = $assignment->variant;
@@ -63,6 +62,7 @@ class SendCampaignEmailJob implements ShouldQueue
                 'campaign_id' => $campaign->id,
                 'recipient_id' => $recipient->id,
                 'variant_id' => $variant->id,
+                'email' => $recipient->email,
                 'status' => 'pending',
                 'bounce_type' => 'none',
                 'bounce_count' => 0,
@@ -84,10 +84,8 @@ class SendCampaignEmailJob implements ShouldQueue
             // Add CTA link if there is one
             $ctaLink = $variant->cta_url;
             if ($ctaLink) {
-                // In production, this would go through a proxy like:
-                // $trackedCta = url("/api/track/click/{$sendLog->id}?url=" . urlencode($ctaLink));
-                // But for now we just inject the raw link
-                $body .= "<br><br><a href='{$ctaLink}'>Click Here</a>";
+                $trackedCta = url("/api/track/click/{$sendLog->id}?url=" . urlencode($ctaLink));
+                $body .= "<br><br><a href='{$trackedCta}'>Click Here</a>";
             }
 
             // In production, body may be markdown or HTML. Assuming HTML for MVP.

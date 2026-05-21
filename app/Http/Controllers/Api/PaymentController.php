@@ -81,7 +81,11 @@ class PaymentController extends Controller
 
     public function status(Request $request, int $transaction)
     {
-        $payment = $this->payments->getStatus($request->user(), $transaction);
+        try {
+            $payment = $this->payments->getStatus($request->user(), $transaction);
+        } catch (PaymentException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
 
         return response()->json([
             'transaction_id' => $payment->id,

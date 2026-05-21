@@ -14,6 +14,8 @@ class Recipient extends Model
         'name',
         'phone',
         'attributes',
+        'module_type',
+        'module_id',
         'is_valid',
         'validation_reason'
     ];

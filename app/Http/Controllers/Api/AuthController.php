@@ -28,6 +28,7 @@ class AuthController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
+            'organization_name' => 'nullable|string|max:255',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
