@@ -13,11 +13,12 @@ return new class extends Migration {
             $table->renameColumn('additional_detail', 'attributes');
         });
 
-        DB::statement("
-            ALTER TABLE recipients 
-            ADD COLUMN lead_type VARCHAR(50) 
-            GENERATED ALWAYS AS (JSON_UNQUOTE(attributes->'$.lead_type')) STORED
-        ");
+        // Convert attributes column to jsonb (if not already)
+        DB::statement('ALTER TABLE recipients ALTER COLUMN attributes TYPE jsonb USING attributes::jsonb');
+        // Add generated column using PostgreSQL syntax
+        DB::statement(
+            "ALTER TABLE recipients ADD COLUMN lead_type VARCHAR(50) GENERATED ALWAYS AS ((attributes->>'lead_type')) STORED"
+        );
 
         // DB::statement("
         //     ALTER TABLE recipients 

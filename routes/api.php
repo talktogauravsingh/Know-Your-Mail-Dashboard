@@ -86,4 +86,5 @@ Route::middleware('auth:sanctum')->prefix('smtp-configurations')->group(function
     Route::post('/', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'store']);
     Route::put('/{smtpConfiguration}', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'update']);
     Route::delete('/{smtpConfiguration}', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'destroy']);
+    Route::post('/{smtpConfiguration}/activate', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'activate']);
 });

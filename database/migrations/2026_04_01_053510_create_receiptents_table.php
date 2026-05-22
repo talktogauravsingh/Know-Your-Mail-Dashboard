@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('recipients', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('campaign_id');
+            $table->foreignId('campaign_id')->constrained('campaigns')->onDelete('cascade');
             $table->string('email');
             $table->boolean('is_valid')->default(false);
             $table->string('validation_reason')->nullable();

@@ -8,17 +8,12 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('send_logs', function (Blueprint $table) {
-            $table->unsignedBigInteger('campaign_id')->nullable();
             $table->unsignedBigInteger('recipient_id')->nullable();
             $table->unsignedBigInteger('variant_id')->nullable();
-
-            $table->enum('status', ['pending','sent','failed','opened','clicked'])
-                  ->default('pending');
 
             $table->string('provider_message_id')->nullable();
 
             $table->timestamp('sent_at')->nullable();
-            $table->timestamp('opened_at')->nullable();
             $table->timestamp('clicked_at')->nullable();
 
             $table->index('campaign_id', 'idx_send_campaign');

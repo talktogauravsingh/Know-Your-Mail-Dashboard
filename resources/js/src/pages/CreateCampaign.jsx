@@ -319,7 +319,7 @@ export default function CreateCampaign() {
 
             {/* Removed Global Subject Line - now handled per segment in Content card */}
 
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="senderConfig">Sender Configuration</Label>
               <Select id="senderConfig" name="sender_config_id" required className="bg-white dark:bg-slate-950">
                 <option value="">Select a sender configuration...</option>
@@ -331,7 +331,7 @@ export default function CreateCampaign() {
                 ))}
               </Select>
               <p className="text-xs text-slate-500 mt-1">Select the verified domain or custom SMTP to send this campaign from.</p>
-            </div>
+            </div> */}
           </CardContent>
         </Card>
 

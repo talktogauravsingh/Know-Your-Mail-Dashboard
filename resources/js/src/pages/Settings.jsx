@@ -11,8 +11,10 @@ export default function Settings() {
   const [isAddingSmtp, setIsAddingSmtp] = useState(false);
   const [newSmtp, setNewSmtp] = useState({ provider: 'Custom SMTP', host: '', port: 587, encryption: 'tls', username: '', password: '', fromName: '', fromAddress: '' });
   const smtpConfigurations = useStore((state) => state.smtpConfigurations);
+  const smtpConfigurationsLoading = useStore((state) => state.smtpConfigurationsLoading);
   const deleteSmtpConfiguration = useStore((state) => state.deleteSmtpConfiguration);
   const addSmtpConfiguration = useStore((state) => state.addSmtpConfiguration);
+  const activateSmtpConfiguration = useStore((state) => state.activateSmtpConfiguration);
 
   const tabs = [
     { id: 'profile', label: 'My Profile', icon: User },
@@ -244,7 +246,23 @@ export default function Settings() {
                     </div>
                   ) : (
                     <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
-                      {smtpConfigurations.length === 0 ? (
+                      {smtpConfigurationsLoading ? (
+                        /* Skeleton loader - shown while API response is in flight */
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {[0, 1, 2].map((i) => (
+                            <div key={i} className="flex items-center justify-between p-4 bg-white dark:bg-slate-950 animate-pulse">
+                              <div className="space-y-2">
+                                <div className="h-3.5 w-36 rounded-full bg-slate-200 dark:bg-slate-800" />
+                                <div className="h-2.5 w-52 rounded-full bg-slate-100 dark:bg-slate-800/60" />
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="h-7 w-20 rounded-lg bg-slate-100 dark:bg-slate-800" />
+                                <div className="h-8 w-8 rounded-md bg-slate-100 dark:bg-slate-800" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : smtpConfigurations.length === 0 ? (
                         <div className="p-8 text-center text-sm text-slate-500">No custom SMTP configurations added yet.</div>
                       ) : (
                         smtpConfigurations.map((config, index) => (
@@ -253,7 +271,22 @@ export default function Settings() {
                               <p className="font-bold text-sm text-slate-900 dark:text-slate-50">{config.provider}</p>
                               <p className="text-xs text-slate-500">{config.fromAddress} ({config.host})</p>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-3">
+                              {config.status === 1 ? (
+                                <Badge variant="success" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 border-none font-semibold text-xs py-1 px-2.5 rounded-full flex items-center gap-1.5 animate-in fade-in zoom-in duration-300">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                  Active
+                                </Badge>
+                              ) : (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200 dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-950/30 transition-all duration-300 rounded-lg shadow-sm" 
+                                  onClick={() => activateSmtpConfiguration(config.id)}
+                                >
+                                  Activate
+                                </Button>
+                              )}
                               <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => deleteSmtpConfiguration(config.id)}>
                                 <Trash2 className="w-4 h-4" />
                               </Button>

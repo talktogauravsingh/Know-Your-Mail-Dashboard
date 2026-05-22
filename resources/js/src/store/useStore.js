@@ -175,7 +175,9 @@ toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : '
 
   // SMTP
   smtpConfigurations: [],
+  smtpConfigurationsLoading: true,
   fetchSmtpConfigurations: async () => {
+    set({ smtpConfigurationsLoading: true });
     try {
       const { data } = await api.get('/smtp-configurations');
       // Convert backend snake_case to camelCase for frontend where needed,
@@ -188,11 +190,13 @@ toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : '
         username: config.username,
         fromName: config.from_name,
         fromAddress: config.from_address,
-        isGlobal: config.is_global
+        isGlobal: config.is_global,
+        status: config.status
       }));
-      set({ smtpConfigurations: mapped });
+      set({ smtpConfigurations: mapped, smtpConfigurationsLoading: false });
     } catch (error) {
       console.error('Failed to fetch SMTP configurations:', error);
+      set({ smtpConfigurationsLoading: false });
     }
   },
   addSmtpConfiguration: async (config) => {
@@ -221,6 +225,15 @@ toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : '
       get().addToast('SMTP configuration deleted successfully', 'success');
     } catch (error) {
       get().addToast(error.response?.data?.message || 'Failed to delete SMTP configuration', 'error');
+    }
+  },
+  activateSmtpConfiguration: async (id) => {
+    try {
+      await api.post(`/smtp-configurations/${id}/activate`);
+      get().fetchSmtpConfigurations();
+      get().addToast('SMTP configuration activated successfully', 'success');
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to activate SMTP configuration', 'error');
     }
   },
 }));

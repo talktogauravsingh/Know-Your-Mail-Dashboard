@@ -26,7 +26,7 @@ class SendCampaignEmailJob implements ShouldQueue
 
     public function handle()
     {
-        return;
+
         $assignment = $this->assignment;
         $recipient = $assignment->recipient;
         $variant = $assignment->variant;
@@ -36,20 +36,34 @@ class SendCampaignEmailJob implements ShouldQueue
             return;
         }
 
-        // Try to find the SMTP config
-        $config = SmtpConfiguration::find($campaign->sender_config_id);
+        // Fetch the active SMTP configuration for this organization
+        $config = SmtpConfiguration::where('organization_id', $campaign->organization_id)
+            ->where('status', 1)
+            ->first();
         
         // If config found, set dynamically. Otherwise it falls back to .env default
         if ($config) {
+
             config([
+                'mail.default' => 'smtp',
+
+                'mail.mailers.smtp.transport' => 'smtp',
                 'mail.mailers.smtp.host' => $config->host,
                 'mail.mailers.smtp.port' => $config->port,
-                'mail.mailers.smtp.encryption' => $config->encryption !== 'none' ? $config->encryption : null,
+                'mail.mailers.smtp.encryption' => $config->encryption !== 'none'
+                    ? $config->encryption
+                    : null,
                 'mail.mailers.smtp.username' => $config->username,
-                'mail.mailers.smtp.password' => $config->password,
-                'mail.from.address' => $config->from_address,
-                'mail.from.name' => $config->from_name,
+                'mail.mailers.smtp.password' => trim($config->password),
+
+                'mail.from' => [
+                    'address' => $config->from_address,
+                    'name' => $config->from_name,
+                ],
             ]);
+
+            app()->forgetInstance('mail.manager');
+            app()->forgetInstance('mailer');
         } else {
             Log::warning("SMTP Config not found for Campaign {$campaign->id}, using default.");
         }
