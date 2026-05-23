@@ -79,8 +79,10 @@ export default function BillingAndPlan() {
     const subscription = billingSummary?.subscription;
     const ctaLabel = billingSummary?.cta_label || "Add New Plan";
 
-
-
+    useEffect(() => {
+        fetchBillingSummary().catch(() => {});
+        fetchBillingPlans().catch(() => {});
+    }, [fetchBillingPlans, fetchBillingSummary]);
     const handlePlanCheckout = async (plan) => {
         const billingAction = subscription ? "update_plan" : "new_plan";
         const order = await createPaymentOrder({
@@ -171,15 +173,103 @@ export default function BillingAndPlan() {
                 </CardContent>
             </Card>
 
-            <div className="flex justify-start">
-                <Button 
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                    onClick={() => {
-                        window.location.href = "http://localhost:5175/pricing-plan";
-                    }}
-                >
-                    Change Plan
-                </Button>
+            <div className="grid gap-4 lg:grid-cols-3 mt-8">
+                {billingPlans.map((plan) => {
+                    const isCurrent =
+                        subscription?.plan_key === plan.key;
+
+                    return (
+                        <Card
+                            key={plan.key}
+                            className={`border ${
+                                isCurrent
+                                    ? "border-indigo-300 shadow-lg shadow-indigo-100/40 dark:border-indigo-500/40 dark:shadow-none"
+                                    : "border-slate-200 dark:border-slate-800"
+                            }`}
+                        >
+                            <CardHeader>
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <CardTitle>
+                                            {plan.name}
+                                        </CardTitle>
+                                        <CardDescription>
+                                            {plan.description}
+                                        </CardDescription>
+                                    </div>
+                                    {isCurrent && (
+                                        <Badge className="bg-indigo-100 text-indigo-700 border-none dark:bg-indigo-500/20 dark:text-indigo-300">
+                                            Current
+                                        </Badge>
+                                    )}
+                                </div>
+                            </CardHeader>
+
+                            <CardContent className="space-y-4">
+                                <div>
+                                    <p className="text-3xl font-black text-slate-900 dark:text-slate-50">
+                                        {formatMoney(
+                                            plan.amount_minor,
+                                            plan.currency,
+                                        )}
+                                    </p>
+                                    <p className="text-sm text-slate-500">
+                                        per {plan.interval}
+                                    </p>
+                                </div>
+
+                                <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    {(
+                                        plan.emails_limit || 0
+                                    ).toLocaleString(
+                                        "en-IN",
+                                    )}{" "}
+                                    emails included
+                                </div>
+
+                                <div className="space-y-2">
+                                    {plan.features.map(
+                                        (feature) => (
+                                            <div
+                                                key={feature}
+                                                className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"
+                                            >
+                                                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                                                <span>
+                                                    {feature}
+                                                </span>
+                                            </div>
+                                        ),
+                                    )}
+                                </div>
+                            </CardContent>
+
+                            <CardFooter>
+                                <Button
+                                    className="w-full"
+                                    variant={
+                                        isCurrent
+                                            ? "outline"
+                                            : "default"
+                                    }
+                                    isLoading={
+                                        billingCheckoutLoading
+                                    }
+                                    disabled={billingLoading}
+                                    onClick={() =>
+                                        handlePlanCheckout(
+                                            plan,
+                                        ).catch(() => {})
+                                    }
+                                >
+                                    {isCurrent
+                                        ? "Update Plan"
+                                        : ctaLabel}
+                                </Button>
+                            </CardFooter>
+                        </Card>
+                    );
+                })}
             </div>
         </div>
     );
