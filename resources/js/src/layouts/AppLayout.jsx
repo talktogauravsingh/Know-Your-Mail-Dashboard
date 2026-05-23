@@ -27,11 +27,6 @@ export default function AppLayout() {
     }
   }, [theme]);
 
-  useEffect(() => {
-    if (!billingSummary) {
-      fetchBillingSummary().catch(() => {});
-    }
-  }, [billingSummary, fetchBillingSummary]);
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-850 font-sans transition-colors duration-200">
