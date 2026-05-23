@@ -160,7 +160,6 @@ export default function Settings() {
     const tabs = [
         { id: "profile", label: "My Profile", icon: User },
         { id: "team", label: "Team Management", icon: Users },
-        { id: "billing", label: "Billing & Plan", icon: CreditCard },
         { id: "integrations", label: "Email Integrations", icon: Mail },
         { id: "domains", label: "Sender Domains", icon: Globe },
     ];

@@ -26,6 +26,21 @@ class BillingService
         $currentPlanKey = $subscription?->plan_key;
         $currentPlan = $currentPlanKey ? $this->planConfig($currentPlanKey) : null;
 
+        $transformedPlan = $currentPlan ? $this->transformPlan($currentPlanKey, $currentPlan) : $this->freePlan();
+        if ($subscription) {
+            // Override with actual subscription amount (includes overage/scaling costs)
+            $transformedPlan['amount_minor'] = (int) $subscription->amount_minor;
+
+            $metaContactCount = (int) ($subscription->metadata['contact_count'] ?? 0);
+            $planLimit = (int) ($currentPlan['emails_limit'] ?? 0);
+
+            if ($metaContactCount > 0) {
+                $transformedPlan['emails_limit'] = max($metaContactCount, $planLimit);
+            } else {
+                $transformedPlan['emails_limit'] = $planLimit;
+            }
+        }
+
         return [
             'organization_id' => $organizationId,
             'subscription' => $subscription ? [
@@ -41,7 +56,7 @@ class BillingService
                 'renews_at' => optional($subscription->renews_at)->toIso8601String(),
                 'cancelled_at' => optional($subscription->cancelled_at)->toIso8601String(),
             ] : null,
-            'current_plan' => $currentPlan ? $this->transformPlan($currentPlanKey, $currentPlan) : $this->freePlan(),
+            'current_plan' => $transformedPlan,
             'cta_label' => $subscription ? 'Update Plan' : 'Add New Plan',
         ];
     }
@@ -88,11 +103,28 @@ class BillingService
             ? CarbonImmutable::instance($subscription->renews_at)
             : $now;
 
+        $basePriceMinor = (int) ($plan['amount_minor'] ?? 0);
+        $contactCount = data_get($transaction->request_payload, 'contact_count');
+        $totalAmountMinor = $basePriceMinor;
+
+        $planEmailsLimit = (int) ($plan['emails_limit'] ?? 0);
+        $finalContactCount = $contactCount ? max((int) $contactCount, $planEmailsLimit) : $planEmailsLimit;
+
+        if ($contactCount && $planKey !== 'scale') {
+            $overage = max(0, (int) $contactCount - $planEmailsLimit);
+            
+            $isINR = strtoupper($plan['currency'] ?? 'INR') === 'INR';
+            $unitPrice = $isINR ? 0.05 : 0.001;
+            
+            $overageCost = $overage * $unitPrice;
+            $totalAmountMinor = $basePriceMinor + (int) round($overageCost * 100);
+        }
+
         $subscription->fill([
             'plan_key' => $planKey,
             'status' => OrganizationSubscription::STATUS_ACTIVE,
             'billing_interval' => (string) ($plan['interval'] ?? 'month'),
-            'amount_minor' => (int) ($plan['amount_minor'] ?? 0),
+            'amount_minor' => $totalAmountMinor,
             'currency' => strtoupper((string) ($plan['currency'] ?? 'INR')),
             'latest_payment_transaction_id' => $transaction->id,
             'started_at' => $subscription->started_at ?? $now,
@@ -101,6 +133,7 @@ class BillingService
             'metadata' => [
                 'activated_via' => data_get($transaction->request_payload, 'billing_action', 'new_plan'),
                 'transaction_id' => $transaction->id,
+                'contact_count' => $finalContactCount,
             ],
         ]);
 

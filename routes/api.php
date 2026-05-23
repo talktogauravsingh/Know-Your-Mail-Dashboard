@@ -96,6 +96,7 @@ Route::middleware('auth:sanctum')->prefix('payments')->group(function () {
 Route::middleware('auth:sanctum')->prefix('billing')->group(function () {
     Route::get('/summary', [BillingController::class, 'summary']);
     Route::get('/plans', [BillingController::class, 'plans']);
+    Route::get('/history', [BillingController::class, 'history']);
 });
 
 Route::middleware('auth:sanctum')->prefix('smtp-configurations')->group(function () {

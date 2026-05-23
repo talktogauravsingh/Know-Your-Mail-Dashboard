@@ -60,6 +60,7 @@ class PaymentService
                     'billing_action' => $data['billing_action'] ?? 'new_plan',
                     'currency' => strtoupper($data['currency'] ?? 'INR'),
                     'amount_minor' => (int) $data['amount_minor'],
+                    'contact_count' => $data['contact_count'] ?? null,
                     'client_reference_id' => $data['client_reference_id'] ?? null,
                 ],
             ]);
@@ -275,7 +276,7 @@ class PaymentService
     private function webhookTransactionUpdates(string $eventType, ?string $providerPaymentId, array $paymentEntity): array
     {
         $status = match ($eventType) {
-            'payment.captured', 'order.paid' => PaymentTransaction::STATUS_PAID,
+            'payment.captured', 'order.paid', 'subscription.charged' => PaymentTransaction::STATUS_PAID,
             'payment.failed' => PaymentTransaction::STATUS_FAILED,
             'payment.authorized' => PaymentTransaction::STATUS_AUTHORIZED,
             default => null,

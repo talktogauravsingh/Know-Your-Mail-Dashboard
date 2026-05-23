@@ -21,10 +21,11 @@ class PaymentController extends Controller
     {
         $validated = $request->validate([
             'plan_key' => ['required', 'string', Rule::in(array_keys(config('payments.plans', [])))],
-            'billing_action' => ['nullable', 'string', Rule::in(['new_plan', 'update_plan'])],
+            'billing_action' => ['nullable', 'string', Rule::in(['new_plan', 'update_plan', 'scale_audience'])],
             'client_reference_id' => ['nullable', 'string', 'max:128'],
             'idempotency_key' => ['nullable', 'string', 'max:128'],
             'notes' => ['nullable', 'array'],
+            'contact_count' => ['nullable', 'integer', 'min:1000', 'max:1000000'],
         ]);
         $plan = config('payments.plans.' . $validated['plan_key']);
         if (!($plan['is_public'] ?? true)) {
@@ -32,7 +33,27 @@ class PaymentController extends Controller
         }
         $validated['provider'] = config('payments.default_provider', 'razorpay');
         $validated['currency'] = $plan['currency'];
-        $validated['amount_minor'] = (int) $plan['amount_minor'];
+
+        $baseAmountMinor = (int) $plan['amount_minor'];
+        $overageCostMinor = 0;
+
+        if (isset($validated['contact_count']) && $validated['plan_key'] !== 'scale') {
+            $allowance = (int) ($plan['emails_limit'] ?? 0);
+            $overage = max(0, (int) $validated['contact_count'] - $allowance);
+            
+            $isINR = strtoupper($plan['currency']) === 'INR';
+            $unitPrice = $isINR ? 0.05 : 0.001;
+            
+            $overageCost = $overage * $unitPrice;
+            $overageCostMinor = (int) round($overageCost * 100);
+        }
+
+        if (($validated['billing_action'] ?? '') === 'scale_audience') {
+            $validated['amount_minor'] = $overageCostMinor;
+        } else {
+            $validated['amount_minor'] = $baseAmountMinor + $overageCostMinor;
+        }
+
         $validated['billing_action'] = $validated['billing_action'] ?? 'new_plan';
         $idempotencyHeader = $request->header('Idempotency-Key');
 
@@ -66,13 +87,24 @@ class PaymentController extends Controller
     public function verify(Request $request)
     {
         $validated = $request->validate([
-            'razorpay_order_id' => ['required', 'string', 'max:128'],
+            'razorpay_order_id' => ['nullable', 'string', 'max:128'],
+            'razorpay_subscription_id' => ['nullable', 'string', 'max:128'],
             'razorpay_payment_id' => ['required', 'string', 'max:128'],
             'razorpay_signature' => ['required', 'string', 'max:256'],
         ]);
 
+        $providerOrderId = $validated['razorpay_order_id'] ?? $validated['razorpay_subscription_id'] ?? null;
+
+        if (!$providerOrderId) {
+            return response()->json(['message' => 'Missing order or subscription ID.'], 422);
+        }
+
         try {
-            $transaction = $this->payments->verifyPayment($request->user(), $validated);
+            $transaction = $this->payments->verifyPayment($request->user(), [
+                'razorpay_order_id' => $providerOrderId,
+                'razorpay_payment_id' => $validated['razorpay_payment_id'],
+                'razorpay_signature' => $validated['razorpay_signature'],
+            ]);
 
             return response()->json([
                 'transaction_id' => $transaction->id,

@@ -28,13 +28,38 @@ final class RazorpayProvider implements PaymentProviderInterface
     {
         $this->ensureConfigured();
 
-        $response = Http::withBasicAuth($this->apiKey, $this->apiSecret)
+        // 1. Create a dynamic Plan for the specific amount
+        $planName = "KYM Plan " . ($input->amountMinor / 100) . " " . strtoupper($input->currency) . " (" . uniqid() . ")";
+        $planResponse = Http::withBasicAuth($this->apiKey, $this->apiSecret)
             ->acceptJson()
             ->asJson()
-            ->post(rtrim($this->baseUrl, '/') . '/orders', [
-                'amount' => $input->amountMinor,
-                'currency' => strtoupper($input->currency),
-                'receipt' => substr($input->idempotencyKey, 0, 40),
+            ->post(rtrim($this->baseUrl, '/') . '/plans', [
+                'period' => 'monthly',
+                'interval' => 1,
+                'item' => [
+                    'name' => substr($planName, 0, 50),
+                    'amount' => $input->amountMinor,
+                    'currency' => strtoupper($input->currency),
+                ],
+            ]);
+
+        if ($planResponse->failed()) {
+            throw new PaymentException('Razorpay plan creation failed: ' . $planResponse->body());
+        }
+
+        $planPayload = $planResponse->json();
+        if (!is_array($planPayload) || empty($planPayload['id'])) {
+            throw new PaymentException('Razorpay plan creation returned an invalid response.');
+        }
+
+        // 2. Create the Subscription using the new Plan ID
+        $subResponse = Http::withBasicAuth($this->apiKey, $this->apiSecret)
+            ->acceptJson()
+            ->asJson()
+            ->post(rtrim($this->baseUrl, '/') . '/subscriptions', [
+                'plan_id' => $planPayload['id'],
+                'total_count' => 120, // 10 years duration
+                'customer_notify' => 1,
                 'notes' => $this->sanitizeNotes(array_merge(
                     $input->customerMetadata,
                     $input->orderNotes,
@@ -46,19 +71,19 @@ final class RazorpayProvider implements PaymentProviderInterface
                 )),
             ]);
 
-        if ($response->failed()) {
-            throw new PaymentException('Razorpay order creation failed: ' . $response->body());
+        if ($subResponse->failed()) {
+            throw new PaymentException('Razorpay subscription creation failed: ' . $subResponse->body());
         }
 
-        $payload = $response->json();
+        $payload = $subResponse->json();
         if (!is_array($payload) || empty($payload['id'])) {
-            throw new PaymentException('Razorpay order creation returned an invalid response.');
+            throw new PaymentException('Razorpay subscription creation returned an invalid response.');
         }
 
         return new CreateOrderOutput(
             providerOrderId: (string) $payload['id'],
-            currency: (string) ($payload['currency'] ?? $input->currency),
-            amountMinor: (int) ($payload['amount'] ?? $input->amountMinor),
+            currency: (string) ($payload['currency'] ?? $input->currency ?? 'INR'),
+            amountMinor: (int) ($input->amountMinor),
             providerRawResponse: $this->sanitizeProviderPayload($payload),
         );
     }
