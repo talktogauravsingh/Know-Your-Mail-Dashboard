@@ -7,6 +7,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PaymentProviderEvent extends Model
 {
+    public const STATUS_RECEIVED = 1;
+    public const STATUS_PROCESSING = 2;
+    public const STATUS_PROCESSED = 3;
+    public const STATUS_FAILED = 4;
+    public const STATUS_IGNORED = 5;
+
     protected $fillable = [
         'organization_id',
         'user_id',
@@ -24,6 +30,7 @@ class PaymentProviderEvent extends Model
     protected function casts(): array
     {
         return [
+            'status' => 'integer',
             'payload' => 'array',
         ];
     }
@@ -36,5 +43,21 @@ class PaymentProviderEvent extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public static function statusLabels(): array
+    {
+        return [
+            self::STATUS_RECEIVED => 'received',
+            self::STATUS_PROCESSING => 'processing',
+            self::STATUS_PROCESSED => 'processed',
+            self::STATUS_FAILED => 'failed',
+            self::STATUS_IGNORED => 'ignored',
+        ];
+    }
+
+    public static function labelForStatus(int $status): string
+    {
+        return self::statusLabels()[$status] ?? 'unknown';
     }
 }

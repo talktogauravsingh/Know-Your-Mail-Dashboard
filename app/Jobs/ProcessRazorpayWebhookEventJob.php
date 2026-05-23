@@ -28,7 +28,7 @@ class ProcessRazorpayWebhookEventJob implements ShouldQueue
     public function failed(?\Throwable $exception): void
     {
         PaymentProviderEvent::whereKey($this->paymentProviderEventId)->update([
-            'status' => 'FAILED',
+            'status' => PaymentProviderEvent::STATUS_FAILED,
             'failure_reason' => $exception ? substr($exception->getMessage(), 0, 1000) : 'Webhook processing failed.',
         ]);
     }

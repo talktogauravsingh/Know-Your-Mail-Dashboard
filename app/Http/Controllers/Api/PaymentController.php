@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\PaymentProviderEvent;
+use App\Models\PaymentTransaction;
 use App\Services\Payments\Exceptions\PaymentException;
 use App\Services\Payments\Exceptions\SignatureVerificationException;
 use App\Services\Payments\PaymentService;
@@ -19,14 +21,19 @@ class PaymentController extends Controller
     {
         $validated = $request->validate([
             'plan_key' => ['required', 'string', Rule::in(array_keys(config('payments.plans', [])))],
+            'billing_action' => ['nullable', 'string', Rule::in(['new_plan', 'update_plan'])],
             'client_reference_id' => ['nullable', 'string', 'max:128'],
             'idempotency_key' => ['nullable', 'string', 'max:128'],
             'notes' => ['nullable', 'array'],
         ]);
         $plan = config('payments.plans.' . $validated['plan_key']);
+        if (!($plan['is_public'] ?? true)) {
+            return response()->json(['message' => 'This plan is not available for self-service checkout.'], 422);
+        }
         $validated['provider'] = config('payments.default_provider', 'razorpay');
         $validated['currency'] = $plan['currency'];
         $validated['amount_minor'] = (int) $plan['amount_minor'];
+        $validated['billing_action'] = $validated['billing_action'] ?? 'new_plan';
         $idempotencyHeader = $request->header('Idempotency-Key');
 
         if ($idempotencyHeader !== null && strlen($idempotencyHeader) > 128) {
@@ -48,6 +55,7 @@ class PaymentController extends Controller
                 'amount_minor' => $transaction->amount_minor,
                 'currency' => $transaction->currency,
                 'status' => $transaction->status,
+                'status_label' => PaymentTransaction::labelForStatus((int) $transaction->status),
                 'razorpay_key_id' => config('services.razorpay.key'),
             ], 201);
         } catch (PaymentException $exception) {
@@ -71,6 +79,7 @@ class PaymentController extends Controller
                 'provider_order_id' => $transaction->provider_order_id,
                 'provider_payment_id' => $transaction->provider_payment_id,
                 'status' => $transaction->status,
+                'status_label' => PaymentTransaction::labelForStatus((int) $transaction->status),
             ]);
         } catch (SignatureVerificationException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
@@ -95,6 +104,7 @@ class PaymentController extends Controller
             'amount_minor' => $payment->amount_minor,
             'currency' => $payment->currency,
             'status' => $payment->status,
+            'status_label' => PaymentTransaction::labelForStatus((int) $payment->status),
         ]);
     }
 
@@ -111,6 +121,7 @@ class PaymentController extends Controller
                 'status' => 'ok',
                 'event_id' => $event->provider_event_id,
                 'event_status' => $event->status,
+                'event_status_label' => PaymentProviderEvent::labelForStatus((int) $event->status),
             ]);
         } catch (SignatureVerificationException $exception) {
             return response()->json(['message' => $exception->getMessage()], 401);

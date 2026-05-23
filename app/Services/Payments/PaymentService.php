@@ -6,6 +6,7 @@ use App\Models\PaymentProviderEvent;
 use App\Models\PaymentTransaction;
 use App\Models\User;
 use App\Jobs\ProcessRazorpayWebhookEventJob;
+use App\Services\BillingService;
 use App\Services\Payments\Contracts\PaymentProviderInterface;
 use App\Services\Payments\DTO\CreateOrderInput;
 use App\Services\Payments\DTO\IdempotencyKeyFactory;
@@ -21,6 +22,7 @@ class PaymentService
 {
     public function __construct(
         private readonly PaymentProviderInterface $provider,
+        private readonly BillingService $billing,
     ) {}
 
     public function createOrder(User $user, array $data, ?string $requestIdempotencyKey = null): PaymentTransaction
@@ -52,9 +54,10 @@ class PaymentService
                 'currency' => strtoupper($data['currency'] ?? 'INR'),
                 'amount_minor' => (int) $data['amount_minor'],
                 'client_reference_id' => $data['client_reference_id'] ?? null,
-                'status' => 'ORDER_PENDING',
+                'status' => PaymentTransaction::STATUS_ORDER_PENDING,
                 'request_payload' => [
                     'plan_key' => $data['plan_key'] ?? null,
+                    'billing_action' => $data['billing_action'] ?? 'new_plan',
                     'currency' => strtoupper($data['currency'] ?? 'INR'),
                     'amount_minor' => (int) $data['amount_minor'],
                     'client_reference_id' => $data['client_reference_id'] ?? null,
@@ -80,7 +83,7 @@ class PaymentService
                 'provider_order_id' => $order->providerOrderId,
                 'currency' => strtoupper($order->currency),
                 'amount_minor' => $order->amountMinor,
-                'status' => 'ORDER_CREATED',
+                'status' => PaymentTransaction::STATUS_ORDER_CREATED,
                 'provider_metadata' => $order->providerRawResponse,
             ]);
 
@@ -103,7 +106,7 @@ class PaymentService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ($transaction->status === 'PAID' && $transaction->provider_payment_id === $providerPaymentId) {
+            if ($transaction->status === PaymentTransaction::STATUS_PAID && $transaction->provider_payment_id === $providerPaymentId) {
                 return ['transaction' => $transaction, 'verified' => true];
             }
 
@@ -117,7 +120,9 @@ class PaymentService
 
             $transaction->update([
                 'provider_payment_id' => $providerPaymentId,
-                'status' => $verification->isVerified ? 'PAID' : 'VERIFICATION_FAILED',
+                'status' => $verification->isVerified
+                    ? PaymentTransaction::STATUS_PAID
+                    : PaymentTransaction::STATUS_VERIFICATION_FAILED,
                 'verification_payload' => [
                     'provider_order_id' => $verification->providerOrderId,
                     'provider_payment_id' => $verification->providerPaymentId,
@@ -131,6 +136,8 @@ class PaymentService
         if (!$result['verified']) {
             throw new SignatureVerificationException('Payment signature verification failed.');
         }
+
+        $this->billing->syncSubscriptionFromPayment($result['transaction']);
 
         return $result['transaction'];
     }
@@ -150,7 +157,7 @@ class PaymentService
     {
         $event = $this->storeRazorpayWebhookEvent($payload, $rawPayload, $signature);
 
-        if ($event->status === 'RECEIVED') {
+        if ($event->status === PaymentProviderEvent::STATUS_RECEIVED) {
             ProcessRazorpayWebhookEventJob::dispatch($event->id);
         }
 
@@ -193,7 +200,7 @@ class PaymentService
                     'provider_payment_id' => $providerPaymentId,
                     'provider_signature' => $signature,
                     'payload' => $this->sanitizeWebhookPayload($payload),
-                    'status' => 'RECEIVED',
+                    'status' => PaymentProviderEvent::STATUS_RECEIVED,
                 ]);
             });
         } catch (QueryException $exception) {
@@ -212,11 +219,14 @@ class PaymentService
         return DB::transaction(function () use ($paymentProviderEventId) {
             $event = PaymentProviderEvent::whereKey($paymentProviderEventId)->lockForUpdate()->firstOrFail();
 
-            if ($event->status === 'PROCESSED' || $event->status === 'IGNORED') {
+            if (
+                $event->status === PaymentProviderEvent::STATUS_PROCESSED
+                || $event->status === PaymentProviderEvent::STATUS_IGNORED
+            ) {
                 return $event;
             }
 
-            $event->update(['status' => 'PROCESSING', 'failure_reason' => null]);
+            $event->update(['status' => PaymentProviderEvent::STATUS_PROCESSING, 'failure_reason' => null]);
 
             $payload = $event->payload ?? [];
             $paymentEntity = $payload['payload']['payment']['entity'] ?? [];
@@ -233,7 +243,7 @@ class PaymentService
                 ->first();
 
             if (!$transaction) {
-                $event->update(['status' => 'IGNORED']);
+                $event->update(['status' => PaymentProviderEvent::STATUS_IGNORED]);
 
                 return $event->refresh();
             }
@@ -244,12 +254,18 @@ class PaymentService
                 $paymentEntity,
             ));
 
+            $transaction = $transaction->refresh();
+
+            if ($transaction->status === PaymentTransaction::STATUS_PAID) {
+                $this->billing->syncSubscriptionFromPayment($transaction);
+            }
+
             $event->update([
                 'organization_id' => (int) $transaction->organization_id,
                 'user_id' => $transaction->user_id,
                 'provider_order_id' => $providerOrderId,
                 'provider_payment_id' => $providerPaymentId,
-                'status' => 'PROCESSED',
+                'status' => PaymentProviderEvent::STATUS_PROCESSED,
             ]);
 
             return $event->refresh();
@@ -259,9 +275,9 @@ class PaymentService
     private function webhookTransactionUpdates(string $eventType, ?string $providerPaymentId, array $paymentEntity): array
     {
         $status = match ($eventType) {
-            'payment.captured', 'order.paid' => 'PAID',
-            'payment.failed' => 'FAILED',
-            'payment.authorized' => 'AUTHORIZED',
+            'payment.captured', 'order.paid' => PaymentTransaction::STATUS_PAID,
+            'payment.failed' => PaymentTransaction::STATUS_FAILED,
+            'payment.authorized' => PaymentTransaction::STATUS_AUTHORIZED,
             default => null,
         };
 

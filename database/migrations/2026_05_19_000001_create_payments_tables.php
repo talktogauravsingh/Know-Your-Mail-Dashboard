@@ -30,7 +30,7 @@ return new class extends Migration
             $table->string('client_reference_id', 128)->nullable()->index();
 
             // State lifecycle
-            $table->string('status', 64)->index(); 
+            $table->integer('status')->index();
             $table->timestamp('expires_at')->nullable();
 
             // Audit-safe raw payloads
@@ -59,7 +59,7 @@ return new class extends Migration
             $table->string('provider_signature', 256)->nullable(); // stored for audit/debug (no secrets)
 
             $table->json('payload')->nullable(); // store non-secret subset
-            $table->string('status', 64)->index(); // RECEIVED, PROCESSED, FAILED, IGNORED
+            $table->integer('status')->index();
 
             $table->text('failure_reason')->nullable();
 

@@ -7,6 +7,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PaymentTransaction extends Model
 {
+    public const STATUS_ORDER_PENDING = 1;
+    public const STATUS_ORDER_CREATED = 2;
+    public const STATUS_AUTHORIZED = 3;
+    public const STATUS_PAID = 4;
+    public const STATUS_FAILED = 5;
+    public const STATUS_VERIFICATION_FAILED = 6;
+
     protected $fillable = [
         'organization_id',
         'user_id',
@@ -28,6 +35,7 @@ class PaymentTransaction extends Model
     {
         return [
             'amount_minor' => 'integer',
+            'status' => 'integer',
             'expires_at' => 'datetime',
             'request_payload' => 'array',
             'verification_payload' => 'array',
@@ -43,5 +51,22 @@ class PaymentTransaction extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public static function statusLabels(): array
+    {
+        return [
+            self::STATUS_ORDER_PENDING => 'order_pending',
+            self::STATUS_ORDER_CREATED => 'order_created',
+            self::STATUS_AUTHORIZED => 'authorized',
+            self::STATUS_PAID => 'paid',
+            self::STATUS_FAILED => 'failed',
+            self::STATUS_VERIFICATION_FAILED => 'verification_failed',
+        ];
+    }
+
+    public static function labelForStatus(int $status): string
+    {
+        return self::statusLabels()[$status] ?? 'unknown';
     }
 }

@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BillingController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\PaymentController;
@@ -90,6 +91,11 @@ Route::middleware('auth:sanctum')->prefix('payments')->group(function () {
     Route::post('/orders', [PaymentController::class, 'createOrder']);
     Route::post('/verify', [PaymentController::class, 'verify']);
     Route::get('/{transaction}/status', [PaymentController::class, 'status']);
+});
+
+Route::middleware('auth:sanctum')->prefix('billing')->group(function () {
+    Route::get('/summary', [BillingController::class, 'summary']);
+    Route::get('/plans', [BillingController::class, 'plans']);
 });
 
 Route::middleware('auth:sanctum')->prefix('smtp-configurations')->group(function () {
