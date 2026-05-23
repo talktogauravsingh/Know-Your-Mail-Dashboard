@@ -19,16 +19,19 @@ import Templates from './pages/Templates';
 import Audience from './pages/Audience';
 import BulkImport from './pages/BulkImport';
 import Settings from './pages/Settings';
+import Billing from './pages/Billing';
 
 // Protected Route Wrapper
 function ProtectedRoute({ children }) {
-  const { user, initAuth } = useStore();
+  const { user, authInitialized, initAuth } = useStore();
   
   useEffect(() => {
-    initAuth();
-  }, [initAuth]);
+    if (!authInitialized) {
+      initAuth();
+    }
+  }, [authInitialized, initAuth]);
   
-  if (user === null) { // Wait for init
+  if (!authInitialized) {
     return <div className="flex items-center justify-center min-h-screen">
       <Loader2 className="h-8 w-8 animate-spin" />
     </div>;
@@ -69,6 +72,7 @@ export default function App() {
           <Route path="/templates" element={<Templates />} />
           <Route path="/audience" element={<Audience />} />
           <Route path="/bulk-import" element={<BulkImport />} />
+          <Route path="/billing" element={<Billing />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
       </Routes>

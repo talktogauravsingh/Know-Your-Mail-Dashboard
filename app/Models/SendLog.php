@@ -10,6 +10,8 @@ class SendLog extends Model
 {
     protected $fillable = [
         'campaign_id',
+        'recipient_id',
+        'variant_id',
         'email',
         'ip_used',
         'status',
@@ -43,10 +45,9 @@ class SendLog extends Model
         });
     }
 
-public function recipient()
+    public function recipient()
     {
-        return $this->belongsTo(Recipient::class, 'email', 'email')
-                    ->whereColumn('recipients.campaign_id', 'send_logs.campaign_id');
+        return $this->belongsTo(Recipient::class);
     }
 
     public function campaign()

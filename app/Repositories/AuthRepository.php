@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Models\User;
 use App\Models\Role;
 use App\Models\Permission;
+use App\Models\Organization;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -24,12 +25,19 @@ class AuthRepository
             throw new \Exception('Default role (user) not found');
         }
 
-        return User::create([
-            'name'     => $data['name'],
-            'email'    => $data['email'],
-            'password' => Hash::make($data['password']),
-            'role_id'  => $roleId,
-        ]);
+        return DB::transaction(function () use ($data, $roleId) {
+            $organization = Organization::create([
+                'name' => $data['organization_name'] ?? $data['name'] . ' Organization',
+            ]);
+
+            return User::create([
+                'name'            => $data['name'],
+                'email'           => $data['email'],
+                'password'        => Hash::make($data['password']),
+                'role_id'         => $roleId,
+                'organization_id' => $organization->id,
+            ]);
+        });
     }
 
     /**
@@ -81,13 +89,18 @@ class AuthRepository
                 }
             }
 
+            $organizationId = $loggedInUser->organization_id;
+            if (!empty($data['organization_id']) && (int) $data['organization_id'] !== (int) $organizationId) {
+                throw new \Exception('Managers can only be created inside your organization.');
+            }
+
             // Create manager
             $manager = User::create([
                 'name'            => $data['name'],
                 'email'           => $data['email'],
                 'password'        => Hash::make($data['password']),
                 'role_id'         => $data['role_id'],
-                'organization_id' => $data['organization_id'] ?? null,
+                'organization_id' => $organizationId,
                 'created_by'      => $loggedInUser->id,
             ]);
 

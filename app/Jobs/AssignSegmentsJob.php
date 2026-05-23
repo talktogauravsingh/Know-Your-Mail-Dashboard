@@ -97,7 +97,10 @@ class AssignSegmentsJob implements ShouldQueue
 
     protected function applyFilter($query, $filter)
     {
-        $field = $filter->field_name;
+        $field = strtolower(trim($filter->field_name));
+        if (!preg_match('/^[A-Za-z0-9_]+$/', $field)) {
+            return;
+        }
         $value = $filter->field_value;
         $op = $filter->operator;
 

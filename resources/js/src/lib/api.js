@@ -24,9 +24,12 @@ api.interceptors.response.use(
   (error) => {
     const store = useStore.getState();
     if (error.response?.status === 401 && window.location.pathname !== '/login') {
-      store.addToast('Session expired. Please login again.', 'error');
+      // Don't show "Session expired" if they were explicitly trying to logout
+      if (!error.config.url.includes('/auth/logout')) {
+          store.addToast('Session expired. Please login again.', 'error');
+      }
       store.clearAuth();
-      window.location.href = '/login';
+      // Let React Router handle the redirect via ProtectedRoute detecting user === null
     }
     return Promise.reject(error);
   }

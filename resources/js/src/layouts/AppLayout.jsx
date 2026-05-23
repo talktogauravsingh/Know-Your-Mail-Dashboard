@@ -2,10 +2,11 @@ import React, { useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
-import { LayoutDashboard, Mail, LayoutList, Settings, LogOut, Search, Bell, Users, Database, Sun, Moon, ChevronDown, Bot, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Mail, LayoutList, Settings, LogOut, Search, Bell, Users, Database, Sun, Moon, ChevronDown, Bot, Sparkles, CreditCard } from 'lucide-react';
 
 const navigation = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Billing & Plan', href: '/billing', icon: CreditCard },
   { name: 'Campaigns', href: '/campaigns', icon: Mail },
   { name: 'Automation', href: '#', icon: Sparkles, disabled: true },
   { name: 'Audience', href: '/audience', icon: Users },
@@ -14,8 +15,9 @@ const navigation = [
 ];
 
 export default function AppLayout() {
-  const { user, logout, theme, toggleTheme } = useStore();
+  const { user, logout, theme, toggleTheme, billingSummary, fetchBillingSummary } = useStore();
   const location = useLocation();
+  const currentPlanName = billingSummary?.current_plan?.name || 'Free';
 
   // Sync theme to document root
   useEffect(() => {
@@ -25,6 +27,7 @@ export default function AppLayout() {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-850 font-sans transition-colors duration-200">
@@ -39,7 +42,7 @@ export default function AppLayout() {
               </div>
               <div className="flex flex-col">
                 <span className="text-sm font-bold text-slate-900 dark:text-slate-50 leading-none">My Workspace</span>
-                <span className="text-[10px] text-slate-500 font-medium mt-1">Free plan</span>
+                <span className="text-[10px] text-slate-500 font-medium mt-1">{currentPlanName} plan</span>
               </div>
             </div>
             <ChevronDown className="h-4 w-4 text-slate-400" />

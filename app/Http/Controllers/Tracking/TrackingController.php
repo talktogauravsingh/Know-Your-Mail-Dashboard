@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Tracking;
 
 use App\Http\Controllers\Controller;
 use App\Http\Services\Tracking\TrackingService;
-use App\Models\Recipient;
 use App\Models\SendLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -23,18 +22,11 @@ class TrackingController extends Controller
     public function OpenMailTrack(Request $request)
     {
         try {
-            $recipientId = $request->route('requestUserId');
-            $recipient = Recipient::find($recipientId);
-            
-            if ($recipient) {
-                $sendLog = SendLog::where('campaign_id', $recipient->campaign_id)
-                    ->where('email', $recipient->email)
-                    ->first();
-                
-                if ($sendLog && !$sendLog->opened_at) {
-                    $sendLog->update(['opened_at' => Carbon::now()]);
-                    $this->trackingService->logTracking($sendLog, $request, 'open');
-                }
+            $sendLog = SendLog::find($request->route('sendLog'));
+
+            if ($sendLog && !$sendLog->opened_at) {
+                $sendLog->update(['opened_at' => Carbon::now()]);
+                $this->trackingService->logTracking($sendLog, $request, 'open');
             }
         } catch (\Exception $e) {
             Log::warning('Tracking open failed: ' . $e->getMessage());
@@ -55,19 +47,12 @@ class TrackingController extends Controller
     public function ClickMailTrack(Request $request)
     {
         try {
-            $recipientId = $request->route('requestUserId');
-            $recipient = Recipient::find($recipientId);
-            
-            if ($recipient) {
-                $sendLog = SendLog::where('campaign_id', $recipient->campaign_id)
-                    ->where('email', $recipient->email)
-                    ->first();
-                
-                if ($sendLog) {
-                    $sendLog->increment('clicks_count');
-                    $sendLog->update(['last_activity_at' => now()]);
-                    $this->trackingService->logTracking($sendLog, $request, 'click');
-                }
+            $sendLog = SendLog::find($request->route('sendLog'));
+
+            if ($sendLog) {
+                $sendLog->increment('clicks_count');
+                $sendLog->update(['last_activity_at' => now()]);
+                $this->trackingService->logTracking($sendLog, $request, 'click');
             }
         } catch (\Exception $e) {
             Log::warning('Tracking click failed: ' . $e->getMessage());

@@ -3,8 +3,10 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BillingController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\PermissionController;
+use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\BulkRecipientController;
 use App\Http\Controllers\Api\AnalysisController;
@@ -51,7 +53,7 @@ Route::middleware(['auth:sanctum', 'permissions:manage_roles'])->prefix('roles/{
     Route::delete('/', [RolePermissionController::class, 'destroy']);
 });
 
-Route::prefix('recipients')->group(function () {
+Route::middleware('auth:sanctum')->prefix('recipients')->group(function () {
     Route::post('bulk-upload', [\App\Http\Controllers\Api\BulkRecipientController::class, 'bulkUpload']);
 });
 
@@ -77,9 +79,25 @@ Route::middleware('auth:sanctum')->prefix('campaigns')->group(function () {
     Route::post('/segments/validate-count/{campaign?}', [\App\Http\Controllers\Api\SegmentationController::class, 'validateCount']);
 });
 
-Route::get('/o/{requestUserId}', [TrackingController::class, 'OpenMailTrack']);
-Route::get('/c/{requestUserId}', [TrackingController::class, 'ClickMailTrack']);
+Route::get('/track/open/{sendLog}', [TrackingController::class, 'OpenMailTrack']);
+Route::get('/track/click/{sendLog}', [TrackingController::class, 'ClickMailTrack']);
+Route::get('/o/{sendLog}', [TrackingController::class, 'OpenMailTrack']);
+Route::get('/c/{sendLog}', [TrackingController::class, 'ClickMailTrack']);
 Route::post('ai/email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate']);
+
+Route::post('/payments/webhooks/razorpay', [PaymentController::class, 'razorpayWebhook']);
+
+Route::middleware('auth:sanctum')->prefix('payments')->group(function () {
+    Route::post('/orders', [PaymentController::class, 'createOrder']);
+    Route::post('/verify', [PaymentController::class, 'verify']);
+    Route::get('/{transaction}/status', [PaymentController::class, 'status']);
+});
+
+Route::middleware('auth:sanctum')->prefix('billing')->group(function () {
+    Route::get('/summary', [BillingController::class, 'summary']);
+    Route::get('/plans', [BillingController::class, 'plans']);
+    Route::get('/history', [BillingController::class, 'history']);
+});
 
 Route::middleware('auth:sanctum')->prefix('smtp-configurations')->group(function () {
     Route::get('/', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'index']);

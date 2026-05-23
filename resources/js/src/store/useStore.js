@@ -5,8 +5,14 @@ import { mockTemplates } from '../lib/mockData';
 export const useStore = create((set, get) => ({
   user: null,
   token: null,
+  authInitialized: false,
   theme: 'light',
   isLoading: false,
+  billingSummary: null,
+  billingPlans: [],
+  billingHistory: [],
+  billingLoading: false,
+  billingCheckoutLoading: false,
 
   // Persistence helpers
   persistAuth: (user, token) => {
@@ -32,6 +38,7 @@ export const useStore = create((set, get) => ({
         get().clearAuth();
       }
     }
+    set({ authInitialized: true });
   },
 
   // Auth
@@ -64,11 +71,9 @@ export const useStore = create((set, get) => ({
     }
   },
 
-  logout: async () => {
-    try {
-      await api.post('/auth/logout');
-    } catch {}
+  logout: () => {
     get().clearAuth();
+    api.post('/auth/logout').catch(() => {});
   },
   fetchUser: async () => {
     try {
@@ -76,6 +81,8 @@ export const useStore = create((set, get) => ({
       const token = get().token;
       get().persistAuth(data, token);
       get().fetchSmtpConfigurations();
+      get().fetchBillingSummary();
+      get().fetchBillingPlans();
     } catch {
       get().clearAuth();
     }
@@ -221,6 +228,79 @@ toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : '
       get().addToast('SMTP configuration deleted successfully', 'success');
     } catch (error) {
       get().addToast(error.response?.data?.message || 'Failed to delete SMTP configuration', 'error');
+    }
+  },
+
+  fetchBillingSummary: async () => {
+    set({ billingLoading: true });
+    try {
+      const { data } = await api.get('/billing/summary');
+      set({ billingSummary: data });
+      return data;
+    } catch (error) {
+      console.error('Failed to fetch billing summary:', error);
+      get().addToast(error.response?.data?.message || 'Failed to load billing summary', 'error');
+      throw error;
+    } finally {
+      set({ billingLoading: false });
+    }
+  },
+  fetchBillingPlans: async () => {
+    try {
+      const { data } = await api.get('/billing/plans');
+      set({ billingPlans: data.plans || [] });
+      return data.plans || [];
+    } catch (error) {
+      console.error('Failed to fetch billing plans:', error);
+      get().addToast(error.response?.data?.message || 'Failed to load billing plans', 'error');
+      throw error;
+    }
+  },
+  fetchBillingHistory: async () => {
+    try {
+      const { data } = await api.get('/billing/history');
+      set({ billingHistory: data || [] });
+      return data || [];
+    } catch (error) {
+      console.error('Failed to fetch billing history:', error);
+      get().addToast(error.response?.data?.message || 'Failed to load billing history', 'error');
+    }
+  },
+  createPaymentOrder: async ({ planKey, billingAction = 'new_plan', contactCount }) => {
+    set({ billingCheckoutLoading: true });
+    try {
+      const idempotencyKey = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `billing-${Date.now()}`;
+      const { data } = await api.post('/payments/orders', {
+        plan_key: planKey,
+        billing_action: billingAction,
+        contact_count: contactCount,
+      }, {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
+      });
+      return data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to create payment order', 'error');
+      throw error;
+    } finally {
+      set({ billingCheckoutLoading: false });
+    }
+  },
+  verifyPayment: async (payload) => {
+    set({ billingCheckoutLoading: true });
+    try {
+      const { data } = await api.post('/payments/verify', payload);
+      await get().fetchBillingSummary();
+      get().addToast('Plan activated successfully', 'success');
+      return data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Payment verification failed', 'error');
+      throw error;
+    } finally {
+      set({ billingCheckoutLoading: false });
     }
   },
 }));

@@ -36,6 +36,8 @@ class CampaignController extends Controller
             'cta_link' => 'nullable',
             'sender_config_id' => 'nullable',
             'segments' => 'nullable|array',
+            'segments.*.filters' => 'nullable|array',
+            'segments.*.filters.*.field' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_]+$/'],
             'variants' => 'nullable|array',
             'status' => 'nullable|string|in:draft,scheduled',
             'schedule_type' => 'nullable|string|in:immediate,once,recurring',
@@ -90,6 +92,8 @@ class CampaignController extends Controller
             'sender_config_id' => 'nullable',
             'audience_segment' => 'nullable|string',
             'segments' => 'nullable|array',
+            'segments.*.filters' => 'nullable|array',
+            'segments.*.filters.*.field' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_]+$/'],
             'variants' => 'nullable|array',
             'status' => 'nullable|string|in:draft,scheduled',
             'schedule_type' => 'nullable|string|in:immediate,once,recurring',
@@ -192,4 +196,3 @@ class CampaignController extends Controller
         return $url;
     }
 }
-

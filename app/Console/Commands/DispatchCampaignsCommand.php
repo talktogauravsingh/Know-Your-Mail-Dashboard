@@ -52,6 +52,7 @@ class DispatchCampaignsCommand extends Command
                     'campaign_id' => $campaign->id,
                     'recipient_id' => $assignment->recipient_id,
                     'variant_id' => $assignment->variant_id,
+                    'email' => $assignment->recipient?->email,
                     'status' => 'pending',
                     'bounce_type' => 'none',
                     'bounce_count' => 0,

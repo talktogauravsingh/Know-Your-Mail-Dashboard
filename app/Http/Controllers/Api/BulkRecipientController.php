@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Campaign;
 use App\Services\BulkImportService;
 use App\Services\RecipientValidationService;
 use Illuminate\Http\Request;
@@ -26,10 +27,9 @@ class BulkRecipientController extends Controller
     {
         $user = Auth::user();
         
-        // Assume agent role check via middleware or permission
-        // if ($user && !$user->hasPermission('bulk_upload_recipients')) {
-        //     return response()->json(['error' => 'Unauthorized'], 403);
-        // }
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
 
         $request->validate([
             'file' => 'required|file|mimes:csv,txt|max:10240', // 10MB
@@ -46,18 +46,29 @@ class BulkRecipientController extends Controller
         $moduleType = $request->input('module_type');
         $moduleId = $request->input('module_id');
 
+        if ($campaignId) {
+            Campaign::where('organization_id', $user->organization_id)->findOrFail($campaignId);
+        }
+
         // Logic for module referencing
         if (!$moduleType) {
             $moduleType = $campaignId ? 2 : 1; // Default to Campaign if id exists, else Org
         }
         
         if (!$moduleId) {
-            $moduleId = $campaignId ?: ($user ? $user->organization_id : 1);
+            $moduleId = $campaignId ?: $user->organization_id;
+        }
+
+        if ((int) $moduleType === 1 && (int) $moduleId !== (int) $user->organization_id) {
+            return response()->json(['message' => 'Organization uploads must target your organization.'], 422);
+        }
+
+        if ((int) $moduleType === 2) {
+            Campaign::where('organization_id', $user->organization_id)->findOrFail($moduleId);
         }
         
-        // Mock fallback if unauthenticated for local testing
-        $organizationId = $user ? $user->organization_id : 1;
-        $agentId = $user ? $user->id : 1;
+        $organizationId = $user->organization_id;
+        $agentId = $user->id;
 
         // Store temp file
         $csvPath = $request->file('file')->store('temp_csv', 'local');
@@ -132,4 +143,3 @@ class BulkRecipientController extends Controller
         }
     }
 }
-
