@@ -271,24 +271,30 @@ Core architectural properties:
   1. Verify raw webhook signature (`X-Razorpay-Signature`).
   2. Persist and deduplicate webhook events by `provider_event_id` into `payment_provider_events`.
   3. Immediately acknowledge quickly.
-  4. Queue `ProcessRazorpayWebhookEventJob` to update `payment_transactions`.
+  4. Queue `ProcessRazorpayWebhookEventJob` to update `payment_transactions`. State transitions are strictly guarded (e.g., terminal states like `PAID` or `FAILED` cannot be overwritten by late-arriving `AUTHORIZED` webhooks).
 - Webhook processing is explicitly queued to avoid slow webhook requests.
 
 ---
 
-### 11) Billing API (Plans + Summary + History)
+### 11) Billing API & Subscriptions (Plans + Summary + History + Renewals)
 
 **What it does**
 - Exposes billing views: current subscription summary, available plans, and billing history.
+- Manages organizational subscriptions and recurring billing life cycles via a headless subscription model.
 
 **Key components**
 - Controller: `app/Http/Controllers/Api/BillingController.php`
+- Service: `app/Services/BillingService.php`
+- Command: `app/Console/Commands/ProcessSubscriptionRenewalsCommand.php`
+- Model: `OrganizationSubscription.php`
 
 **Working**
 - Under `/api/billing` (auth required):
   - `GET /summary`
   - `GET /plans`
   - `GET /history`
+- `OrganizationSubscription` tracks `current_period_start`, `current_period_end`, and `due_date`.
+- The `billing:process-renewals` command runs hourly, generating new Razorpay orders for active subscriptions that are past their `due_date`, allowing dynamic pricing adjustments (e.g., usage/overages) while retaining backend control over billing.
 
 ---
 
@@ -307,37 +313,11 @@ Core architectural properties:
 
 ## Notes on Known Constraints / Structural Risks (from current issue register)
 
-### A) Subscription billing is not modeled yet (one-time payment only)
+### A) [RESOLVED] Subscription billing is not modeled yet (one-time payment only)
+- **Resolved**: Added `current_period_start`, `current_period_end`, and `due_date` fields to `OrganizationSubscription`. Implemented the `billing:process-renewals` command to query for past-due active subscriptions, generate new Razorpay orders for renewals (with dynamic overage pricing), and move the subscription to `PAST_DUE`.
 
-**Current state**
-- Razorpay integration currently supports **creating/verifying one-time orders**.
-- There are no subscription lifecycle models/tables that represent monthly billing, plan periods, due dates, cancellation/renewal, etc.
-
-**Why it matters**
-- A “subscription billing cron” cannot be implemented safely without:
-  - a subscription record per organization
-  - a plan catalog (price + billing cadence)
-  - due-date/period logic and idempotent renewal keys
-  - webhook-driven status transitions (renewal success/failure)
-
-**What should be added (implementation-level spec, no code here)**
-- Database: `subscriptions` (and/or `organization_subscriptions`) with due_date, current_period_start/end, status.
-- Billing service: generates due renewals by calling Razorpay using backend-owned amounts.
-- Webhook mapping: update subscription status based on payment outcomes.
-
-### B) Payment state transitions are permissive (possible regressions)
-
-**Current state**
-- Payment/provider statuses can be updated directly when processing webhooks.
-
-**Why it matters**
-- If events arrive out-of-order (or retries happen), later “intermediate” statuses may overwrite earlier terminal statuses.
-
-**What should be added (implementation-level spec, no code here)**
-- Centralized transition rules:
-  - allowed transitions from each state
-  - terminal-state protection (e.g., once `paid`/`succeeded`, never revert)
-- Transition enforcement inside the job/service that updates `payment_transactions`.
+### B) [RESOLVED] Payment state transitions are permissive (possible regressions)
+- **Resolved**: Updated `PaymentService` to implement a strict state machine via `guardTransactionStatus()`. Terminal states (`PAID`, `FAILED`, `VERIFICATION_FAILED`) can no longer be overwritten by out-of-order webhooks (e.g., `AUTHORIZED`).
 
 ### C) Tracking enrichment (IP geolocation) inline
 - Tracking enrichment currently calls an external IP geolocation API during request flow, which can slow tracking endpoints.

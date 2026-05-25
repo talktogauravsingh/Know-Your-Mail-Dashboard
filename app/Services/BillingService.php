@@ -129,6 +129,9 @@ class BillingService
             'latest_payment_transaction_id' => $transaction->id,
             'started_at' => $subscription->started_at ?? $now,
             'renews_at' => $this->nextRenewalAt($effectiveStart, (string) ($plan['interval'] ?? 'month')),
+            'current_period_start' => $effectiveStart,
+            'current_period_end' => $this->nextRenewalAt($effectiveStart, (string) ($plan['interval'] ?? 'month')),
+            'due_date' => $this->nextRenewalAt($effectiveStart, (string) ($plan['interval'] ?? 'month')),
             'cancelled_at' => null,
             'metadata' => [
                 'activated_via' => data_get($transaction->request_payload, 'billing_action', 'new_plan'),
@@ -140,6 +143,48 @@ class BillingService
         $subscription->save();
 
         return $subscription->refresh();
+    }
+
+    public function processDueRenewals(\App\Services\Payments\PaymentService $paymentService): void
+    {
+        $now = CarbonImmutable::now();
+        $dueSubscriptions = OrganizationSubscription::where('status', OrganizationSubscription::STATUS_ACTIVE)
+            ->whereNotNull('due_date')
+            ->where('due_date', '<=', $now)
+            ->with(['latestPaymentTransaction.user'])
+            ->get();
+
+        foreach ($dueSubscriptions as $subscription) {
+            $latestTx = $subscription->latestPaymentTransaction;
+            $user = $latestTx?->user ?? User::where('organization_id', $subscription->organization_id)->first();
+
+            if (!$user) {
+                continue;
+            }
+
+            $idempotencyKey = 'renewal_' . $subscription->id . '_' . $subscription->current_period_end?->timestamp;
+
+            try {
+                $paymentService->createOrder($user, [
+                    'provider' => 'razorpay',
+                    'currency' => $subscription->currency,
+                    'amount_minor' => $subscription->amount_minor,
+                    'plan_key' => $subscription->plan_key,
+                    'billing_action' => 'renewal',
+                    'contact_count' => $subscription->metadata['contact_count'] ?? null,
+                    'notes' => ['renewal_for_subscription' => (string) $subscription->id]
+                ], $idempotencyKey);
+
+                $subscription->update([
+                    'status' => OrganizationSubscription::STATUS_PAST_DUE,
+                    'metadata' => array_merge($subscription->metadata ?? [], [
+                        'last_renewal_order_created_at' => $now->toIso8601String(),
+                    ])
+                ]);
+            } catch (\Exception $e) {
+                report($e);
+            }
+        }
     }
 
     private function plans(): Collection

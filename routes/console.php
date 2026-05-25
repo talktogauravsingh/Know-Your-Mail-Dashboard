@@ -10,3 +10,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('campaigns:dispatch')->everyMinute();
+Schedule::command('billing:process-renewals')->hourly();

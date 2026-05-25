@@ -23,6 +23,9 @@ class OrganizationSubscription extends Model
         'latest_payment_transaction_id',
         'started_at',
         'renews_at',
+        'current_period_start',
+        'current_period_end',
+        'due_date',
         'cancelled_at',
         'metadata',
     ];
@@ -35,6 +38,9 @@ class OrganizationSubscription extends Model
             'latest_payment_transaction_id' => 'integer',
             'started_at' => 'datetime',
             'renews_at' => 'datetime',
+            'current_period_start' => 'datetime',
+            'current_period_end' => 'datetime',
+            'due_date' => 'datetime',
             'cancelled_at' => 'datetime',
             'metadata' => 'array',
         ];
