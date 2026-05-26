@@ -250,6 +250,7 @@ class PaymentService
             }
 
             $transaction->update($this->webhookTransactionUpdates(
+                $transaction,
                 (string) $event->event_type,
                 $providerPaymentId,
                 $paymentEntity,
@@ -273,20 +274,47 @@ class PaymentService
         });
     }
 
-    private function webhookTransactionUpdates(string $eventType, ?string $providerPaymentId, array $paymentEntity): array
+    private function webhookTransactionUpdates(PaymentTransaction $transaction, string $eventType, ?string $providerPaymentId, array $paymentEntity): array
     {
-        $status = match ($eventType) {
+        $proposedStatus = match ($eventType) {
             'payment.captured', 'order.paid', 'subscription.charged' => PaymentTransaction::STATUS_PAID,
             'payment.failed' => PaymentTransaction::STATUS_FAILED,
             'payment.authorized' => PaymentTransaction::STATUS_AUTHORIZED,
             default => null,
         };
 
+        $finalStatus = $this->guardTransactionStatus($transaction->status, $proposedStatus);
+
         return array_filter([
             'provider_payment_id' => $providerPaymentId,
-            'status' => $status,
+            'status' => $finalStatus,
             'provider_metadata' => ['last_webhook_payment_status' => $paymentEntity['status'] ?? null],
         ], fn ($value) => $value !== null);
+    }
+
+    private function guardTransactionStatus(int $currentStatus, ?int $proposedStatus): ?int
+    {
+        if ($proposedStatus === null) {
+            return null;
+        }
+
+        $terminalStates = [
+            PaymentTransaction::STATUS_PAID,
+            PaymentTransaction::STATUS_FAILED,
+            PaymentTransaction::STATUS_VERIFICATION_FAILED
+        ];
+
+        if (in_array($currentStatus, $terminalStates, true)) {
+            return null; // Skip updating status if already in terminal state
+        }
+
+        if ($currentStatus === PaymentTransaction::STATUS_AUTHORIZED) {
+            if (in_array($proposedStatus, [PaymentTransaction::STATUS_ORDER_PENDING, PaymentTransaction::STATUS_ORDER_CREATED], true)) {
+                return null;
+            }
+        }
+
+        return $proposedStatus;
     }
 
     private function sanitizeWebhookPayload(array $payload): array
