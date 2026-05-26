@@ -323,6 +323,8 @@ toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : '
       throw error;
     } finally {
       set({ billingCheckoutLoading: false });
+    }
+  },
   activateSmtpConfiguration: async (id) => {
     try {
       await api.post(`/smtp-configurations/${id}/activate`);
