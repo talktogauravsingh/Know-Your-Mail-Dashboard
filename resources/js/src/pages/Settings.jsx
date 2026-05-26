@@ -106,6 +106,9 @@ export default function Settings() {
     const fetchBillingPlans = useStore((state) => state.fetchBillingPlans);
     const createPaymentOrder = useStore((state) => state.createPaymentOrder);
     const verifyPayment = useStore((state) => state.verifyPayment);
+    const fetchSmtpConfigurations = useStore(
+        (state) => state.fetchSmtpConfigurations,
+    );
     const user = useStore((state) => state.user);
     const smtpConfigurationsLoading = useStore(
         (state) => state.smtpConfigurationsLoading,
@@ -122,6 +125,12 @@ export default function Settings() {
         fetchBillingSummary().catch(() => {});
         fetchBillingPlans().catch(() => {});
     }, [fetchBillingPlans, fetchBillingSummary]);
+
+    useEffect(() => {
+        if (activeTab === 'integrations') {
+            fetchSmtpConfigurations().catch(() => {});
+        }
+    }, [activeTab, fetchSmtpConfigurations]);
 
     const handlePlanCheckout = async (plan) => {
         const billingAction = subscription ? "update_plan" : "new_plan";
@@ -771,10 +780,24 @@ export default function Settings() {
                                         </div>
                                     ) : (
                                         <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
-                                            {smtpConfigurations.length === 0 ? (
+                                            {smtpConfigurationsLoading ? (
+                                                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                    {[1, 2, 3].map((item) => (
+                                                        <div key={item} className="flex items-center justify-between p-4 bg-white dark:bg-slate-950 animate-pulse">
+                                                            <div className="space-y-2">
+                                                                <div className="h-4 w-40 rounded-full bg-slate-200 dark:bg-slate-800" />
+                                                                <div className="h-3 w-56 rounded-full bg-slate-100 dark:bg-slate-800/60" />
+                                                            </div>
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="h-7 w-20 rounded-lg bg-slate-100 dark:bg-slate-800" />
+                                                                <div className="h-8 w-8 rounded-md bg-slate-100 dark:bg-slate-800" />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : smtpConfigurations.length === 0 ? (
                                                 <div className="p-8 text-center text-sm text-slate-500">
-                                                    No custom SMTP
-                                                    configurations added yet.
+                                                    No custom SMTP configurations added yet.
                                                 </div>
                                             ) : (
                                                 smtpConfigurations.map(
@@ -785,31 +808,33 @@ export default function Settings() {
                                                         >
                                                             <div>
                                                                 <p className="font-bold text-sm text-slate-900 dark:text-slate-50">
-                                                                    {
-                                                                        config.provider
-                                                                    }
+                                                                    {config.provider}
                                                                 </p>
                                                                 <p className="text-xs text-slate-500">
-                                                                    {
-                                                                        config.fromAddress
-                                                                    }{" "}
-                                                                    (
-                                                                    {
-                                                                        config.host
-                                                                    }
-                                                                    )
+                                                                    {config.fromAddress} ({config.host})
                                                                 </p>
                                                             </div>
                                                             <div className="flex gap-2">
+                                                                {config.status === 1 ? (
+                                                                    <Badge variant="success" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 border-none font-semibold text-xs py-1 px-2.5 rounded-full flex items-center gap-1.5">
+                                                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                                                        Active
+                                                                    </Badge>
+                                                                ) : (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        className="h-8 text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200 dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-950/30 transition-all duration-300 rounded-lg shadow-sm"
+                                                                        onClick={() => activateSmtpConfiguration(config.id)}
+                                                                    >
+                                                                        Activate
+                                                                    </Button>
+                                                                )}
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="sm"
                                                                     className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                                                    onClick={() =>
-                                                                        deleteSmtpConfiguration(
-                                                                            config.id,
-                                                                        )
-                                                                    }
+                                                                    onClick={() => deleteSmtpConfiguration(config.id)}
                                                                 >
                                                                     <Trash2 className="w-4 h-4" />
                                                                 </Button>

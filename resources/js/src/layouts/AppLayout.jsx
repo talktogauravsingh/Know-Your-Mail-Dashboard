@@ -2,12 +2,13 @@ import React, { useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
-import { LayoutDashboard, Mail, LayoutList, Settings, LogOut, Search, Bell, Users, Database, Sun, Moon, ChevronDown, Bot, Sparkles, CreditCard } from 'lucide-react';
+import { LayoutDashboard, Mail, LayoutList, Settings, LogOut, Search, Bell, Users, Database, Sun, Moon, ChevronDown, Bot, Sparkles, CreditCard, LayoutTemplate } from 'lucide-react';
 
 const navigation = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Billing & Plan', href: '/billing', icon: CreditCard },
   { name: 'Campaigns', href: '/campaigns', icon: Mail },
+  { name: 'Templates', href: '/templates', icon: LayoutTemplate },
   { name: 'Automation', href: '#', icon: Sparkles, disabled: true },
   { name: 'Audience', href: '/audience', icon: Users },
   { name: 'AI Chatbot', href: '#', icon: Bot, disabled: true },

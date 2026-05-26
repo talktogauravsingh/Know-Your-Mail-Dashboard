@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import api from '../lib/api';
 import {
@@ -155,6 +156,8 @@ export default function TemplateDesigner() {
   const [showTestSend, setShowTestSend] = useState(false);
 
   const addToast = useStore((state) => state.addToast);
+  const addTemplate = useStore((state) => state.addTemplate);
+  const updateTemplate = useStore((state) => state.updateTemplate);
 
   const selectedSectionIndex = sections.findIndex(
     (section) => section.id === selectedSectionId
@@ -324,6 +327,15 @@ export default function TemplateDesigner() {
     return `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${escapeHtml(templateName)}</title></head><body style="margin:0; padding:24px; background:#f8fafc; font-family:Inter, system-ui, sans-serif;">${sections.map(renderSectionHtml).join('')}</body></html>`;
   };
 
+  const mapTemplateForStore = (template) => ({
+    id: template.id || `t-${Date.now()}`,
+    name: template.template_name || template.name || 'Untitled Template',
+    category: template.category || category || 'Newsletter',
+    description: template.description || template.preview_text || template.subject || '',
+    avgOpenRate: template.avg_open_rate || '-',
+    color: template.color || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+  });
+
   const saveTemplate = async (newStatus = 'draft') => {
     try {
       setSaving(true);
@@ -344,6 +356,12 @@ export default function TemplateDesigner() {
       const data = response.data;
       setTemplateId(data.id);
       setStatus(data.status || newStatus);
+      const storeTemplate = mapTemplateForStore(data);
+      if (templateId) {
+        updateTemplate(data.id, storeTemplate);
+      } else {
+        addTemplate(storeTemplate);
+      }
       addToast(`Template ${newStatus === 'published' ? 'published' : 'saved'} successfully`, 'success');
       return data;
     } catch (error) {
@@ -469,6 +487,11 @@ export default function TemplateDesigner() {
       <main className="flex-1 flex flex-col overflow-hidden">
         <div className="h-20 bg-white border-b border-slate-200 px-8 flex items-center justify-between">
           <div className="flex-1">
+            <div className="flex items-center gap-3 mb-3">
+              <Link to="/templates" className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+                ← Back to Templates
+              </Link>
+            </div>
             <div className="flex flex-col gap-2">
               <div className="flex flex-col sm:flex-row sm:items-end sm:gap-3">
                 <div className="flex-1">

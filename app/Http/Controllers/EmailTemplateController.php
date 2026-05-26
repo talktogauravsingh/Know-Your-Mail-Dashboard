@@ -6,16 +6,16 @@ use App\Http\Requests\StoreEmailTemplateRequest;
 use App\Http\Requests\UpdateEmailTemplateRequest;
 use App\Models\EmailTemplate;
 use App\Services\EmailTemplateService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Http\Response;
 
 class EmailTemplateController extends Controller
 {
     /**
      * List all templates for the authenticated user's organization.
      */
-    public function index(Request $request): Response
+    public function index(Request $request): JsonResponse
     {
         $templates = EmailTemplate::where('organization_id', $request->user()->organization_id)
             ->orderBy('updated_at', 'desc')
@@ -26,7 +26,7 @@ class EmailTemplateController extends Controller
     /**
      * Store a new template.
      */
-    public function store(StoreEmailTemplateRequest $request): Response
+    public function store(StoreEmailTemplateRequest $request): JsonResponse
     {
         $data = $request->validated();
         $data['organization_id'] = $request->user()->organization_id;
@@ -39,7 +39,7 @@ class EmailTemplateController extends Controller
     /**
      * Show a single template.
      */
-    public function show(EmailTemplate $template): Response
+    public function show(EmailTemplate $template): JsonResponse
     {
         $this->authorize('view', $template);
         return response()->json($template);
@@ -48,7 +48,7 @@ class EmailTemplateController extends Controller
     /**
      * Update an existing template.
      */
-    public function update(UpdateEmailTemplateRequest $request, EmailTemplate $template): Response
+    public function update(UpdateEmailTemplateRequest $request, EmailTemplate $template): JsonResponse
     {
         $this->authorize('update', $template);
         $data = $request->validated();
@@ -60,7 +60,7 @@ class EmailTemplateController extends Controller
     /**
      * Delete a template.
      */
-    public function destroy(EmailTemplate $template): Response
+    public function destroy(EmailTemplate $template): JsonResponse
     {
         $this->authorize('delete', $template);
         $template->delete();
@@ -70,7 +70,7 @@ class EmailTemplateController extends Controller
     /**
      * Duplicate a template.
      */
-    public function duplicate(EmailTemplate $template): Response
+    public function duplicate(EmailTemplate $template): JsonResponse
     {
         $this->authorize('duplicate', $template);
         $new = $template->replicate();
@@ -85,7 +85,7 @@ class EmailTemplateController extends Controller
     /**
      * Render template with supplied variables for preview.
      */
-    public function render(Request $request, EmailTemplate $template): Response
+    public function render(Request $request, EmailTemplate $template): JsonResponse
     {
         $this->authorize('render', $template);
         $variables = $request->input('variables', []);
@@ -97,7 +97,7 @@ class EmailTemplateController extends Controller
     /**
      * Send a test email using the rendered content.
      */
-    public function testSend(Request $request, EmailTemplate $template): Response
+    public function testSend(Request $request, EmailTemplate $template): JsonResponse
     {
         $this->authorize('render', $template);
         $variables = $request->input('variables', []);
