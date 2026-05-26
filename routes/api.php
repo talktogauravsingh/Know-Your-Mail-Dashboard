@@ -77,6 +77,17 @@ Route::middleware('auth:sanctum')->prefix('campaigns')->group(function () {
     Route::post('/segments/validate-count/{campaign?}', [\App\Http\Controllers\Api\SegmentationController::class, 'validateCount']);
 });
 
+Route::middleware('auth:sanctum')->prefix('email-templates')->group(function () {
+    Route::get('/', [\App\Http\Controllers\EmailTemplateController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\EmailTemplateController::class, 'store']);
+    Route::get('/{template}', [\App\Http\Controllers\EmailTemplateController::class, 'show']);
+    Route::patch('/{template}', [\App\Http\Controllers\EmailTemplateController::class, 'update']);
+    Route::delete('/{template}', [\App\Http\Controllers\EmailTemplateController::class, 'destroy']);
+    Route::post('/{template}/duplicate', [\App\Http\Controllers\EmailTemplateController::class, 'duplicate']);
+    Route::post('/{template}/render', [\App\Http\Controllers\EmailTemplateController::class, 'render']);
+    Route::post('/{template}/test-send', [\App\Http\Controllers\EmailTemplateController::class, 'testSend']);
+});
+
 Route::get('/o/{requestUserId}', [TrackingController::class, 'OpenMailTrack']);
 Route::get('/c/{requestUserId}', [TrackingController::class, 'ClickMailTrack']);
 Route::post('ai/email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate']);

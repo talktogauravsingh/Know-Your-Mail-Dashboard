@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -12,7 +12,7 @@ export default function Templates() {
   const addTemplate = useStore((state) => state.addTemplate);
   const updateTemplate = useStore((state) => state.updateTemplate);
   const deleteTemplate = useStore((state) => state.deleteTemplate);
-
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
 
@@ -24,9 +24,7 @@ export default function Templates() {
   const [formData, setFormData] = useState({ name: '', category: 'Newsletter', description: '' });
 
   const handleOpenCreate = () => {
-    setModalMode('create');
-    setFormData({ name: '', category: 'Newsletter', description: '' });
-    setIsModalOpen(true);
+    navigate('/templates/designer');
   };
 
   const handleOpenEdit = (e, template) => {

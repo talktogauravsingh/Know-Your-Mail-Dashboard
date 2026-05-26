@@ -169,9 +169,27 @@ toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : '
     }
   },
 
-  // Templates (keep mock)
+  // Templates – fetch from API
   templates: mockTemplates,
+  templatesLoading: false,
+  fetchTemplates: async () => {
+    set({ templatesLoading: true });
+    try {
+      const { data } = await api.get('/email-templates');
+      set({ templates: data, templatesLoading: false });
+    } catch (error) {
+      console.error('Failed to fetch templates:', error);
+      set({ templatesLoading: false });
+    }
+  },
   setTemplates: (templates) => set({ templates }),
+  addTemplate: (template) => set((state) => ({ templates: [...state.templates, template] })),
+  updateTemplate: (id, updates) => set((state) => ({
+    templates: state.templates.map((t) => (t.id === id ? { ...t, ...updates } : t))
+  })),
+  deleteTemplate: (id) => set((state) => ({
+    templates: state.templates.filter((t) => t.id !== id)
+  })),
 
   // SMTP
   smtpConfigurations: [],
