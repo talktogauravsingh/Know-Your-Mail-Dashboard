@@ -107,6 +107,14 @@ export default function Settings() {
     const createPaymentOrder = useStore((state) => state.createPaymentOrder);
     const verifyPayment = useStore((state) => state.verifyPayment);
     const user = useStore((state) => state.user);
+  const [activeTab, setActiveTab] = useState('team');
+  const [isAddingSmtp, setIsAddingSmtp] = useState(false);
+  const [newSmtp, setNewSmtp] = useState({ provider: 'Custom SMTP', host: '', port: 587, encryption: 'tls', username: '', password: '', fromName: '', fromAddress: '' });
+  const smtpConfigurations = useStore((state) => state.smtpConfigurations);
+  const smtpConfigurationsLoading = useStore((state) => state.smtpConfigurationsLoading);
+  const deleteSmtpConfiguration = useStore((state) => state.deleteSmtpConfiguration);
+  const addSmtpConfiguration = useStore((state) => state.addSmtpConfiguration);
+  const activateSmtpConfiguration = useStore((state) => state.activateSmtpConfiguration);
 
     const currentPlan = billingSummary?.current_plan;
     const subscription = billingSummary?.subscription;
@@ -428,6 +436,129 @@ export default function Settings() {
                             </div>
                         </div>
                     )}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Custom SMTP Credentials</CardTitle>
+                    <CardDescription>Connect third-party providers like SendGrid, AWS SES, or Gmail.</CardDescription>
+                  </div>
+                  {!isAddingSmtp && (
+                    <Button onClick={() => setIsAddingSmtp(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"><Plus className="w-4 h-4"/> Add Setup</Button>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {isAddingSmtp ? (
+                    <div className="space-y-4 border border-slate-200 dark:border-slate-800 rounded-lg p-6 bg-slate-50 dark:bg-slate-900/50">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-900 dark:text-slate-50">Provider</label>
+                          <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500" value={newSmtp.provider} onChange={(e) => setNewSmtp({...newSmtp, provider: e.target.value})}>
+                            <option value="Custom SMTP">Custom SMTP</option>
+                            <option value="AWS SES">AWS SES</option>
+                            <option value="SendGrid">SendGrid</option>
+                            <option value="Gmail">Gmail</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-900 dark:text-slate-50">Host / Endpoint URLs</label>
+                          <Input value={newSmtp.host} onChange={(e) => setNewSmtp({...newSmtp, host: e.target.value})} placeholder="smtp.example.com" className="bg-white dark:bg-slate-950" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-900 dark:text-slate-50">Port</label>
+                          <Input type="number" value={newSmtp.port} onChange={(e) => setNewSmtp({...newSmtp, port: parseInt(e.target.value)})} className="bg-white dark:bg-slate-950" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-900 dark:text-slate-50">Encryption</label>
+                          <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500" value={newSmtp.encryption} onChange={(e) => setNewSmtp({...newSmtp, encryption: e.target.value})}>
+                            <option value="">None</option>
+                            <option value="tls">TLS</option>
+                            <option value="ssl">SSL</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-900 dark:text-slate-50">Username / API Key</label>
+                          <Input value={newSmtp.username} onChange={(e) => setNewSmtp({...newSmtp, username: e.target.value})} className="bg-white dark:bg-slate-950" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-900 dark:text-slate-50">Password / Secret</label>
+                          <Input type="password" value={newSmtp.password} onChange={(e) => setNewSmtp({...newSmtp, password: e.target.value})} className="bg-white dark:bg-slate-950" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-900 dark:text-slate-50">Sender Name</label>
+                          <Input value={newSmtp.fromName} onChange={(e) => setNewSmtp({...newSmtp, fromName: e.target.value})} placeholder="Marketing Team" className="bg-white dark:bg-slate-950" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-900 dark:text-slate-50">Sender Address</label>
+                          <Input value={newSmtp.fromAddress} onChange={(e) => setNewSmtp({...newSmtp, fromAddress: e.target.value})} placeholder="hello@example.com" className="bg-white dark:bg-slate-950" />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800 mt-4">
+                        <Button variant="outline" onClick={() => setIsAddingSmtp(false)} className="bg-white dark:bg-slate-950">Cancel</Button>
+                        <Button onClick={() => {
+                          if (newSmtp.host && newSmtp.username) {
+                            addSmtpConfiguration(newSmtp);
+                            setIsAddingSmtp(false);
+                            setNewSmtp({ provider: 'Custom SMTP', host: '', port: 587, encryption: 'tls', username: '', password: '', fromName: '', fromAddress: '' });
+                          }
+                        }} className="bg-indigo-600 hover:bg-indigo-700 text-white">Save Configuration</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+                      {smtpConfigurationsLoading ? (
+                        /* Skeleton loader - shown while API response is in flight */
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {[0, 1, 2].map((i) => (
+                            <div key={i} className="flex items-center justify-between p-4 bg-white dark:bg-slate-950 animate-pulse">
+                              <div className="space-y-2">
+                                <div className="h-3.5 w-36 rounded-full bg-slate-200 dark:bg-slate-800" />
+                                <div className="h-2.5 w-52 rounded-full bg-slate-100 dark:bg-slate-800/60" />
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="h-7 w-20 rounded-lg bg-slate-100 dark:bg-slate-800" />
+                                <div className="h-8 w-8 rounded-md bg-slate-100 dark:bg-slate-800" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : smtpConfigurations.length === 0 ? (
+                        <div className="p-8 text-center text-sm text-slate-500">No custom SMTP configurations added yet.</div>
+                      ) : (
+                        smtpConfigurations.map((config, index) => (
+                          <div key={config.id} className={`flex items-center justify-between p-4 bg-white dark:bg-slate-950 ${index !== smtpConfigurations.length - 1 ? 'border-b border-slate-200 dark:border-slate-800' : ''}`}>
+                            <div>
+                              <p className="font-bold text-sm text-slate-900 dark:text-slate-50">{config.provider}</p>
+                              <p className="text-xs text-slate-500">{config.fromAddress} ({config.host})</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {config.status === 1 ? (
+                                <Badge variant="success" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 border-none font-semibold text-xs py-1 px-2.5 rounded-full flex items-center gap-1.5 animate-in fade-in zoom-in duration-300">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                  Active
+                                </Badge>
+                              ) : (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200 dark:border-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-950/30 transition-all duration-300 rounded-lg shadow-sm" 
+                                  onClick={() => activateSmtpConfiguration(config.id)}
+                                >
+                                  Activate
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => deleteSmtpConfiguration(config.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
                     {activeTab === "domains" && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">

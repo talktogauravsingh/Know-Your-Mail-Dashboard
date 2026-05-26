@@ -39,6 +39,7 @@ export default function CreateCampaign() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [recipientSource, setRecipientSource] = useState('campaign'); // 'campaign' or 'org'
   const [variants, setVariants] = useState({}); // { [segmentId]: { subject, body, cta_url } }
+  const [selectedTemplateData, setSelectedTemplateData] = useState(null);
   const fileInputRef = useRef(null);
 
   // CRITICAL: Reset campaignId on every fresh mount so stale IDs don't leak across sessions
@@ -46,6 +47,21 @@ export default function CreateCampaign() {
     setCampaignId(null);
     return () => setCampaignId(null); // also reset on unmount
   }, []);
+
+  // Load selected template data into form fields
+  useEffect(() => {
+    if (selectedTemplateData) {
+      // Populate default segment variant
+      setVariants(prev => ({
+        ...prev,
+        default: {
+          ...prev.default,
+          subject: selectedTemplateData.subject || '',
+          body: selectedTemplateData.plain_text_content || selectedTemplateData.html_content || '',
+        },
+      }));
+    }
+  }, [selectedTemplateData]);
 
   const fetchInsights = async (id) => {
     try {
@@ -201,6 +217,32 @@ export default function CreateCampaign() {
     <div className="space-y-6 max-w-4xl mx-auto pb-10 animate-in fade-in duration-500">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
+          <Select
+            value={selectedTemplateData ? selectedTemplateData.id : ''}
+            onChange={e => {
+              const tmpl = templates.find(t => t.id === e.target.value);
+              setSelectedTemplateData(tmpl);
+              // Update URL param without reload
+              const params = new URLSearchParams(window.location.search);
+              if (tmpl) {
+                params.set('template', tmpl.id);
+              } else {
+                params.delete('template');
+              }
+              window.history.replaceState(null, '', `?${params.toString()}`);
+            }}
+            className="bg-white dark:bg-slate-950"
+          >
+            <option value="">Select Template</option>
+            {templates.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </Select>
+          <Link to="/templates/builder">
+            <Button variant="secondary">Create New Template</Button>
+          </Link>
+        </div>
+        <div className="flex items-center gap-4">
           <Link to="/campaigns">
             <Button type="button" variant="ghost" size="icon" className="rounded-full">
               <ArrowLeft className="h-5 w-5" />
@@ -208,9 +250,9 @@ export default function CreateCampaign() {
           </Link>
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">New Campaign</h2>
-            <p className="text-slate-500 dark:text-slate-400">
-              {selectedTemplate ? `Starting from layout: ${selectedTemplate.name}` : 'Configure your email campaign details.'}
-            </p>
+              <p className="text-slate-500 dark:text-slate-400">
+                {selectedTemplateData ? `Starting from layout: ${selectedTemplateData.name}` : 'Configure your email campaign details.'}
+              </p>
           </div>
         </div>
         <div className="flex items-center gap-3 bg-white dark:bg-slate-950 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -319,7 +361,7 @@ export default function CreateCampaign() {
 
             {/* Removed Global Subject Line - now handled per segment in Content card */}
 
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="senderConfig">Sender Configuration</Label>
               <Select id="senderConfig" name="sender_config_id" required className="bg-white dark:bg-slate-950">
                 <option value="">Select a sender configuration...</option>
@@ -331,7 +373,7 @@ export default function CreateCampaign() {
                 ))}
               </Select>
               <p className="text-xs text-slate-500 mt-1">Select the verified domain or custom SMTP to send this campaign from.</p>
-            </div>
+            </div> */}
           </CardContent>
         </Card>
 

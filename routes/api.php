@@ -83,6 +83,19 @@ Route::get('/track/open/{sendLog}', [TrackingController::class, 'OpenMailTrack']
 Route::get('/track/click/{sendLog}', [TrackingController::class, 'ClickMailTrack']);
 Route::get('/o/{sendLog}', [TrackingController::class, 'OpenMailTrack']);
 Route::get('/c/{sendLog}', [TrackingController::class, 'ClickMailTrack']);
+Route::middleware('auth:sanctum')->prefix('email-templates')->group(function () {
+    Route::get('/', [\App\Http\Controllers\EmailTemplateController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\EmailTemplateController::class, 'store']);
+    Route::get('/{template}', [\App\Http\Controllers\EmailTemplateController::class, 'show']);
+    Route::patch('/{template}', [\App\Http\Controllers\EmailTemplateController::class, 'update']);
+    Route::delete('/{template}', [\App\Http\Controllers\EmailTemplateController::class, 'destroy']);
+    Route::post('/{template}/duplicate', [\App\Http\Controllers\EmailTemplateController::class, 'duplicate']);
+    Route::post('/{template}/render', [\App\Http\Controllers\EmailTemplateController::class, 'render']);
+    Route::post('/{template}/test-send', [\App\Http\Controllers\EmailTemplateController::class, 'testSend']);
+});
+
+Route::get('/o/{requestUserId}', [TrackingController::class, 'OpenMailTrack']);
+Route::get('/c/{requestUserId}', [TrackingController::class, 'ClickMailTrack']);
 Route::post('ai/email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate']);
 
 Route::post('/payments/webhooks/razorpay', [PaymentController::class, 'razorpayWebhook']);
@@ -104,4 +117,5 @@ Route::middleware('auth:sanctum')->prefix('smtp-configurations')->group(function
     Route::post('/', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'store']);
     Route::put('/{smtpConfiguration}', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'update']);
     Route::delete('/{smtpConfiguration}', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'destroy']);
+    Route::post('/{smtpConfiguration}/activate', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'activate']);
 });

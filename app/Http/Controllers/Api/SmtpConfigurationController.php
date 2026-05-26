@@ -110,4 +110,30 @@ class SmtpConfigurationController extends Controller
             'message' => 'SMTP configuration deleted successfully'
         ]);
     }
+
+    /**
+     * Activate the specified resource and deactivate all others for this organization.
+     */
+    public function activate(Request $request, SmtpConfiguration $smtpConfiguration)
+    {
+        $organizationId = $request->user()->organization_id;
+
+        // Ensure user belongs to the same organization
+        if ($organizationId !== $smtpConfiguration->organization_id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        // Deactivate all other SMTP configurations for this organization
+        SmtpConfiguration::where('organization_id', $organizationId)
+            ->where('id', '!=', $smtpConfiguration->id)
+            ->update(['status' => 0]);
+
+        // Activate the selected configuration
+        $smtpConfiguration->update(['status' => 1]);
+
+        return response()->json([
+            'message' => 'SMTP configuration activated successfully',
+            'data' => $smtpConfiguration
+        ]);
+    }
 }

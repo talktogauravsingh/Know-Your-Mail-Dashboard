@@ -11,9 +11,16 @@ use App\Services\Payments\Contracts\PaymentProviderInterface;
 use App\Services\Payments\Providers\Razorpay\RazorpayProvider;
 use App\Services\Payments\Providers\Razorpay\RazorpayWebhookVerificationStrategy;
 use App\Services\RecipientValidationService;
+use App\Models\EmailTemplate;
+use App\Policies\EmailTemplatePolicy;
+use Illuminate\Support\Facades\Gate;
 
 class AppServiceProvider extends ServiceProvider
 {
+    protected $policies = [
+        EmailTemplate::class => EmailTemplatePolicy::class,
+    ];
+
     /**
      * Register any application services.
      */
@@ -42,6 +49,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        $this->registerPolicies();
+    }
+
+    protected function registerPolicies(): void
+    {
+        foreach ($this->policies as $model => $policy) {
+            Gate::policy($model, $policy);
+        }
     }
 }

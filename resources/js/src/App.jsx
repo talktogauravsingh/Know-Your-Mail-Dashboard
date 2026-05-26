@@ -15,11 +15,13 @@ import Dashboard from './pages/Dashboard';
 import Campaigns from './pages/Campaigns';
 import CreateCampaign from './pages/CreateCampaign';
 import CampaignAnalytics from './pages/CampaignAnalytics';
+import TemplateBuilder from './pages/TemplateBuilder';
 import Templates from './pages/Templates';
 import Audience from './pages/Audience';
 import BulkImport from './pages/BulkImport';
 import Settings from './pages/Settings';
 import Billing from './pages/Billing';
+import TemplateDesigner from './pages/TemplateDesigner';
 
 // Protected Route Wrapper
 function ProtectedRoute({ children }) {
@@ -70,10 +72,15 @@ export default function App() {
           <Route path="/campaigns/new" element={<CreateCampaign />} />
           <Route path="/campaigns/:id" element={<CampaignAnalytics />} />
           <Route path="/templates" element={<Templates />} />
+          <Route path="/templates/builder" element={<TemplateBuilder />} />
           <Route path="/audience" element={<Audience />} />
           <Route path="/bulk-import" element={<BulkImport />} />
           <Route path="/billing" element={<Billing />} />
           <Route path="/settings" element={<Settings />} />
+          <Route
+            path="/templates/designer"
+            element={<TemplateDesigner />}
+          />
         </Route>
       </Routes>
       <ToastList />

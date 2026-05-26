@@ -13,8 +13,12 @@ return new class extends Migration {
             $table->unsignedBigInteger('organization_id');
             $table->string('email')->nullable();
 
-            // JSON column
-            $table->json('attributes')->nullable();
+        // Convert attributes column to jsonb (if not already)
+        DB::statement('ALTER TABLE recipients ALTER COLUMN attributes TYPE jsonb USING attributes::jsonb');
+        // Add generated column using PostgreSQL syntax
+        DB::statement(
+            "ALTER TABLE recipients ADD COLUMN lead_type VARCHAR(50) GENERATED ALWAYS AS ((attributes->>'lead_type')) STORED"
+        );
 
             // Generated columns (defined directly)
             $table->string('lead_type', 50);
