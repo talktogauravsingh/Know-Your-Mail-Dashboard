@@ -60,6 +60,7 @@ const blockGroups = [
       { type: 'footer', label: 'Footer', icon: <Mail /> },
       { type: 'cta', label: 'CTA Banner', icon: <LayoutGrid /> },
       { type: 'social', label: 'Social Links', icon: <Columns /> },
+      { type: 'content', label: 'Content Zone', icon: <Type /> },
       { type: 'userInfo', label: 'User Info', icon: <Type /> },
       { type: 'receipt', label: 'Receipt', icon: <Image /> },
     ],
@@ -84,6 +85,7 @@ const dynamicVariables = [
   '{{amount}}',
   '{{payment_date}}',
   '{{donation_link}}',
+  '{{content}}',
 ];
 
 const initialSections = [
@@ -329,6 +331,8 @@ export default function TemplateDesigner() {
         return `<section style="${sectionStyle}">${section.content || ''}</section>`;
       case 'heading':
         return `<section style="${sectionStyle} margin-bottom:28px;"><h2 style="margin:0; font-size:28px; font-weight:700;">${escapeHtml(section.heading)}</h2></section>`;
+      case 'content':
+        return `<div class="content-zone" style="${sectionStyle} border:2px dashed #cbd5e1; border-radius:12px; background:#f1f5f9; min-height:200px;">{{content}}</div>`;
       case 'button':
         return `<section style="${sectionStyle} margin-bottom:28px;"><a href="#" style="display:inline-block; padding:14px 28px; border-radius:999px; background:#4f46e5; color:#fff; text-decoration:none;">${escapeHtml(section.buttonText)}</a></section>`;
       case 'image':
@@ -878,6 +882,7 @@ function SectionEditor({ section, updateSection, insertVariable, deleteSection, 
     html: 'HTML block',
     divider: 'Divider',
     spacer: 'Spacer',
+    content: 'Content Zone',
     oneColumn: '1 Column',
     twoColumns: '2 Columns',
     threeColumns: '3 Columns',
@@ -963,14 +968,28 @@ function SectionEditor({ section, updateSection, insertVariable, deleteSection, 
               onChange={(value) => setValue('content', value)}
             />
           )}
+
+          {section.type === 'content' && (
+            <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-2 h-2 rounded-full bg-indigo-600 mt-1 flex-shrink-0"></div>
+                <div>
+                  <p className="text-sm font-medium text-indigo-900">Campaign Content Zone</p>
+                  <p className="text-xs text-indigo-700 mt-1">This placeholder will be replaced with campaign body content when sending emails. Campaign content will be injected here during email merging.</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       <div>
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-slate-700">Text Styling</p>
-          <p className="text-xs text-slate-400">Applies to this block</p>
-        </div>
+        {section.type !== 'content' && (
+          <div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-700">Text Styling</p>
+              <p className="text-xs text-slate-400">Applies to this block</p>
+            </div>
 
         <div className="mt-4 space-y-4">
           <div>
@@ -1063,6 +1082,8 @@ function SectionEditor({ section, updateSection, insertVariable, deleteSection, 
             </div>
           </div>
         </div>
+            </div>
+          )}
       </div>
 
       <div>

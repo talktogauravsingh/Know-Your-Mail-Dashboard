@@ -12,6 +12,9 @@ use App\Models\SmtpConfiguration;
 use App\Models\SendLog;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use App\Services\EmailTemplateService;
+use App\Services\TemplateVariableEngine;
+use App\Mail\BulkMail;
 
 class SendCampaignEmailJob implements ShouldQueue
 {
@@ -87,28 +90,55 @@ class SendCampaignEmailJob implements ShouldQueue
         }
 
         try {
-            // Replace variables in subject and body
-            $subject = str_replace('{{name}}', $recipient->name ?? '', $variant->subject);
-            $body = str_replace('{{name}}', $recipient->name ?? '', $variant->body);
+            // Prepare variables for substitution
+            $variables = [
+                'name' => $recipient->name ?? '',
+                'email' => $recipient->email,
+            ];
 
-            // Add tracking pixel
+            // Determine the email subject (variant subject always takes precedence)
+            $subject = $variant->subject;
+            $engine = new TemplateVariableEngine();
+            $subject = $engine->render($subject, $variables);
+
+            // Prepare HTML body
+            $htmlBody = '';
+
+            // If campaign has a template with content block, use template merging
+            if ($campaign->template_id && $campaign->template) {
+                $template = $campaign->template;
+                $templateService = new EmailTemplateService();
+                
+                // Prepare the variant body (with variable substitution)
+                $body = $engine->render($variant->body, $variables);
+                
+                // Merge campaign body into template's {{content}} block
+                $htmlBody = $templateService->mergeWithContent($template, $body, $variables);
+            } else {
+                // Fallback: no template, use raw body from variant
+                $body = $engine->render($variant->body, $variables);
+                $htmlBody = nl2br($body);
+            }
+
+            // Add tracking pixel to the HTML body
             $trackingUrl = url("/api/track/open/{$sendLog->id}");
             $trackingPixel = "<img src='{$trackingUrl}' width='1' height='1' style='display:none;' />";
             
-            // Add CTA link if there is one
+            // Add CTA tracking if there is one
             $ctaLink = $variant->cta_url;
             if ($ctaLink) {
                 $trackedCta = url("/api/track/click/{$sendLog->id}?url=" . urlencode($ctaLink));
-                $body .= "<br><br><a href='{$trackedCta}'>Click Here</a>";
+                // Append CTA link if not already in body
+                if (!str_contains($htmlBody, $ctaLink)) {
+                    $htmlBody .= "<br><br><a href='{$trackedCta}'>Click Here</a>";
+                }
             }
 
-            // In production, body may be markdown or HTML. Assuming HTML for MVP.
-            $htmlBody = nl2br($body) . $trackingPixel;
+            // Append tracking pixel at the end
+            $htmlBody .= $trackingPixel;
 
-            Mail::html($htmlBody, function ($message) use ($recipient, $subject) {
-                $message->to($recipient->email)
-                        ->subject($subject);
-            });
+            // Send email using the new BulkMail mailable
+            Mail::to($recipient->email)->send(new BulkMail($subject, $htmlBody));
 
             $sendLog->update([
                 'status' => 'sent',

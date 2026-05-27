@@ -2,6 +2,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use HTMLPurifier;
 use HTMLPurifier_Config;
@@ -9,6 +10,14 @@ use HTMLPurifier_Config;
 class EmailTemplate extends Model
 {
     protected $table = 'email_templates';
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($template) {
+            $template->uuid = Str::uuid();
+        });
+    }
 
     protected $fillable = [
         'uuid',

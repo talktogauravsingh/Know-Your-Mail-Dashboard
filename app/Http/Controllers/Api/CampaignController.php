@@ -33,6 +33,7 @@ class CampaignController extends Controller
             'name' => 'required|string|max:255',
             'subject' => 'required|string|max:255',
             'body' => 'required|string',
+            'template_id' => 'nullable|exists:email_templates,id',
             'cta_link' => 'nullable',
             'sender_config_id' => 'nullable',
             'segments' => 'nullable|array',
@@ -57,6 +58,7 @@ class CampaignController extends Controller
             'name' => $validated['name'],
             'subject' => $validated['subject'],
             'body' => $validated['body'],
+            'template_id' => $validated['template_id'] ?? null,
             'cta_url' => $this->formatUrl($validated['cta_link'] ?? null),
             'sender_config_id' => $validated['sender_config_id'] ?? null,
             'segmentation_mode' => $request->input('segmentation_mode', 'single'),
@@ -93,6 +95,7 @@ class CampaignController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'subject' => 'sometimes|required|string|max:255',
             'body' => 'sometimes|required|string',
+            'template_id' => 'nullable|exists:email_templates,id',
             'cta_link' => 'nullable|string',
             'sender_config_id' => 'nullable',
             'audience_segment' => 'nullable|string',
@@ -117,6 +120,7 @@ class CampaignController extends Controller
             'name' => $validated['name'] ?? $campaign->name,
             'subject' => $validated['subject'] ?? $campaign->subject,
             'body' => $validated['body'] ?? $campaign->body,
+            'template_id' => $validated['template_id'] ?? $campaign->template_id,
             'cta_url' => isset($validated['cta_link']) ? $this->formatUrl($validated['cta_link']) : $campaign->cta_url,
             'sender_config_id' => $validated['sender_config_id'] ?? $campaign->sender_config_id,
             'segmentation_mode' => $request->input('segmentation_mode', $campaign->segmentation_mode),
@@ -228,5 +232,40 @@ class CampaignController extends Controller
             return 'https://' . ltrim($url, '/');
         }
         return $url;
+    }
+
+    /**
+     * Preview campaign with merged template content.
+     * Accepts template_id + body + variables and returns merged HTML.
+     */
+    public function preview(Request $request)
+    {
+        $validated = $request->validate([
+            'template_id' => 'required|exists:email_templates,id',
+            'body' => 'required|string',
+            'variables' => 'nullable|array',
+        ]);
+
+        try {
+            $template = \App\Models\EmailTemplate::findOrFail($validated['template_id']);
+            
+            $templateService = new \App\Services\EmailTemplateService();
+            $htmlBody = $templateService->mergeWithContent(
+                $template,
+                $validated['body'],
+                $validated['variables'] ?? []
+            );
+
+            return response()->json([
+                'success' => true,
+                'htmlBody' => $htmlBody,
+                'template' => $template->only(['id', 'template_name', 'subject']),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Preview failed: ' . $e->getMessage(),
+            ], 400);
+        }
     }
 }

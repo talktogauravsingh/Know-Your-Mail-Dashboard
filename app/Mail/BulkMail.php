@@ -14,21 +14,23 @@ class BulkMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public string $bannerLine; // renamed
+    public string $htmlBody;
+    public string $subject;
 
-    public function __construct(string $bannerLine)
+    public function __construct(string $subject, string $htmlBody)
     {
-        $this->bannerLine = $bannerLine;
+        $this->subject = $subject;
+        $this->htmlBody = $htmlBody;
     }
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Bulk Mail');
+        return new Envelope(subject: $this->subject);
     }
 
     public function content(): Content
     {
-        return new Content(view: 'emails.bulk');
+        return new Content(view: 'emails.campaign');
     }
 
     public function attachments(): array

@@ -33,4 +33,35 @@ class EmailTemplateService
 
         return $safeHtml;
     }
+
+    /**
+     * Merge campaign body content into template's {{content}} block,
+     * then substitute all other template variables.
+     *
+     * Process:
+     * 1. Replace {{content}} with the campaign body
+     * 2. Substitute all other template variables
+     * 3. Re-purify the output to ensure safety
+     */
+    public function mergeWithContent(EmailTemplate $template, string $body, array $variables = []): string
+    {
+        // Start with the template HTML
+        $html = $template->html_content ?? '';
+
+        // First, replace {{content}} with the campaign body
+        // The body should already be sanitized, but we'll be careful
+        $merged = str_replace('{{content}}', $body, $html);
+
+        // Then substitute all other template variables
+        $engine = new TemplateVariableEngine();
+        $rendered = $engine->render($merged, $variables);
+
+        // Re-purify the final output to ensure all content is safe
+        $config = HTMLPurifier_Config::createDefault();
+        $config->set('Cache.SerializerPath', storage_path('app/purifier'));
+        $purifier = new HTMLPurifier($config);
+        $safeHtml = $purifier->purify($rendered);
+
+        return $safeHtml;
+    }
 }

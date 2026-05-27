@@ -11,6 +11,7 @@ import { SegmentationEngine } from '../components/SegmentationEngine';
 import { AiGenerationModal } from '../components/AiGenerationModal';
 import { AiRewriteModal } from '../components/AiRewriteModal';
 import { AiAnalysisModal } from '../components/AiAnalysisModal';
+import { CampaignPreview } from '../components/CampaignPreview';
 import api from '../lib/api';
 import { cn } from '../lib/utils';
 
@@ -50,6 +51,8 @@ export default function CreateCampaign() {
   const [aiRewriteOpen, setAiRewriteOpen] = useState(false);
   const [aiAnalysisOpen, setAiAnalysisOpen] = useState(false);
   const [activeAiSegment, setActiveAiSegment] = useState(null);
+  const [templateHasContentBlock, setTemplateHasContentBlock] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   // CRITICAL: Reset campaignId on every fresh mount so stale IDs don't leak across sessions
   useEffect(() => {
@@ -57,9 +60,19 @@ export default function CreateCampaign() {
     return () => setCampaignId(null); // also reset on unmount
   }, []);
 
+  // Helper function to check if template has {{content}} block
+  const checkTemplateHasContentBlock = (template) => {
+    if (!template) return false;
+    const html = template.html_content || '';
+    return html.includes('{{content}}');
+  };
+
   // Load selected template data into form fields
   useEffect(() => {
     if (selectedTemplateData) {
+      const hasContent = checkTemplateHasContentBlock(selectedTemplateData);
+      setTemplateHasContentBlock(hasContent);
+      
       // Populate default segment variant
       setVariants(prev => ({
         ...prev,
@@ -69,6 +82,8 @@ export default function CreateCampaign() {
           body: selectedTemplateData.plain_text_content || selectedTemplateData.html_content || '',
         },
       }));
+    } else {
+      setTemplateHasContentBlock(false);
     }
   }, [selectedTemplateData]);
 
@@ -188,6 +203,9 @@ export default function CreateCampaign() {
       data.ab_test_type = abTestType;
       data.segmentation_mode = segmentationMode;
       data.variants = variants;
+      if (selectedTemplateData) {
+        data.template_id = selectedTemplateData.id;
+      }
 
       // Always use the 'default' variant's content as the main campaign content fallback
       // This is because we removed the global subject/body fields
@@ -673,6 +691,25 @@ export default function CreateCampaign() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {selectedTemplateData && !templateHasContentBlock && (
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 flex gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">No Content Zone in Template</p>
+                  <p className="text-sm text-amber-700 dark:text-amber-200 mt-1">This template doesn't have a {{content}} block. <Link to="/templates/builder" className="underline font-medium">Edit the template</Link> to add a Content Zone first.</p>
+                </div>
+              </div>
+            )}
+
+            {selectedTemplateData && templateHasContentBlock && (
+              <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800 flex gap-3">
+                <CheckCircle2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">Template with Content Zone</p>
+                  <p className="text-sm text-indigo-700 dark:text-indigo-200 mt-1">Your content will be injected into the template's content zone during sending.</p>
+                </div>
+              </div>
+            )}
             <div className="space-y-8">
               {segments.map((segment) => (
                 <div key={segment.id} className={cn(
@@ -715,37 +752,49 @@ export default function CreateCampaign() {
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-semibold">Email Content</Label>
-                        <div className="flex items-center gap-3">
-                          <button 
-                            type="button" 
-                            onClick={() => { setActiveAiSegment(segment.id); setAiRewriteOpen(true); }}
-                            className="text-xs flex items-center gap-1 text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
-                          >
-                            <Wand2 className="w-3 h-3" /> Rewrite
-                          </button>
-                          <button 
-                            type="button" 
-                            onClick={() => { setActiveAiSegment(segment.id); setAiAnalysisOpen(true); }}
-                            className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
-                          >
-                            <Activity className="w-3 h-3" /> Analyze
-                          </button>
+                    {(!selectedTemplateData || templateHasContentBlock) && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-semibold">Email Content</Label>
+                          <div className="flex items-center gap-3">
+                            <button 
+                              type="button" 
+                              onClick={() => { setActiveAiSegment(segment.id); setAiRewriteOpen(true); }}
+                              className="text-xs flex items-center gap-1 text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
+                            >
+                              <Wand2 className="w-3 h-3" /> Rewrite
+                            </button>
+                            <button 
+                              type="button" 
+                              onClick={() => { setActiveAiSegment(segment.id); setAiAnalysisOpen(true); }}
+                              className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                            >
+                              <Activity className="w-3 h-3" /> Analyze
+                            </button>
+                          </div>
                         </div>
+                        <textarea 
+                          className="flex min-h-[200px] w-full rounded-md border border-slate-200 bg-white dark:bg-slate-950 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 dark:border-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                          placeholder={selectedTemplateData && templateHasContentBlock ? "Your message will be injected into the template's content zone..." : "Your message goes here..."}
+                          value={variants[segment.id]?.body || ''}
+                          onChange={(e) => setVariants({
+                            ...variants,
+                            [segment.id]: { ...variants[segment.id], body: e.target.value }
+                          })}
+                          disabled={selectedTemplateData && !templateHasContentBlock}
+                          required
+                        ></textarea>
+                        {selectedTemplateData && templateHasContentBlock && variants[segment.id]?.body && (
+                          <button 
+                            type="button"
+                            onClick={() => setShowPreview(true)}
+                            className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium"
+                          >
+                            👁️ Preview & Style
+                          </button>
+                        )}
                       </div>
-                      <textarea 
-                        className="flex min-h-[200px] w-full rounded-md border border-slate-200 bg-white dark:bg-slate-950 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 dark:border-slate-800"
-                        placeholder="Your message goes here..."
-                        value={variants[segment.id]?.body || ''}
-                        onChange={(e) => setVariants({
-                          ...variants,
-                          [segment.id]: { ...variants[segment.id], body: e.target.value }
-                        })}
-                        required
-                      ></textarea>
-                    </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label className="text-sm font-semibold">CTA Link</Label>
@@ -820,6 +869,16 @@ export default function CreateCampaign() {
         subject={activeAiSegment ? variants[activeAiSegment]?.subject : ''}
         content={activeAiSegment ? variants[activeAiSegment]?.body : ''}
       />
+      
+      {/* Campaign Preview Modal */}
+      {showPreview && selectedTemplateData && activeAiSegment && variants[activeAiSegment] && (
+        <CampaignPreview 
+          template={selectedTemplateData}
+          body={variants[activeAiSegment].body}
+          subject={variants[activeAiSegment].subject}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
     </div>
   );
 }

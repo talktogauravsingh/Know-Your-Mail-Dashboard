@@ -18,6 +18,7 @@ class Campaign extends Model
         'status',
         'segmentation_mode', // 'single' or 'segmented'
         'sender_config_id',
+        'template_id',
         'cta_url',
         'variants',
         'schedule_type',
@@ -36,6 +37,11 @@ class Campaign extends Model
     public function variants()
     {
         return $this->hasMany(CampaignVariant::class);
+    }
+
+    public function template()
+    {
+        return $this->belongsTo(EmailTemplate::class, 'template_id');
     }
 
     public function assignments()
