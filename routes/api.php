@@ -96,7 +96,13 @@ Route::middleware('auth:sanctum')->prefix('email-templates')->group(function () 
 
 Route::get('/o/{requestUserId}', [TrackingController::class, 'OpenMailTrack']);
 Route::get('/c/{requestUserId}', [TrackingController::class, 'ClickMailTrack']);
-Route::post('ai/email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate']);
+Route::prefix('v1')->group(function () {
+    Route::post('spam/check', [\App\Http\Controllers\Api\EmailAIController::class, 'spamCheck']);
+    Route::post('email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate']);
+    Route::post('email/rewrite', [\App\Http\Controllers\Api\EmailAIController::class, 'rewrite']);
+    Route::post('email/score', [\App\Http\Controllers\Api\EmailAIController::class, 'score']);
+    Route::get('health', [\App\Http\Controllers\Api\EmailAIController::class, 'health']);
+});
 
 Route::post('/payments/webhooks/razorpay', [PaymentController::class, 'razorpayWebhook']);
 
