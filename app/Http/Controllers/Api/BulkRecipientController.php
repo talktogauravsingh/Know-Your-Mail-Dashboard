@@ -85,29 +85,45 @@ class BulkRecipientController extends Controller
         $previewLimit = 5;
 
         if (($fh = fopen($fullPath, 'r')) !== false) {
-            $rawHeaders = fgetcsv($fh);
-            if ($rawHeaders) {
-                $csvHeaders = array_map(fn($h) => strtolower(trim($h)), $rawHeaders);
-            }
-
-            while (($row = fgetcsv($fh, 4000, ',')) !== false) {
-                if (count($csvHeaders) !== count($row)) continue;
-                $totalRows++;
-                $assoc = array_combine($csvHeaders, $row);
-
-                // Find the email value heuristically (first column containing @)
-                $emailValue = '';
-                foreach ($assoc as $val) {
-                    if (str_contains((string)$val, '@')) { $emailValue = trim($val); break; }
+            // Read first line to detect delimiter, then parse headers using it.
+            $firstLine = fgets($fh);
+            if ($firstLine !== false) {
+                $possible = [',', "\t", ';', '|', ' '];
+                $detected = ',';
+                foreach ($possible as $d) {
+                    $parts = str_getcsv($firstLine, $d);
+                    if (count($parts) > 1) {
+                        $detected = $d;
+                        break;
+                    }
                 }
 
-                $isValid = $emailValue && filter_var($emailValue, FILTER_VALIDATE_EMAIL);
-                $isValid ? $validRows++ : $invalidRows++;
+                $rawHeaders = str_getcsv($firstLine, $detected);
+                if ($rawHeaders) {
+                    $csvHeaders = array_map(fn($h) => strtolower(trim($h)), $rawHeaders);
+                }
 
-                if (count($previewRows) < $previewLimit) {
-                    $previewRows[] = $assoc;
+                // Use the detected delimiter for the preview rows as well
+                while (($row = fgetcsv($fh, 4000, $detected)) !== false) {
+                    if (count($csvHeaders) !== count($row)) continue;
+                    $totalRows++;
+                    $assoc = array_combine($csvHeaders, $row);
+
+                    // Find the email value heuristically (first column containing @)
+                    $emailValue = '';
+                    foreach ($assoc as $val) {
+                        if (str_contains((string)$val, '@')) { $emailValue = trim($val); break; }
+                    }
+
+                    $isValid = $emailValue && filter_var($emailValue, FILTER_VALIDATE_EMAIL);
+                    $isValid ? $validRows++ : $invalidRows++;
+
+                    if (count($previewRows) < $previewLimit) {
+                        $previewRows[] = $assoc;
+                    }
                 }
             }
+
             fclose($fh);
         }
         // ──────────────────────────────────────────────────────────────────

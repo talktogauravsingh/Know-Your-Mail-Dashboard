@@ -17,7 +17,8 @@ class SmtpConfiguration extends Model
         'encryption',
         'from_name',
         'from_address',
-        'is_global'
+        'is_global',
+        'status'
     ];
 
     public function organization()

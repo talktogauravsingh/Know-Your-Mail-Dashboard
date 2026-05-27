@@ -88,8 +88,8 @@ class AssignSegmentsJob implements ShouldQueue
 
         $sql = "
             INSERT INTO recipient_segment_assignments (campaign_id, recipient_id, variant_id, created_at, updated_at)
-            " . $query->selectRaw("?, id, ?, ?, ?", [$campaignId, $variantId, $now, $now])->toSql() . "
-            ON DUPLICATE KEY UPDATE variant_id = VALUES(variant_id), updated_at = VALUES(updated_at)
+            " . $query->selectRaw('?, id, ?, ?, ?', [$campaignId, $variantId, $now, $now])->toSql() . "
+            ON CONFLICT (campaign_id, recipient_id) DO UPDATE SET variant_id = EXCLUDED.variant_id, updated_at = EXCLUDED.updated_at
         ";
 
         DB::statement($sql, $query->getBindings());
@@ -109,29 +109,31 @@ class AssignSegmentsJob implements ShouldQueue
             $value = strtolower(trim($value));
         }
 
-        // Attributes is a JSON column. We use JSON_UNQUOTE(JSON_EXTRACT(...)) or -> syntax
-        $column = "attributes->'$.{$field}'";
+        // Attributes is a JSON column. Use Postgres ->> operator to extract text
+        $column = "attributes->>'{$field}'";
 
         switch ($op) {
             case '=':
-                $query->whereRaw("JSON_UNQUOTE({$column}) = ?", [$value]);
+                $query->whereRaw("{$column} = ?", [$value]);
                 break;
             case '!=':
-                $query->whereRaw("JSON_UNQUOTE({$column}) != ?", [$value]);
+                $query->whereRaw("{$column} != ?", [$value]);
                 break;
             case 'in':
                 $values = array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
-                $query->whereRaw("JSON_UNQUOTE({$column}) IN (" . implode(',', array_fill(0, count($values), '?')) . ")", $values);
+                $placeholders = implode(',', array_fill(0, count($values), '?'));
+                $query->whereRaw("{$column} IN ({$placeholders})", $values);
                 break;
             case 'not_in':
                 $values = array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
-                $query->whereRaw("JSON_UNQUOTE({$column}) NOT IN (" . implode(',', array_fill(0, count($values), '?')) . ")", $values);
+                $placeholders = implode(',', array_fill(0, count($values), '?'));
+                $query->whereRaw("{$column} NOT IN ({$placeholders})", $values);
                 break;
             case 'contains':
-                $query->whereRaw("JSON_UNQUOTE({$column}) LIKE ?", ["%{$value}%"]);
+                $query->whereRaw("{$column} LIKE ?", ["%{$value}%"]);
                 break;
             case 'starts_with':
-                $query->whereRaw("JSON_UNQUOTE({$column}) LIKE ?", ["{$value}%"]);
+                $query->whereRaw("{$column} LIKE ?", ["{$value}%"]);
                 break;
         }
     }

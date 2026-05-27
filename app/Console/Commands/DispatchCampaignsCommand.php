@@ -46,24 +46,24 @@ class DispatchCampaignsCommand extends Command
             }
 
             // 3. Pre-create Send Logs so they appear in Analytics immediately as "queued"
-            $logsToInsert = [];
-            foreach ($assignments as $assignment) {
-                $logsToInsert[] = [
-                    'campaign_id' => $campaign->id,
-                    'recipient_id' => $assignment->recipient_id,
-                    'variant_id' => $assignment->variant_id,
-                    'email' => $assignment->recipient?->email,
-                    'status' => 'pending',
-                    'bounce_type' => 'none',
-                    'bounce_count' => 0,
-                    'clicks_count' => 0,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
-            foreach (array_chunk($logsToInsert, 500) as $chunk) {
-                SendLog::insert($chunk);
-            }
+        $logsToInsert = [];
+        foreach ($assignments as $assignment) {
+            $logsToInsert[] = [
+                'campaign_id'   => $campaign->id,
+                'recipient_id' => $assignment->recipient_id,
+                'variant_id'   => $assignment->variant_id,
+                'status'       => 'pending',
+                'bounce_type'  => 'none',
+                'bounce_count' => 0,
+                'clicks_count' => 0,
+                'email'        => $assignment->recipient->email ?? null,
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ];
+        }
+        foreach (array_chunk($logsToInsert, 500) as $chunk) {
+            SendLog::insert($chunk);
+        }
 
             // 4. Queue emails
             foreach ($assignments as $assignment) {

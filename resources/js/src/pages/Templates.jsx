@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -9,10 +9,12 @@ import { useStore } from '../store/useStore';
 
 export default function Templates() {
   const templates = useStore((state) => state.templates);
+  const templatesLoading = useStore((state) => state.templatesLoading);
+  const fetchTemplates = useStore((state) => state.fetchTemplates);
   const addTemplate = useStore((state) => state.addTemplate);
   const updateTemplate = useStore((state) => state.updateTemplate);
   const deleteTemplate = useStore((state) => state.deleteTemplate);
-
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
 
@@ -24,9 +26,7 @@ export default function Templates() {
   const [formData, setFormData] = useState({ name: '', category: 'Newsletter', description: '' });
 
   const handleOpenCreate = () => {
-    setModalMode('create');
-    setFormData({ name: '', category: 'Newsletter', description: '' });
-    setIsModalOpen(true);
+    navigate('/templates/designer');
   };
 
   const handleOpenEdit = (e, template) => {
@@ -65,6 +65,10 @@ export default function Templates() {
     setIsModalOpen(false);
   };
 
+  useEffect(() => {
+    fetchTemplates().catch(() => {});
+  }, [fetchTemplates]);
+
   const filteredTemplates = templates.filter(t => 
     (activeFilter === 'All' || t.category === activeFilter) &&
     t.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -74,8 +78,9 @@ export default function Templates() {
     <div className="space-y-6 animate-in fade-in duration-500 pb-10">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">Performance Templates</h2>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">Start with high-converting layouts backed by historical campaign data.</p>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">Saved Templates</h2>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">All your created templates are listed here. Use the designer to add or edit templates.</p>
+          {templatesLoading && <p className="text-sm text-slate-500 mt-2">Loading templates…</p>}
         </div>
         <Button onClick={handleOpenCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 shadow-sm">
           <Plus className="h-4 w-4" />

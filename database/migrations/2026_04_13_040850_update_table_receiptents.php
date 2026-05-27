@@ -8,32 +8,51 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration {
     public function up(): void
     {
-        Schema::create('recipients', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('organization_id');
-            $table->string('email')->nullable();
+        Schema::table('recipients', function (Blueprint $table) {
+            if (!Schema::hasColumn('recipients', 'organization_id')) {
+                $table->unsignedBigInteger('organization_id');
+            }
+            if (!Schema::hasColumn('recipients', 'attributes')) {
+                $table->json('attributes')->nullable();
+            }
+            if (!Schema::hasColumn('recipients', 'lead_type')) {
+                $table->string('lead_type', 50)->nullable();
+            }
+            if (!Schema::hasColumn('recipients', 'city')) {
+                $table->string('city', 100)->nullable();
+            }
+            if (!Schema::hasColumn('recipients', 'gender')) {
+                $table->string('gender', 20)->nullable();
+            }
 
-            // JSON column
-            $table->json('attributes')->nullable();
-
-            // Generated columns (defined directly)
-            $table->string('lead_type', 50);
-
-            $table->string('city', 100);
-
-            $table->string('gender', 20);
-
-            $table->timestamps();
-
-            // Indexes
             $table->index(['organization_id', 'lead_type'], 'idx_org_lead_type');
             $table->index(['organization_id', 'city'], 'idx_org_city');
             $table->index(['organization_id', 'email'], 'idx_org_email');
         });
+
+        if (Schema::hasColumn('recipients', 'attributes')) {
+            DB::statement('ALTER TABLE recipients ALTER COLUMN attributes TYPE jsonb USING attributes::jsonb');
+        }
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('recipients');
+        Schema::table('recipients', function (Blueprint $table) {
+            if (Schema::hasColumn('recipients', 'gender')) {
+                $table->dropColumn('gender');
+            }
+            if (Schema::hasColumn('recipients', 'city')) {
+                $table->dropColumn('city');
+            }
+            if (Schema::hasColumn('recipients', 'lead_type')) {
+                $table->dropColumn('lead_type');
+            }
+            if (Schema::hasColumn('recipients', 'attributes')) {
+                $table->dropColumn('attributes');
+            }
+            if (Schema::hasColumn('recipients', 'organization_id')) {
+                $table->dropColumn('organization_id');
+            }
+        });
     }
 };

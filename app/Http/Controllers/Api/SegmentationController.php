@@ -146,21 +146,21 @@ class SegmentationController extends Controller
             $column = $field;
             $useJson = false;
         } else {
-            $column = "attributes->'$.{$field}'";
+            $column = "attributes->>'{$field}'";
             $useJson = true;
         }
 
         switch ($op) {
             case '=':
                 if ($useJson) {
-                    $query->whereRaw("JSON_UNQUOTE({$column}) = ?", [$value]);
+                    $query->whereRaw("{$column} = ?", [$value]);
                 } else {
                     $query->where($column, $value);
                 }
                 break;
             case '!=':
                 if ($useJson) {
-                    $query->whereRaw("JSON_UNQUOTE({$column}) != ?", [$value]);
+                    $query->whereRaw("{$column} != ?", [$value]);
                 } else {
                     $query->where($column, '!=', $value);
                 }
@@ -168,7 +168,8 @@ class SegmentationController extends Controller
             case 'in':
                 $values = is_array($value) ? $value : array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
                 if ($useJson) {
-                    $query->whereRaw("JSON_UNQUOTE({$column}) IN (" . implode(',', array_fill(0, count($values), '?')) . ")", $values);
+                    $placeholders = implode(',', array_fill(0, count($values), '?'));
+                    $query->whereRaw("{$column} IN ({$placeholders})", $values);
                 } else {
                     $query->whereIn($column, $values);
                 }
@@ -176,21 +177,22 @@ class SegmentationController extends Controller
             case 'not_in':
                 $values = is_array($value) ? $value : array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
                 if ($useJson) {
-                    $query->whereRaw("JSON_UNQUOTE({$column}) NOT IN (" . implode(',', array_fill(0, count($values), '?')) . ")", $values);
+                    $placeholders = implode(',', array_fill(0, count($values), '?'));
+                    $query->whereRaw("{$column} NOT IN ({$placeholders})", $values);
                 } else {
                     $query->whereNotIn($column, $values);
                 }
                 break;
             case 'contains':
                 if ($useJson) {
-                    $query->whereRaw("JSON_UNQUOTE({$column}) LIKE ?", ["%{$value}%"]);
+                    $query->whereRaw("{$column} LIKE ?", ["%{$value}%"]);
                 } else {
                     $query->where($column, 'LIKE', "%{$value}%");
                 }
                 break;
             case 'starts_with':
                 if ($useJson) {
-                    $query->whereRaw("JSON_UNQUOTE({$column}) LIKE ?", ["{$value}%"]);
+                    $query->whereRaw("{$column} LIKE ?", ["{$value}%"]);
                 } else {
                     $query->where($column, 'LIKE', "{$value}%");
                 }
