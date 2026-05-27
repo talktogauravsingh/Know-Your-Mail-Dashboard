@@ -4,10 +4,13 @@ import { Button } from '../components/ui/Button';
 import { Input, Label } from '../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import { Select } from '../components/ui/Select';
-import { ArrowLeft, Save, Send, SplitSquareVertical, FlaskConical, Layers, CheckCircle2, AlertCircle, Upload, Calendar, Clock } from 'lucide-react';
+import { ArrowLeft, Save, Send, SplitSquareVertical, FlaskConical, Layers, CheckCircle2, AlertCircle, Upload, Calendar, Clock, Sparkles, Wand2, Activity } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { CsvPreviewPanel } from '../components/CsvPreview';
 import { SegmentationEngine } from '../components/SegmentationEngine';
+import { AiGenerationModal } from '../components/AiGenerationModal';
+import { AiRewriteModal } from '../components/AiRewriteModal';
+import { AiAnalysisModal } from '../components/AiAnalysisModal';
 import api from '../lib/api';
 import { cn } from '../lib/utils';
 
@@ -41,6 +44,12 @@ export default function CreateCampaign() {
   const [variants, setVariants] = useState({}); // { [segmentId]: { subject, body, cta_url } }
   const [selectedTemplateData, setSelectedTemplateData] = useState(null);
   const fileInputRef = useRef(null);
+
+  // AI Modals state
+  const [aiGenOpen, setAiGenOpen] = useState(false);
+  const [aiRewriteOpen, setAiRewriteOpen] = useState(false);
+  const [aiAnalysisOpen, setAiAnalysisOpen] = useState(false);
+  const [activeAiSegment, setActiveAiSegment] = useState(null);
 
   // CRITICAL: Reset campaignId on every fresh mount so stale IDs don't leak across sessions
   useEffect(() => {
@@ -684,7 +693,16 @@ export default function CreateCampaign() {
 
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label className="text-sm font-semibold">Subject Line</Label>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-semibold">Subject Line</Label>
+                        <button 
+                          type="button" 
+                          onClick={() => { setActiveAiSegment(segment.id); setAiGenOpen(true); }}
+                          className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium"
+                        >
+                          <Sparkles className="w-3 h-3" /> AI Generate
+                        </button>
+                      </div>
                       <Input 
                         placeholder="What will they see in their inbox?"
                         value={variants[segment.id]?.subject || ''}
@@ -698,7 +716,25 @@ export default function CreateCampaign() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-sm font-semibold">Email Content</Label>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-semibold">Email Content</Label>
+                        <div className="flex items-center gap-3">
+                          <button 
+                            type="button" 
+                            onClick={() => { setActiveAiSegment(segment.id); setAiRewriteOpen(true); }}
+                            className="text-xs flex items-center gap-1 text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
+                          >
+                            <Wand2 className="w-3 h-3" /> Rewrite
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={() => { setActiveAiSegment(segment.id); setAiAnalysisOpen(true); }}
+                            className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                          >
+                            <Activity className="w-3 h-3" /> Analyze
+                          </button>
+                        </div>
+                      </div>
                       <textarea 
                         className="flex min-h-[200px] w-full rounded-md border border-slate-200 bg-white dark:bg-slate-950 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 dark:border-slate-800"
                         placeholder="Your message goes here..."
@@ -743,6 +779,47 @@ export default function CreateCampaign() {
           </Button>
         </div>
       </form>
+
+      <AiGenerationModal 
+        isOpen={aiGenOpen}
+        onClose={() => setAiGenOpen(false)}
+        onApply={(data) => {
+          if (activeAiSegment) {
+            setVariants(prev => ({
+              ...prev,
+              [activeAiSegment]: {
+                ...prev[activeAiSegment],
+                ...(data.subject ? { subject: data.subject } : {}),
+                ...(data.content ? { body: data.content } : {})
+              }
+            }));
+          }
+          setAiGenOpen(false);
+        }}
+      />
+      <AiRewriteModal
+        isOpen={aiRewriteOpen}
+        onClose={() => setAiRewriteOpen(false)}
+        initialContent={activeAiSegment ? variants[activeAiSegment]?.body : ''}
+        onApply={(content) => {
+          if (activeAiSegment) {
+            setVariants(prev => ({
+              ...prev,
+              [activeAiSegment]: {
+                ...prev[activeAiSegment],
+                body: content
+              }
+            }));
+          }
+          setAiRewriteOpen(false);
+        }}
+      />
+      <AiAnalysisModal
+        isOpen={aiAnalysisOpen}
+        onClose={() => setAiAnalysisOpen(false)}
+        subject={activeAiSegment ? variants[activeAiSegment]?.subject : ''}
+        content={activeAiSegment ? variants[activeAiSegment]?.body : ''}
+      />
     </div>
   );
 }
