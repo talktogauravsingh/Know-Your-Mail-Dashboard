@@ -36,8 +36,13 @@ class CampaignController extends Controller
             'cta_link' => 'nullable',
             'sender_config_id' => 'nullable',
             'segments' => 'nullable|array',
+            'segments.*.id' => 'nullable|string',
             'segments.*.filters' => 'nullable|array',
             'segments.*.filters.*.field' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_]+$/'],
+            'segments.*.filters.*.field_name' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_]+$/'],
+            'segments.*.filters.*.operator' => 'nullable|string',
+            'segments.*.filters.*.value' => 'nullable',
+            'segments.*.filters.*.field_value' => 'nullable',
             'variants' => 'nullable|array',
             'status' => 'nullable|string|in:draft,scheduled',
             'schedule_type' => 'nullable|string|in:immediate,once,recurring',
@@ -92,8 +97,13 @@ class CampaignController extends Controller
             'sender_config_id' => 'nullable',
             'audience_segment' => 'nullable|string',
             'segments' => 'nullable|array',
+            'segments.*.id' => 'nullable|string',
             'segments.*.filters' => 'nullable|array',
             'segments.*.filters.*.field' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_]+$/'],
+            'segments.*.filters.*.field_name' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_]+$/'],
+            'segments.*.filters.*.operator' => 'nullable|string',
+            'segments.*.filters.*.value' => 'nullable',
+            'segments.*.filters.*.field_value' => 'nullable',
             'variants' => 'nullable|array',
             'status' => 'nullable|string|in:draft,scheduled',
             'schedule_type' => 'nullable|string|in:immediate,once,recurring',
@@ -150,23 +160,46 @@ class CampaignController extends Controller
 
             foreach ($segments as $segment) {
                 $isDefault = $segment['isDefault'] ?? false;
-                
+                $segmentId = $segment['id'] ?? null;
+                $custom = $segmentId !== null ? ($variantData[$segmentId] ?? []) : [];
+
                 // 1. Create or Update Variant
                 // If it's a default segment, we often link it to the campaign's main content
                 // unless overrides are provided.
-                $custom = $variantData[$segment['id']] ?? [];
-                
-                $variant = $campaign->variants()->updateOrCreate(
-                    ['id' => is_numeric($segment['id']) ? $segment['id'] : null], // Use ID if it's numeric (saved before)
-                    [
+                if (is_numeric($segmentId)) {
+                    $variant = $campaign->variants()->updateOrCreate(
+                        ['id' => $segmentId],
+                        [
+                            'name' => $segment['name'] ?? 'Untitled Segment',
+                            'subject' => $custom['subject'] ?? $campaign->subject,
+                            'body' => $custom['body'] ?? $campaign->body,
+                            'cta_url' => $this->formatUrl($custom['cta_link'] ?? $campaign->cta_url),
+                            'is_default' => $isDefault,
+                            'priority' => $segment['priority'] ?? 0,
+                        ]
+                    );
+                } elseif ($isDefault) {
+                    $variant = $campaign->variants()->updateOrCreate(
+                        ['is_default' => true],
+                        [
+                            'name' => $segment['name'] ?? 'Untitled Segment',
+                            'subject' => $custom['subject'] ?? $campaign->subject,
+                            'body' => $custom['body'] ?? $campaign->body,
+                            'cta_url' => $this->formatUrl($custom['cta_link'] ?? $campaign->cta_url),
+                            'is_default' => $isDefault,
+                            'priority' => $segment['priority'] ?? 0,
+                        ]
+                    );
+                } else {
+                    $variant = $campaign->variants()->create([
                         'name' => $segment['name'] ?? 'Untitled Segment',
                         'subject' => $custom['subject'] ?? $campaign->subject,
                         'body' => $custom['body'] ?? $campaign->body,
                         'cta_url' => $this->formatUrl($custom['cta_link'] ?? $campaign->cta_url),
                         'is_default' => $isDefault,
                         'priority' => $segment['priority'] ?? 0,
-                    ]
-                );
+                    ]);
+                }
 
                 // 2. Sync Filters
                 $variant->filterGroups()->delete(); // Simple clear and recreate
@@ -175,12 +208,13 @@ class CampaignController extends Controller
                     $group = $variant->filterGroups()->create(['group_index' => 0]);
                     
                     foreach ($segment['filters'] as $filter) {
-                        if (empty($filter['field'])) continue;
+                        $fieldName = $filter['field'] ?? $filter['field_name'] ?? null;
+                        if (empty($fieldName)) continue;
                         
                         $group->filters()->create([
-                            'field_name' => $filter['field'],
+                            'field_name' => $fieldName,
                             'operator' => $filter['operator'] ?? '=',
-                            'field_value' => $filter['value'] ?? '',
+                            'field_value' => $filter['field_value'] ?? $filter['value'] ?? '',
                         ]);
                     }
                 }

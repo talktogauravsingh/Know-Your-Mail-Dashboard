@@ -7,12 +7,21 @@ import { Plus, Trash2, Users, AlertCircle, CheckCircle2, ChevronRight, Filter } 
 import api from '../lib/api';
 import { cn } from '../lib/utils';
 
-export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange, moduleType, moduleId, maxSegments = 3, isSingleMode = false }) {
+export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange, moduleType, moduleId, maxSegments = 3, isSingleMode = false, canAddSegments = true }) {
   const [segments, setSegments] = useState([
-    { id: 'default', name: 'Default Segment', isDefault: true, priority: 100, filters: [] }
+    { id: 'default', name: 'Default Segment', isDefault: true, priority: 100, filters: [{ field: '', operator: '=', value: '' }] }
   ]);
   const [counts, setCounts] = useState({});
   const [loading, setLoading] = useState({});
+
+  useEffect(() => {
+    if (isSingleMode) {
+      setSegments(prev => {
+        const first = prev[0];
+        return [{ ...first, isDefault: true, priority: 100, filters: first.filters.length ? first.filters : [{ field: '', operator: '=', value: '' }] }];
+      });
+    }
+  }, [isSingleMode]);
 
   const addSegment = () => {
     if (segments.length >= maxSegments) return;
@@ -41,6 +50,8 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
       filters: [...s.filters, { field: '', operator: '=', value: '' }] 
     } : s));
   };
+
+  const canModifyFilters = isSingleMode || canAddSegments;
 
   const updateFilter = (segmentId, filterIndex, updates) => {
     setSegments(segments.map(s => {
@@ -154,7 +165,7 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
 
   return (
     <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-      {!isSingleMode && (
+      {!isSingleMode && canAddSegments && (
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Multi-Variant Segmentation</h3>
@@ -212,29 +223,44 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
                 <p className="text-sm text-slate-500 italic">This segment will receive the default variant if they don't match any other rules.</p>
               ) : (
                 <div className="space-y-4">
-                  {activeInsights.length === 0 ? (
-                    <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 flex items-center gap-3">
-                      <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                      <p className="text-sm text-amber-700 dark:text-amber-400">
-                        Upload a CSV file first to see available filter fields (Gender, City, etc.)
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {segment.filters.map((filter, fIdx) => (
+                  <div className="space-y-3">
+                    {activeInsights.length === 0 && (
+                      <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 flex items-center gap-3">
+                        <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                        <p className="text-sm text-amber-700 dark:text-amber-400">
+                          Upload a CSV file or switch to organization audience to autocomplete available filter fields.
+                        </p>
+                      </div>
+                    )}
+                    {!canModifyFilters ? (
+                      <div className="p-4 rounded-lg bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 text-sm">
+                        Upload a campaign CSV or switch to organization audience to enable multi-segment filter creation.
+                      </div>
+                    ) : (
+                      segment.filters.map((filter, fIdx) => (
+
                       <div key={fIdx} className="flex items-center gap-2 animate-in fade-in zoom-in duration-200">
-                        <Select 
-                          value={filter.field} 
-                          onChange={(e) => updateFilter(segment.id, fIdx, { field: e.target.value })}
-                          className="h-9 min-w-[140px]"
-                        >
-                          <option value="">Select Field</option>
-                          {activeInsights.map(insight => (
-                            <option key={insight.field_name} value={insight.field_name}>
-                              {insight.field_name.charAt(0).toUpperCase() + insight.field_name.slice(1)}
-                            </option>
-                          ))}
-                        </Select>
+                        {activeInsights.length > 0 ? (
+                          <Select 
+                            value={filter.field} 
+                            onChange={(e) => updateFilter(segment.id, fIdx, { field: e.target.value })}
+                            className="h-9 min-w-[140px]"
+                          >
+                            <option value="">Select Field</option>
+                            {activeInsights.map(insight => (
+                              <option key={insight.field_name} value={insight.field_name}>
+                                {insight.field_name.charAt(0).toUpperCase() + insight.field_name.slice(1)}
+                              </option>
+                            ))}
+                          </Select>
+                        ) : (
+                          <Input
+                            placeholder="Field name"
+                            value={filter.field}
+                            onChange={(e) => updateFilter(segment.id, fIdx, { field: e.target.value })}
+                            className="h-9 min-w-[140px]"
+                          />
+                        )}
                         
                         <Select 
                           value={filter.operator} 
@@ -260,10 +286,17 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
-                    ))}
+                    ))) }
                     
                     <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
-                      <Button type="button" variant="ghost" size="sm" onClick={() => addFilter(segment.id)} className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 gap-1.5 h-8">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => addFilter(segment.id)}
+                        disabled={!canModifyFilters}
+                        className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 gap-1.5 h-8 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
                         <Plus className="h-3.5 w-3.5" /> Add Condition
                       </Button>
                       
@@ -282,9 +315,8 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}

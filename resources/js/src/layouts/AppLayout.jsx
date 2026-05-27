@@ -11,6 +11,7 @@ const navigation = [
   { name: 'Templates', href: '/templates', icon: LayoutTemplate },
   { name: 'Automation', href: '#', icon: Sparkles, disabled: true },
   { name: 'Audience', href: '/audience', icon: Users },
+    { name: 'Global Import', href: '/bulk-import', icon: Database },
   { name: 'AI Chatbot', href: '#', icon: Bot, disabled: true },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

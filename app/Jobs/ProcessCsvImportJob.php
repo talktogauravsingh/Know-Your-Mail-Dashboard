@@ -40,15 +40,26 @@ class ProcessCsvImportJob implements ShouldQueue
         $file = fopen($fullPath, 'r');
         if (!$file) return;
 
-        $headers = fgetcsv($file);
-        if (!$headers) return;
-        
-        $headers = array_map(fn($h) => strtolower(trim($h)), $headers);
-        
+        // Detect delimiter from the first line, then use it for all fgetcsv calls.
+        $firstLine = fgets($file);
+        if ($firstLine === false) { fclose($file); return; }
+
+        $possible = [',', "\t", ';', '|', ' '];
+        $detected = ',';
+        foreach ($possible as $d) {
+            $parts = str_getcsv($firstLine, $d);
+            if (count($parts) > 1) { $detected = $d; break; }
+        }
+
+        // Parse headers using detected delimiter
+        $rawHeaders = str_getcsv($firstLine, $detected);
+        if (!$rawHeaders) { fclose($file); return; }
+        $headers = array_map(fn($h) => strtolower(trim($h)), $rawHeaders);
+
         // Read first 50 rows to detect email column reliably
         $sample = [];
         for ($i = 0; $i < 50; $i++) {
-            $row = fgetcsv($file);
+            $row = fgetcsv($file, 4000, $detected);
             if ($row) {
                 if (count($headers) === count($row)) {
                     $sample[] = array_combine($headers, $row);
@@ -57,17 +68,18 @@ class ProcessCsvImportJob implements ShouldQueue
                 break;
             }
         }
-        
+
         $emailColumn = $this->detectEmailColumn($sample) ?? 'email';
-        
+
+        // Rewind and skip header line to begin full processing
         rewind($file);
-        fgetcsv($file); // skip header
-        
+        fgets($file);
+
         $chunk = [];
         $chunkSize = 1000;
         $stats = []; // For 100% accurate insights
-        
-        while (($row = fgetcsv($file, 4000, ',')) !== false) {
+
+        while (($row = fgetcsv($file, 4000, $detected)) !== false) {
             if (count($headers) !== count($row)) continue;
             $rowAssoc = array_combine($headers, $row);
             

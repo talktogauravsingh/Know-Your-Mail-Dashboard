@@ -473,7 +473,7 @@ export default function CreateCampaign() {
               )}
             </div>
 
-            {(insights.length > 0 || (recipientSource === 'org' && !campaignId)) && (
+            {(segmentationMode === 'segmented' || segmentationMode === 'single' || insights.length > 0 || (recipientSource === 'org' && !campaignId)) && (
               <div className="space-y-6 pt-4 border-t border-slate-100 dark:border-slate-800 mt-6">
                 <div className="flex flex-col gap-1">
                   <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
@@ -493,6 +493,7 @@ export default function CreateCampaign() {
                   moduleId={recipientSource === 'org' ? (user?.organization_id || 1) : campaignId}
                   maxSegments={3}
                   isSingleMode={segmentationMode === 'single'}
+                  canAddSegments={recipientSource === 'org' || Boolean(csvResult)}
                 />
               </div>
             )}
