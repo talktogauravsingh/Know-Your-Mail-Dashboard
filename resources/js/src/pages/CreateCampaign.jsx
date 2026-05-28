@@ -99,7 +99,7 @@ export default function CreateCampaign() {
   const smtpConfigurations = useStore((state) => state.smtpConfigurations);
   const templates = useStore((state) => state.templates);
   const user = useStore((state) => state.user);
-  const selectedTemplate = templates.find(t => t.id === templateId);
+  const selectedTemplate = templates.find(t => String(t.id) === String(templateId)) || null;
 
   const createCampaign = useStore((state) => state.createCampaign);
   const updateCampaign = useStore((state) => state.updateCampaign);
@@ -247,7 +247,9 @@ export default function CreateCampaign() {
           <Select
             value={selectedTemplateData ? selectedTemplateData.id : ''}
             onChange={e => {
-              const tmpl = templates.find(t => t.id === e.target.value);
+              // option values are strings in the DOM; coerce when matching ids
+              const val = e.target.value;
+              const tmpl = templates.find(t => String(t.id) === String(val)) || null;
               setSelectedTemplateData(tmpl);
               // Update URL param without reload
               const params = new URLSearchParams(window.location.search);
