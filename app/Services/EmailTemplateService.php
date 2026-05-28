@@ -25,11 +25,18 @@ class EmailTemplateService
         $rendered = $engine->render($html, $variables);
 
         // Re‑purify the rendered HTML to ensure any variable data cannot break the allow‑list
+        $serializerPath = storage_path('app/purifier');
+        if (!is_dir($serializerPath)) {
+            @mkdir($serializerPath, 0775, true);
+        }
+
         $config = HTMLPurifier_Config::createDefault();
-        $config->set('Cache.SerializerPath', storage_path('app/purifier'));
+        $config->set('Cache.SerializerPath', $serializerPath);
         // Use the same configuration as in the model (allow‑list of safe tags/attributes)
+        $config->set('HTML.Allowed', 'p[style|class],b[style|class],i[style|class],u[style|class],strong[style|class],em[style|class],ul[style|class],ol[style|class],li[style|class],br,img[src|alt|title|width|height|style|class],a[href|title|target|style|class],table[style|class|width|cellpadding|cellspacing|border|align],thead[style|class],tbody[style|class],tr[style|class],th[style|class|width|align],td[style|class|width|align|valign],div[style|class],span[style|class],hr[style|class]');
         $purifier = new HTMLPurifier($config);
         $safeHtml = $purifier->purify($rendered);
+
 
         return $safeHtml;
     }
@@ -57,9 +64,17 @@ class EmailTemplateService
         $rendered = $engine->render($merged, $variables);
 
         // Re-purify the final output to ensure all content is safe
+        $serializerPath = storage_path('app/purifier');
+        if (!is_dir($serializerPath)) {
+            @mkdir($serializerPath, 0775, true);
+        }
+
         $config = HTMLPurifier_Config::createDefault();
-        $config->set('Cache.SerializerPath', storage_path('app/purifier'));
+        $config->set('Cache.SerializerPath', $serializerPath);
+        // Use the same configuration as in the model (allow‑list of safe tags/attributes)
+        $config->set('HTML.Allowed', 'p[style|class],b[style|class],i[style|class],u[style|class],strong[style|class],em[style|class],ul[style|class],ol[style|class],li[style|class],br,img[src|alt|title|width|height|style|class],a[href|title|target|style|class],table[style|class|width|cellpadding|cellspacing|border|align],thead[style|class],tbody[style|class],tr[style|class],th[style|class|width|align],td[style|class|width|align|valign],div[style|class],span[style|class],hr[style|class]');
         $purifier = new HTMLPurifier($config);
+
         $safeHtml = $purifier->purify($rendered);
 
         return $safeHtml;

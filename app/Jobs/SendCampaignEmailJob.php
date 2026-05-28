@@ -22,6 +22,16 @@ class SendCampaignEmailJob implements ShouldQueue
 
     protected $assignment;
 
+    /**
+     * Maximum number of attempts before the job is failed
+     */
+    public $tries = 3;
+
+    /**
+     * Number of seconds to wait before retrying the job
+     */
+    public $backoff = [10, 60, 300];  // 10s, 60s, 5min
+
     public function __construct(RecipientSegmentAssignment $assignment)
     {
         $this->assignment = $assignment;
@@ -149,10 +159,20 @@ class SendCampaignEmailJob implements ShouldQueue
 
         } catch (\Exception $e) {
             Log::error("Failed to send email to {$recipient->email}: " . $e->getMessage());
-            $sendLog->update([
-                'status' => 'failed',
-                'response' => substr($e->getMessage(), 0, 255),
-            ]);
+            if ($sendLog) {
+                $sendLog->update([
+                    'status' => 'failed',
+                    'response' => substr($e->getMessage(), 0, 255),
+                ]);
+            }
+            
+            // Release the job back to the queue for retry
+            if ($this->attempts() <= $this->tries) {
+                $this->release($this->backoff[$this->attempts() - 1] ?? 300);
+            } else {
+                // Job exceeded max attempts, fail it permanently
+                $this->fail($e);
+            }
         }
     }
 }

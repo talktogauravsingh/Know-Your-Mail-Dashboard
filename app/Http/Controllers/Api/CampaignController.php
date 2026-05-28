@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Campaign;
+use App\Models\EmailTemplate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +34,12 @@ class CampaignController extends Controller
             'name' => 'required|string|max:255',
             'subject' => 'required|string|max:255',
             'body' => 'required|string',
-            'template_id' => 'nullable|exists:email_templates,id',
+            'template_id' => [
+                'nullable',
+                Rule::exists('email_templates', 'id')->where(function ($query) {
+                    $query->where('organization_id', Auth::user()->organization_id ?? 1);
+                }),
+            ],
             'cta_link' => 'nullable',
             'sender_config_id' => 'nullable',
             'segments' => 'nullable|array',
@@ -95,7 +101,12 @@ class CampaignController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'subject' => 'sometimes|required|string|max:255',
             'body' => 'sometimes|required|string',
-            'template_id' => 'nullable|exists:email_templates,id',
+            'template_id' => [
+                'nullable',
+                Rule::exists('email_templates', 'id')->where(function ($query) {
+                    $query->where('organization_id', Auth::user()->organization_id ?? 1);
+                }),
+            ],
             'cta_link' => 'nullable|string',
             'sender_config_id' => 'nullable',
             'audience_segment' => 'nullable|string',
@@ -247,7 +258,8 @@ class CampaignController extends Controller
         ]);
 
         try {
-            $template = \App\Models\EmailTemplate::findOrFail($validated['template_id']);
+            $template = EmailTemplate::where('organization_id', Auth::user()->organization_id ?? 1)
+                ->findOrFail($validated['template_id']);
             
             $templateService = new \App\Services\EmailTemplateService();
             $htmlBody = $templateService->mergeWithContent(

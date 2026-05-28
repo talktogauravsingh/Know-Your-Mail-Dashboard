@@ -70,8 +70,8 @@ class EmailTemplate extends Model
     public function setHtmlContentAttribute(string $value): void
     {
         $config = HTMLPurifier_Config::createDefault();
-        // Restrict to safe HTML only; no scripts, no iframes.
-        $config->set('HTML.Allowed', 'p,b,i,u,strong,em,ul,ol,li,br,img[src|alt|title|width|height],a[href|title|target],table,thead,tbody,tr,th,td,div,span,hr');
+        // Restrict to safe HTML only; no scripts, no iframes. Allow inline styles and classes for premium email designs.
+        $config->set('HTML.Allowed', 'p[style|class],b[style|class],i[style|class],u[style|class],strong[style|class],em[style|class],ul[style|class],ol[style|class],li[style|class],br,img[src|alt|title|width|height|style|class],a[href|title|target|style|class],table[style|class|width|cellpadding|cellspacing|border|align],thead[style|class],tbody[style|class],tr[style|class],th[style|class|width|align],td[style|class|width|align|valign],div[style|class],span[style|class],hr[style|class]');
         $purifier = new HTMLPurifier($config);
         $this->attributes['html_content'] = $purifier->purify($value);
     }

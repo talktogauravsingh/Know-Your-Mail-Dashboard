@@ -79,7 +79,9 @@ export default function CreateCampaign() {
         default: {
           ...prev.default,
           subject: selectedTemplateData.subject || '',
-          body: selectedTemplateData.plain_text_content || selectedTemplateData.html_content || '',
+          body: hasContent 
+            ? "Thank you for supporting our mission!\n\nYour contribution helps us bring positive change to communities in need."
+            : "",
         },
       }));
     } else {
@@ -98,11 +100,22 @@ export default function CreateCampaign() {
 
   const smtpConfigurations = useStore((state) => state.smtpConfigurations);
   const templates = useStore((state) => state.templates);
+  const fetchTemplates = useStore((state) => state.fetchTemplates);
   const user = useStore((state) => state.user);
-  const selectedTemplate = templates.find(t => t.id === templateId);
+  const selectedTemplate = templates.find(t => String(t.id) === String(templateId));
 
   const createCampaign = useStore((state) => state.createCampaign);
   const updateCampaign = useStore((state) => state.updateCampaign);
+
+  useEffect(() => {
+    fetchTemplates().catch(() => {});
+  }, [fetchTemplates]);
+
+  useEffect(() => {
+    if (templateId && selectedTemplate) {
+      setSelectedTemplateData(selectedTemplate);
+    }
+  }, [templateId, selectedTemplate]);
   
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
@@ -245,24 +258,27 @@ export default function CreateCampaign() {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Select
-            value={selectedTemplateData ? selectedTemplateData.id : ''}
+            value={selectedTemplateData ? String(selectedTemplateData.id) : ''}
             onChange={e => {
-              const tmpl = templates.find(t => t.id === e.target.value);
-              setSelectedTemplateData(tmpl);
-              // Update URL param without reload
-              const params = new URLSearchParams(window.location.search);
+              const tmpl = templates.find(t => String(t?.id) === e.target.value);
               if (tmpl) {
+                setSelectedTemplateData(tmpl);
+                // Update URL param without reload
+                const params = new URLSearchParams(window.location.search);
                 params.set('template', tmpl.id);
+                window.history.replaceState(null, '', `?${params.toString()}`);
               } else {
+                setSelectedTemplateData(null);
+                const params = new URLSearchParams(window.location.search);
                 params.delete('template');
+                window.history.replaceState(null, '', `?${params.toString()}`);
               }
-              window.history.replaceState(null, '', `?${params.toString()}`);
             }}
             className="bg-white dark:bg-slate-950"
           >
             <option value="">Select Template</option>
-            {templates.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+            {templates.filter(t => t && t.id).map(t => (
+              <option key={t.id} value={String(t.id)}>{t.template_name || t.name || t.slug || `Template ${t.id}`}</option>
             ))}
           </Select>
           <Link to="/templates/builder">
@@ -278,7 +294,7 @@ export default function CreateCampaign() {
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">New Campaign</h2>
               <p className="text-slate-500 dark:text-slate-400">
-                {selectedTemplateData ? `Starting from layout: ${selectedTemplateData.name}` : 'Configure your email campaign details.'}
+                {selectedTemplateData ? `Starting from layout: ${selectedTemplateData.template_name || selectedTemplateData.name}` : 'Configure your email campaign details.'}
               </p>
           </div>
         </div>
@@ -696,7 +712,7 @@ export default function CreateCampaign() {
                 <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">No Content Zone in Template</p>
-                  <p className="text-sm text-amber-700 dark:text-amber-200 mt-1">This template doesn't have a {{content}} block. <Link to="/templates/builder" className="underline font-medium">Edit the template</Link> to add a Content Zone first.</p>
+                  <p className="text-sm text-amber-700 dark:text-amber-200 mt-1">This template doesn't have a {'{{content}}'} block. <Link to={`/templates/designer?id=${selectedTemplateData.id}`} className="underline font-medium">Edit the template</Link> to add a Content Zone first.</p>
                 </div>
               </div>
             )}
@@ -775,15 +791,24 @@ export default function CreateCampaign() {
                         </div>
                         <textarea 
                           className="flex min-h-[200px] w-full rounded-md border border-slate-200 bg-white dark:bg-slate-950 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 dark:border-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                          placeholder={selectedTemplateData && templateHasContentBlock ? "Your message will be injected into the template's content zone..." : "Your message goes here..."}
+                          placeholder={selectedTemplateData && templateHasContentBlock ? "Your message will be injected into the template's content zone..." : selectedTemplateData ? "Content field disabled. Edit the template first to add a Content Zone block." : "Your message goes here..."}
                           value={variants[segment.id]?.body || ''}
                           onChange={(e) => setVariants({
                             ...variants,
                             [segment.id]: { ...variants[segment.id], body: e.target.value }
                           })}
                           disabled={selectedTemplateData && !templateHasContentBlock}
-                          required
+                          required={!selectedTemplateData || templateHasContentBlock}
                         ></textarea>
+                        {selectedTemplateData && !templateHasContentBlock && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <Link to={`/templates/designer?id=${selectedTemplateData.id}`}>
+                              <Button type="button" variant="outline" size="sm">
+                                Edit Template in Designer
+                              </Button>
+                            </Link>
+                          </div>
+                        )}
                         {selectedTemplateData && templateHasContentBlock && variants[segment.id]?.body && (
                           <button 
                             type="button"
