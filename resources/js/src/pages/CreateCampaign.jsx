@@ -12,6 +12,8 @@ import { AiGenerationModal } from '../components/AiGenerationModal';
 import { AiRewriteModal } from '../components/AiRewriteModal';
 import { AiAnalysisModal } from '../components/AiAnalysisModal';
 import { CampaignPreview } from '../components/CampaignPreview';
+import { VariableMappingSidebar } from '../components/VariableMappingSidebar';
+import { autoMapVariables } from '../lib/variableUtils';
 import api from '../lib/api';
 import { cn } from '../lib/utils';
 
@@ -45,6 +47,39 @@ export default function CreateCampaign() {
   const [variants, setVariants] = useState({}); // { [segmentId]: { subject, body, cta_url } }
   const [selectedTemplateData, setSelectedTemplateData] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Wizard and Variable Mapping states
+  const [currentStep, setCurrentStep] = useState(1);
+  const [variableMappings, setVariableMappings] = useState({});
+  const [detectedVariables, setDetectedVariables] = useState([]);
+
+  // Extract variables from template + body content + subject
+  const extractAllCampaignVariables = async () => {
+    try {
+      const bodyContent = Object.values(variants).map(v => v.body || '').join('\n');
+      const subjectContent = Object.values(variants).map(v => v.subject || '').join('\n');
+
+      const response = await api.post('/campaigns/extract-variables', {
+        template_id: selectedTemplateData?.id,
+        body: bodyContent,
+        subject: subjectContent,
+      });
+
+      const vars = response.data.variables || [];
+      setDetectedVariables(vars);
+
+      // Run smart auto-mapping with uploaded CSV headers
+      const headers = csvResult?.headers || [];
+      const autoMappings = autoMapVariables(vars, headers);
+      
+      setVariableMappings(prev => ({
+        ...autoMappings,
+        ...prev
+      }));
+    } catch (err) {
+      console.error('Failed to extract campaign variables:', err);
+    }
+  };
 
   // AI Modals state
   const [aiGenOpen, setAiGenOpen] = useState(false);
@@ -203,11 +238,12 @@ export default function CreateCampaign() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e, actionOverride = null) => {
+    if (e && e.preventDefault) e.preventDefault();
     setIsSubmitting(true);
     try {
-      const formData = new FormData(e.target);
+      const formElement = document.getElementById('campaignForm');
+      const formData = formElement ? new FormData(formElement) : new FormData();
       const data = Object.fromEntries(formData);
       
       // Include additional state data
@@ -216,12 +252,13 @@ export default function CreateCampaign() {
       data.ab_test_type = abTestType;
       data.segmentation_mode = segmentationMode;
       data.variants = variants;
+      data.variable_mappings = variableMappings; // Persistent mapping
+      
       if (selectedTemplateData) {
         data.template_id = selectedTemplateData.id;
       }
 
       // Always use the 'default' variant's content as the main campaign content fallback
-      // This is because we removed the global subject/body fields
       const defaultVar = variants['default'] || {};
       data.subject = defaultVar.subject || '';
       data.body = defaultVar.body || '';
@@ -229,7 +266,10 @@ export default function CreateCampaign() {
 
       // Append scheduling
       data.schedule_type = scheduleType;
-      data.status = submitAction === 'draft' ? 'draft' : 'scheduled';
+      
+      const currentAction = actionOverride || submitAction;
+      data.status = currentAction === 'draft' ? 'draft' : 'scheduled';
+      
       if (scheduleType === 'once') {
         data.scheduled_at = scheduledAt;
       } else if (scheduleType === 'recurring') {
@@ -242,7 +282,10 @@ export default function CreateCampaign() {
       if (campaignId) {
         await updateCampaign(campaignId, data);
       } else {
-        await createCampaign(data);
+        const response = await api.post('/campaigns', data);
+        if (response?.data?.id) {
+          setCampaignId(response.data.id);
+        }
       }
       
       navigate('/campaigns');
@@ -252,6 +295,135 @@ export default function CreateCampaign() {
       setIsSubmitting(false);
     }
   };
+
+  if (currentStep === 2) {
+    const csvHeaders = csvResult?.headers || [];
+    const csvFirstRow = csvResult?.rows?.[0] || {};
+    const defaultVariant = variants['default'] || {};
+
+    return (
+      <div className="space-y-6 max-w-7xl mx-auto pb-10 animate-in fade-in duration-300">
+        {/* Step 2 Header */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <button 
+              type="button" 
+              onClick={() => setCurrentStep(1)}
+              className="rounded-full border border-slate-200 dark:border-slate-800 p-2 hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-655 dark:text-slate-350 transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">Preview & Variable Mapping</h2>
+              <p className="text-slate-500 dark:text-slate-400 text-sm">
+                Map custom variables to your recipient list headers and preview the result.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500 bg-slate-100 dark:bg-slate-900 dark:text-slate-400 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
+              Step 2 of 2
+            </span>
+          </div>
+        </div>
+
+        {/* Wizard Progress Tracker */}
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center" aria-hidden="true">
+            <div className="w-full border-t border-slate-200 dark:border-slate-800"></div>
+          </div>
+          <div className="relative flex justify-between">
+            <button 
+              type="button" 
+              onClick={() => setCurrentStep(1)}
+              className="bg-slate-50 dark:bg-slate-950 pr-4 flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs font-semibold hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors animate-pulse"
+            >
+              <span className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold">1</span>
+              Configure Campaign
+            </button>
+            <div className="bg-slate-50 dark:bg-slate-950 pl-4 flex items-center gap-2 text-indigo-650 dark:text-indigo-400 text-xs font-bold">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-white font-bold animate-bounce">2</span>
+              Map & Preview
+            </div>
+          </div>
+        </div>
+
+        {/* Main Work Area */}
+        <div className="flex flex-col lg:flex-row gap-6 items-stretch">
+          {/* Left Area: Live Preview */}
+          <div className="flex-1 min-w-0">
+            {selectedTemplateData && (
+              <CampaignPreview 
+                template={selectedTemplateData}
+                body={defaultVariant.body || ''}
+                subject={defaultVariant.subject || ''}
+                inline={true}
+                variableMappings={variableMappings}
+                csvFirstRow={csvFirstRow}
+                detectedVariables={detectedVariables}
+              />
+            )}
+          </div>
+
+          {/* Right Area: Variable Mappings Sidebar */}
+          <div className="shrink-0 flex items-stretch">
+            <VariableMappingSidebar 
+              variables={detectedVariables}
+              csvHeaders={csvHeaders}
+              csvFirstRow={csvFirstRow}
+              mappings={variableMappings}
+              onMappingChange={(varName, headerName) => {
+                setVariableMappings(prev => ({
+                  ...prev,
+                  [varName]: headerName
+                }));
+              }}
+              recipientSource={recipientSource}
+            />
+          </div>
+        </div>
+
+        {/* Bottom Actions Bar */}
+        <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 pt-6 bg-slate-50/50 dark:bg-slate-950/20 px-1">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => setCurrentStep(1)}
+            className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-850 dark:text-slate-150"
+          >
+            ← Back to Edit
+          </Button>
+          
+          <div className="flex items-center gap-3">
+            <Button 
+              type="button" 
+              onClick={() => {
+                setSubmitAction('draft');
+                handleSubmit(null, 'draft');
+              }} 
+              variant="secondary" 
+              className="gap-2 bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-850"
+              isLoading={isSubmitting && submitAction === 'draft'}
+            >
+              <Save className="h-4 w-4" /> Save Draft
+            </Button>
+            <Button 
+              type="button" 
+              onClick={() => {
+                setSubmitAction('schedule');
+                handleSubmit(null, 'schedule');
+              }} 
+              className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2" 
+              isLoading={isSubmitting && submitAction === 'schedule'}
+            >
+              <Send className="h-4 w-4" /> {scheduleType === 'immediate' ? 'Send Now' : 'Schedule Campaign'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-10 animate-in fade-in duration-500">
@@ -315,7 +487,7 @@ export default function CreateCampaign() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <form id="campaignForm" onSubmit={handleSubmit} className="space-y-8">
         {isABTest && (
           <Card className="border-indigo-200 bg-indigo-50/50 dark:border-indigo-900/30 dark:bg-indigo-900/10">
             <CardHeader className="pb-3">
@@ -845,11 +1017,51 @@ export default function CreateCampaign() {
           <Button type="button" variant="outline" onClick={() => navigate('/campaigns')}>
             Cancel
           </Button>
-          <Button type="submit" onClick={() => setSubmitAction('draft')} variant="secondary" className="gap-2 bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-800">
-            <Save className="h-4 w-4" /> Save Draft
-          </Button>
-          <Button type="submit" onClick={() => setSubmitAction('schedule')} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2" isLoading={isSubmitting && submitAction === 'schedule'}>
-            <Send className="h-4 w-4" /> {scheduleType === 'immediate' ? 'Send Now' : 'Schedule Campaign'}
+          <Button 
+            type="button"
+            onClick={async () => {
+              const form = document.getElementById('campaignForm');
+              if (form && !form.checkValidity()) {
+                form.reportValidity();
+                return;
+              }
+
+              setIsSubmitting(true);
+              try {
+                // If not saved as draft yet, create a quick draft so we have a campaign ID
+                if (!campaignId) {
+                  const formData = new FormData(form);
+                  const data = Object.fromEntries(formData);
+                  data.segments = segments;
+                  data.is_ab_test = isABTest;
+                  data.ab_test_type = abTestType;
+                  data.segmentation_mode = segmentationMode;
+                  data.variants = variants;
+                  
+                  const defaultVar = variants['default'] || {};
+                  data.subject = defaultVar.subject || '';
+                  data.body = defaultVar.body || '';
+                  data.cta_link = defaultVar.cta_link || data.cta_link || '';
+                  data.status = 'draft';
+                  
+                  const response = await api.post('/campaigns', data);
+                  if (response?.data?.id) {
+                    setCampaignId(response.data.id);
+                  }
+                }
+                
+                await extractAllCampaignVariables();
+                setCurrentStep(2);
+              } catch (err) {
+                console.error('Failed to transition to step 2:', err);
+              } finally {
+                setIsSubmitting(false);
+              }
+            }}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
+            isLoading={isSubmitting}
+          >
+            Continue to Preview & Mapping →
           </Button>
         </div>
       </form>

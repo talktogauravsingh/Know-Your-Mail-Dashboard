@@ -101,10 +101,21 @@ class SendCampaignEmailJob implements ShouldQueue
 
         try {
             // Prepare variables for substitution
+            // Start with core fields that are always available
             $variables = [
                 'name' => $recipient->name ?? '',
                 'email' => $recipient->email,
             ];
+
+            // Apply dynamic variable mappings from campaign settings
+            // Maps template variables to CSV column headers stored in recipient attributes
+            $mappings = $campaign->variable_mappings ?? [];
+            $attributes = $recipient->attributes ?? [];
+            foreach ($mappings as $templateVar => $csvHeader) {
+                if ($csvHeader && isset($attributes[$csvHeader])) {
+                    $variables[$templateVar] = $attributes[$csvHeader];
+                }
+            }
 
             // Determine the email subject (variant subject always takes precedence)
             $subject = $variant->subject;
