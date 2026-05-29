@@ -18,6 +18,7 @@ class Campaign extends Model
         'status',
         'segmentation_mode', // 'single' or 'segmented'
         'sender_config_id',
+        'template_id',
         'cta_url',
         'variants',
         'schedule_type',
@@ -25,17 +26,24 @@ class Campaign extends Model
         'schedule_frequency',
         'schedule_days',
         'schedule_time',
+        'variable_mappings',
     ];
 
     protected $casts = [
         'variants' => 'array',
         'schedule_days' => 'array',
         'scheduled_at' => 'datetime',
+        'variable_mappings' => 'array',
     ];
 
     public function variants()
     {
         return $this->hasMany(CampaignVariant::class);
+    }
+
+    public function template()
+    {
+        return $this->belongsTo(EmailTemplate::class, 'template_id');
     }
 
     public function assignments()

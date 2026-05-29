@@ -27,4 +27,13 @@ class TemplateVariableEngine
             return $variables[$key] ?? $fallback;
         }, $content);
     }
+
+    /**
+     * Check if a given HTML content contains a {{content}} block.
+     * This is used to determine if a template supports content injection.
+     */
+    public function hasContentBlock(string $html): bool
+    {
+        return str_contains($html, '{{content}}');
+    }
 }

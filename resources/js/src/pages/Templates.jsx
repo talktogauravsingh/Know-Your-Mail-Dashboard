@@ -31,10 +31,7 @@ export default function Templates() {
 
   const handleOpenEdit = (e, template) => {
     e.preventDefault();
-    setModalMode('edit');
-    setCurrentTemplate(template);
-    setFormData({ name: template.name, category: template.category, description: template.description });
-    setIsModalOpen(true);
+    navigate(`/templates/designer?id=${template.id}`);
   };
 
   const handleOpenPreview = (e, template) => {

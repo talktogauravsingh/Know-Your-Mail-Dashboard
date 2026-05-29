@@ -3,9 +3,7 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -14,21 +12,27 @@ class BulkMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public string $bannerLine; // renamed
+    public string $htmlBody;
+    public string $mailSubject;
 
-    public function __construct(string $bannerLine)
+    public function __construct(string $subject, string $htmlBody)
     {
-        $this->bannerLine = $bannerLine;
+        $this->mailSubject = $subject;
+        $this->htmlBody = $htmlBody;
     }
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Bulk Mail');
+        return new Envelope(
+            subject: $this->mailSubject
+        );
     }
 
     public function content(): Content
     {
-        return new Content(view: 'emails.bulk');
+        return new Content(
+            view: 'email.campaign'
+        );
     }
 
     public function attachments(): array

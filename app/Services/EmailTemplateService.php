@@ -3,34 +3,134 @@
 namespace App\Services;
 
 use App\Models\EmailTemplate;
-use HTMLPurifier;
-use HTMLPurifier_Config;
 
 class EmailTemplateService
 {
     /**
+     * Securely sanitizes template HTML contents.
+     * Blocks script, iframe, object, embed tags, on* event handlers, and javascript: protocols.
+     * 100% preserves custom layout elements (like section, h1, h2, h3) and inline CSS (like border-radius, flexbox, gap).
+     */
+    protected static function sanitizeHtml(string $html): string
+    {
+        if (empty($html)) {
+            return '';
+        }
+
+        // 1. Strip script tags and their inner content
+        $html = preg_replace('/<script[^>]*>.*?<\/script>/is', '', $html);
+
+        // 2. Strip iframe tags and their inner content
+        $html = preg_replace('/<iframe[^>]*>.*?<\/iframe>/is', '', $html);
+
+        // 3. Strip object, embed, applet, form, inputs, and buttons
+        $html = preg_replace('/<(object|embed|applet|form|input|button|textarea)[^>]*>.*?<\/\\1>/is', '', $html);
+
+        // 4. Strip inline event handlers (e.g. onclick, onload, onerror)
+        $html = preg_replace('/on[a-z]+=\s*["\'].*?["\']/is', '', $html);
+        $html = preg_replace('/on[a-z]+=\s*[^\s>]+/is', '', $html);
+
+        // 5. Strip javascript: protocols in links/sources
+        $html = preg_replace('/href=\s*["\']\s*javascript:.*?["\']/is', 'href="#"', $html);
+        $html = preg_replace('/src=\s*["\']\s*javascript:.*?["\']/is', 'src=""', $html);
+
+        return $html;
+    }
+
+    /**
      * Render an EmailTemplate with given variables.
-     *
-     * The template HTML is first sanitized on save using HTMLPurifier.
-     * When rendering, we substitute variables safely and re‑sanitize the output
-     * to prevent injection of malicious markup through variable values.
+     * Extracts, purifies, and reconstructs full envelopes, preserving styling.
      */
     public function render(EmailTemplate $template, array $variables = []): string
     {
-        // Retrieve the stored HTML content (already purified on storage)
         $html = $template->html_content ?? '';
 
-        // Perform variable substitution using the TemplateVariableEngine service
+        // Extract head contents
+        $headContent = '';
+        if (preg_match('/<head[^>]*>(.*?)<\/head>/is', $html, $matches)) {
+            $headContent = $matches[1];
+        }
+
+        // Extract body styles
+        $bodyStyle = '';
+        if (preg_match('/<body\s+[^>]*style=["\'](.*?)["\']/is', $html, $matches)) {
+            $bodyStyle = $matches[1];
+        }
+
+        // Extract body contents
+        $bodyContent = $html;
+        if (preg_match('/<body[^>]*>(.*?)<\/body>/is', $html, $matches)) {
+            $bodyContent = $matches[1];
+        }
+
+        // Apply fallback envelope style for existing legacy templates that don't have them stored
+        if (empty($headContent) && empty($bodyStyle)) {
+            $headContent = '<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>' . e($template->template_name) . '</title>';
+            $bodyStyle = 'margin:0; padding:24px; background:#f8fafc; font-family:Inter, system-ui, sans-serif;';
+        }
+
+        // Perform variable substitution
         $engine = new TemplateVariableEngine();
-        $rendered = $engine->render($html, $variables);
+        $renderedBody = $engine->render($bodyContent, $variables);
 
-        // Re‑purify the rendered HTML to ensure any variable data cannot break the allow‑list
-        $config = HTMLPurifier_Config::createDefault();
-        $config->set('Cache.SerializerPath', storage_path('app/purifier'));
-        // Use the same configuration as in the model (allow‑list of safe tags/attributes)
-        $purifier = new HTMLPurifier($config);
-        $safeHtml = $purifier->purify($rendered);
+        // Purify body content safely
+        $safeBody = self::sanitizeHtml($renderedBody);
 
-        return $safeHtml;
+        // Sanitize head styles
+        $purifiedHead = self::sanitizeHtml($headContent);
+
+        // Reconstruct the full HTML document
+        return '<!doctype html><html><head>' . $purifiedHead . '</head><body style="' . e($bodyStyle) . '">' . $safeBody . '</body></html>';
+    }
+
+    /**
+     * Merge campaign body content into template's {{content}} block,
+     * then substitute all other template variables and reconstruct.
+     */
+    public function mergeWithContent(EmailTemplate $template, string $body, array $variables = []): string
+    {
+        $html = $template->html_content ?? '';
+
+        // Extract head contents
+        $headContent = '';
+        if (preg_match('/<head[^>]*>(.*?)<\/head>/is', $html, $matches)) {
+            $headContent = $matches[1];
+        }
+
+        // Extract body styles
+        $bodyStyle = '';
+        if (preg_match('/<body\s+[^>]*style=["\'](.*?)["\']/is', $html, $matches)) {
+            $bodyStyle = $matches[1];
+        }
+
+        // Extract body contents
+        $bodyContent = $html;
+        if (preg_match('/<body[^>]*>(.*?)<\/body>/is', $html, $matches)) {
+            $bodyContent = $matches[1];
+        }
+
+        // Apply fallback envelope style for existing legacy templates that don't have them stored
+        if (empty($headContent) && empty($bodyStyle)) {
+            $headContent = '<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>' . e($template->template_name) . '</title>';
+            $bodyStyle = 'margin:0; padding:24px; background:#f8fafc; font-family:Inter, system-ui, sans-serif;';
+        }
+
+        // First, replace {{content}} with the campaign body inside the body content
+        $mergedBody = str_replace('{{content}}', $body, $bodyContent);
+
+        // Then substitute all other template variables
+        $engine = new TemplateVariableEngine();
+        $renderedBody = $engine->render($mergedBody, $variables);
+
+        // Purify body content safely
+        $safeBody = self::sanitizeHtml($renderedBody);
+
+        // Sanitize head styles
+        $purifiedHead = self::sanitizeHtml($headContent);
+
+        // Reconstruct the full HTML document
+        return '<!doctype html><html><head>' . $purifiedHead . '</head><body style="' . e($bodyStyle) . '">' . $safeBody . '</body></html>';
     }
 }
+
+

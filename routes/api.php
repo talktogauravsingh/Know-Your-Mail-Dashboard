@@ -73,6 +73,8 @@ Route::middleware(['auth:sanctum'])->prefix('analysis')->group(function () {
 Route::middleware('auth:sanctum')->prefix('campaigns')->group(function () {
     Route::get('/', [CampaignController::class, 'index']);
     Route::post('/', [CampaignController::class, 'store']);
+    Route::post('/preview', [CampaignController::class, 'preview']);
+    Route::post('/extract-variables', [CampaignController::class, 'extractVariables']);
     Route::get('/{campaign}', [CampaignController::class, 'show']);
     Route::patch('/{campaign}', [CampaignController::class, 'update']);
     Route::get('/{campaign}/insights', [\App\Http\Controllers\Api\SegmentationController::class, 'getInsights']);

@@ -11,6 +11,9 @@ import { SegmentationEngine } from '../components/SegmentationEngine';
 import { AiGenerationModal } from '../components/AiGenerationModal';
 import { AiRewriteModal } from '../components/AiRewriteModal';
 import { AiAnalysisModal } from '../components/AiAnalysisModal';
+import { CampaignPreview } from '../components/CampaignPreview';
+import { VariableMappingSidebar } from '../components/VariableMappingSidebar';
+import { autoMapVariables } from '../lib/variableUtils';
 import api from '../lib/api';
 import { cn } from '../lib/utils';
 
@@ -45,11 +48,46 @@ export default function CreateCampaign() {
   const [selectedTemplateData, setSelectedTemplateData] = useState(null);
   const fileInputRef = useRef(null);
 
+  // Wizard and Variable Mapping states
+  const [currentStep, setCurrentStep] = useState(1);
+  const [variableMappings, setVariableMappings] = useState({});
+  const [detectedVariables, setDetectedVariables] = useState([]);
+
+  // Extract variables from template + body content + subject
+  const extractAllCampaignVariables = async () => {
+    try {
+      const bodyContent = Object.values(variants).map(v => v.body || '').join('\n');
+      const subjectContent = Object.values(variants).map(v => v.subject || '').join('\n');
+
+      const response = await api.post('/campaigns/extract-variables', {
+        template_id: selectedTemplateData?.id,
+        body: bodyContent,
+        subject: subjectContent,
+      });
+
+      const vars = response.data.variables || [];
+      setDetectedVariables(vars);
+
+      // Run smart auto-mapping with uploaded CSV headers
+      const headers = csvResult?.headers || [];
+      const autoMappings = autoMapVariables(vars, headers);
+      
+      setVariableMappings(prev => ({
+        ...autoMappings,
+        ...prev
+      }));
+    } catch (err) {
+      console.error('Failed to extract campaign variables:', err);
+    }
+  };
+
   // AI Modals state
   const [aiGenOpen, setAiGenOpen] = useState(false);
   const [aiRewriteOpen, setAiRewriteOpen] = useState(false);
   const [aiAnalysisOpen, setAiAnalysisOpen] = useState(false);
   const [activeAiSegment, setActiveAiSegment] = useState(null);
+  const [templateHasContentBlock, setTemplateHasContentBlock] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   // CRITICAL: Reset campaignId on every fresh mount so stale IDs don't leak across sessions
   useEffect(() => {
@@ -57,18 +95,32 @@ export default function CreateCampaign() {
     return () => setCampaignId(null); // also reset on unmount
   }, []);
 
+  // Helper function to check if template has {{content}} block
+  const checkTemplateHasContentBlock = (template) => {
+    if (!template) return false;
+    const html = template.html_content || '';
+    return html.includes('{{content}}');
+  };
+
   // Load selected template data into form fields
   useEffect(() => {
     if (selectedTemplateData) {
+      const hasContent = checkTemplateHasContentBlock(selectedTemplateData);
+      setTemplateHasContentBlock(hasContent);
+      
       // Populate default segment variant
       setVariants(prev => ({
         ...prev,
         default: {
           ...prev.default,
           subject: selectedTemplateData.subject || '',
-          body: selectedTemplateData.plain_text_content || selectedTemplateData.html_content || '',
+          body: hasContent 
+            ? "Thank you for supporting our mission!\n\nYour contribution helps us bring positive change to communities in need."
+            : "",
         },
       }));
+    } else {
+      setTemplateHasContentBlock(false);
     }
   }, [selectedTemplateData]);
 
@@ -83,11 +135,22 @@ export default function CreateCampaign() {
 
   const smtpConfigurations = useStore((state) => state.smtpConfigurations);
   const templates = useStore((state) => state.templates);
+  const fetchTemplates = useStore((state) => state.fetchTemplates);
   const user = useStore((state) => state.user);
-  const selectedTemplate = templates.find(t => t.id === templateId);
+  const selectedTemplate = templates.find(t => String(t.id) === String(templateId));
 
   const createCampaign = useStore((state) => state.createCampaign);
   const updateCampaign = useStore((state) => state.updateCampaign);
+
+  useEffect(() => {
+    fetchTemplates().catch(() => {});
+  }, [fetchTemplates]);
+
+  useEffect(() => {
+    if (templateId && selectedTemplate) {
+      setSelectedTemplateData(selectedTemplate);
+    }
+  }, [templateId, selectedTemplate]);
   
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
@@ -175,11 +238,12 @@ export default function CreateCampaign() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e, actionOverride = null) => {
+    if (e && e.preventDefault) e.preventDefault();
     setIsSubmitting(true);
     try {
-      const formData = new FormData(e.target);
+      const formElement = document.getElementById('campaignForm');
+      const formData = formElement ? new FormData(formElement) : new FormData();
       const data = Object.fromEntries(formData);
       
       // Include additional state data
@@ -188,9 +252,13 @@ export default function CreateCampaign() {
       data.ab_test_type = abTestType;
       data.segmentation_mode = segmentationMode;
       data.variants = variants;
+      data.variable_mappings = variableMappings; // Persistent mapping
+      
+      if (selectedTemplateData) {
+        data.template_id = selectedTemplateData.id;
+      }
 
       // Always use the 'default' variant's content as the main campaign content fallback
-      // This is because we removed the global subject/body fields
       const defaultVar = variants['default'] || {};
       data.subject = defaultVar.subject || '';
       data.body = defaultVar.body || '';
@@ -198,7 +266,10 @@ export default function CreateCampaign() {
 
       // Append scheduling
       data.schedule_type = scheduleType;
-      data.status = submitAction === 'draft' ? 'draft' : 'scheduled';
+      
+      const currentAction = actionOverride || submitAction;
+      data.status = currentAction === 'draft' ? 'draft' : 'scheduled';
+      
       if (scheduleType === 'once') {
         data.scheduled_at = scheduledAt;
       } else if (scheduleType === 'recurring') {
@@ -211,7 +282,10 @@ export default function CreateCampaign() {
       if (campaignId) {
         await updateCampaign(campaignId, data);
       } else {
-        await createCampaign(data);
+        const response = await api.post('/campaigns', data);
+        if (response?.data?.id) {
+          setCampaignId(response.data.id);
+        }
       }
       
       navigate('/campaigns');
@@ -222,29 +296,161 @@ export default function CreateCampaign() {
     }
   };
 
+  if (currentStep === 2) {
+    const csvHeaders = csvResult?.headers || [];
+    const csvFirstRow = csvResult?.rows?.[0] || {};
+    const defaultVariant = variants['default'] || {};
+
+    return (
+      <div className="space-y-6 max-w-7xl mx-auto pb-10 animate-in fade-in duration-300">
+        {/* Step 2 Header */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <button 
+              type="button" 
+              onClick={() => setCurrentStep(1)}
+              className="rounded-full border border-slate-200 dark:border-slate-800 p-2 hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-655 dark:text-slate-350 transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">Preview & Variable Mapping</h2>
+              <p className="text-slate-500 dark:text-slate-400 text-sm">
+                Map custom variables to your recipient list headers and preview the result.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500 bg-slate-100 dark:bg-slate-900 dark:text-slate-400 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
+              Step 2 of 2
+            </span>
+          </div>
+        </div>
+
+        {/* Wizard Progress Tracker */}
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center" aria-hidden="true">
+            <div className="w-full border-t border-slate-200 dark:border-slate-800"></div>
+          </div>
+          <div className="relative flex justify-between">
+            <button 
+              type="button" 
+              onClick={() => setCurrentStep(1)}
+              className="bg-slate-50 dark:bg-slate-950 pr-4 flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs font-semibold hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors animate-pulse"
+            >
+              <span className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold">1</span>
+              Configure Campaign
+            </button>
+            <div className="bg-slate-50 dark:bg-slate-950 pl-4 flex items-center gap-2 text-indigo-650 dark:text-indigo-400 text-xs font-bold">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-white font-bold animate-bounce">2</span>
+              Map & Preview
+            </div>
+          </div>
+        </div>
+
+        {/* Main Work Area */}
+        <div className="flex flex-col lg:flex-row gap-6 items-stretch">
+          {/* Left Area: Live Preview */}
+          <div className="flex-1 min-w-0">
+            {selectedTemplateData && (
+              <CampaignPreview 
+                template={selectedTemplateData}
+                body={defaultVariant.body || ''}
+                subject={defaultVariant.subject || ''}
+                inline={true}
+                variableMappings={variableMappings}
+                csvFirstRow={csvFirstRow}
+                detectedVariables={detectedVariables}
+              />
+            )}
+          </div>
+
+          {/* Right Area: Variable Mappings Sidebar */}
+          <div className="shrink-0 flex items-stretch">
+            <VariableMappingSidebar 
+              variables={detectedVariables}
+              csvHeaders={csvHeaders}
+              csvFirstRow={csvFirstRow}
+              mappings={variableMappings}
+              onMappingChange={(varName, headerName) => {
+                setVariableMappings(prev => ({
+                  ...prev,
+                  [varName]: headerName
+                }));
+              }}
+              recipientSource={recipientSource}
+            />
+          </div>
+        </div>
+
+        {/* Bottom Actions Bar */}
+        <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 pt-6 bg-slate-50/50 dark:bg-slate-950/20 px-1">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => setCurrentStep(1)}
+            className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-850 dark:text-slate-150"
+          >
+            ← Back to Edit
+          </Button>
+          
+          <div className="flex items-center gap-3">
+            <Button 
+              type="button" 
+              onClick={() => {
+                setSubmitAction('draft');
+                handleSubmit(null, 'draft');
+              }} 
+              variant="secondary" 
+              className="gap-2 bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-850"
+              isLoading={isSubmitting && submitAction === 'draft'}
+            >
+              <Save className="h-4 w-4" /> Save Draft
+            </Button>
+            <Button 
+              type="button" 
+              onClick={() => {
+                setSubmitAction('schedule');
+                handleSubmit(null, 'schedule');
+              }} 
+              className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2" 
+              isLoading={isSubmitting && submitAction === 'schedule'}
+            >
+              <Send className="h-4 w-4" /> {scheduleType === 'immediate' ? 'Send Now' : 'Schedule Campaign'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-10 animate-in fade-in duration-500">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Select
-            value={selectedTemplateData ? selectedTemplateData.id : ''}
+            value={selectedTemplateData ? String(selectedTemplateData.id) : ''}
             onChange={e => {
-              const tmpl = templates.find(t => t.id === e.target.value);
-              setSelectedTemplateData(tmpl);
-              // Update URL param without reload
-              const params = new URLSearchParams(window.location.search);
+              const tmpl = templates.find(t => String(t?.id) === e.target.value);
               if (tmpl) {
+                setSelectedTemplateData(tmpl);
+                // Update URL param without reload
+                const params = new URLSearchParams(window.location.search);
                 params.set('template', tmpl.id);
+                window.history.replaceState(null, '', `?${params.toString()}`);
               } else {
+                setSelectedTemplateData(null);
+                const params = new URLSearchParams(window.location.search);
                 params.delete('template');
+                window.history.replaceState(null, '', `?${params.toString()}`);
               }
-              window.history.replaceState(null, '', `?${params.toString()}`);
             }}
             className="bg-white dark:bg-slate-950"
           >
             <option value="">Select Template</option>
-            {templates.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+            {templates.filter(t => t && t.id).map(t => (
+              <option key={t.id} value={String(t.id)}>{t.template_name || t.name || t.slug || `Template ${t.id}`}</option>
             ))}
           </Select>
           <Link to="/templates/builder">
@@ -260,7 +466,7 @@ export default function CreateCampaign() {
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">New Campaign</h2>
               <p className="text-slate-500 dark:text-slate-400">
-                {selectedTemplateData ? `Starting from layout: ${selectedTemplateData.name}` : 'Configure your email campaign details.'}
+                {selectedTemplateData ? `Starting from layout: ${selectedTemplateData.template_name || selectedTemplateData.name}` : 'Configure your email campaign details.'}
               </p>
           </div>
         </div>
@@ -281,7 +487,7 @@ export default function CreateCampaign() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <form id="campaignForm" onSubmit={handleSubmit} className="space-y-8">
         {isABTest && (
           <Card className="border-indigo-200 bg-indigo-50/50 dark:border-indigo-900/30 dark:bg-indigo-900/10">
             <CardHeader className="pb-3">
@@ -673,6 +879,25 @@ export default function CreateCampaign() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {selectedTemplateData && !templateHasContentBlock && (
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 flex gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">No Content Zone in Template</p>
+                  <p className="text-sm text-amber-700 dark:text-amber-200 mt-1">This template doesn't have a {'{{content}}'} block. <Link to={`/templates/designer?id=${selectedTemplateData.id}`} className="underline font-medium">Edit the template</Link> to add a Content Zone first.</p>
+                </div>
+              </div>
+            )}
+
+            {selectedTemplateData && templateHasContentBlock && (
+              <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800 flex gap-3">
+                <CheckCircle2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">Template with Content Zone</p>
+                  <p className="text-sm text-indigo-700 dark:text-indigo-200 mt-1">Your content will be injected into the template's content zone during sending.</p>
+                </div>
+              </div>
+            )}
             <div className="space-y-8">
               {segments.map((segment) => (
                 <div key={segment.id} className={cn(
@@ -715,37 +940,58 @@ export default function CreateCampaign() {
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-semibold">Email Content</Label>
-                        <div className="flex items-center gap-3">
-                          <button 
-                            type="button" 
-                            onClick={() => { setActiveAiSegment(segment.id); setAiRewriteOpen(true); }}
-                            className="text-xs flex items-center gap-1 text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
-                          >
-                            <Wand2 className="w-3 h-3" /> Rewrite
-                          </button>
-                          <button 
-                            type="button" 
-                            onClick={() => { setActiveAiSegment(segment.id); setAiAnalysisOpen(true); }}
-                            className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
-                          >
-                            <Activity className="w-3 h-3" /> Analyze
-                          </button>
+                    {(!selectedTemplateData || templateHasContentBlock) && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-semibold">Email Content</Label>
+                          <div className="flex items-center gap-3">
+                            <button 
+                              type="button" 
+                              onClick={() => { setActiveAiSegment(segment.id); setAiRewriteOpen(true); }}
+                              className="text-xs flex items-center gap-1 text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
+                            >
+                              <Wand2 className="w-3 h-3" /> Rewrite
+                            </button>
+                            <button 
+                              type="button" 
+                              onClick={() => { setActiveAiSegment(segment.id); setAiAnalysisOpen(true); }}
+                              className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                            >
+                              <Activity className="w-3 h-3" /> Analyze
+                            </button>
+                          </div>
                         </div>
+                        <textarea 
+                          className="flex min-h-[200px] w-full rounded-md border border-slate-200 bg-white dark:bg-slate-950 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 dark:border-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                          placeholder={selectedTemplateData && templateHasContentBlock ? "Your message will be injected into the template's content zone..." : selectedTemplateData ? "Content field disabled. Edit the template first to add a Content Zone block." : "Your message goes here..."}
+                          value={variants[segment.id]?.body || ''}
+                          onChange={(e) => setVariants({
+                            ...variants,
+                            [segment.id]: { ...variants[segment.id], body: e.target.value }
+                          })}
+                          disabled={selectedTemplateData && !templateHasContentBlock}
+                          required={!selectedTemplateData || templateHasContentBlock}
+                        ></textarea>
+                        {selectedTemplateData && !templateHasContentBlock && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <Link to={`/templates/designer?id=${selectedTemplateData.id}`}>
+                              <Button type="button" variant="outline" size="sm">
+                                Edit Template in Designer
+                              </Button>
+                            </Link>
+                          </div>
+                        )}
+                        {selectedTemplateData && templateHasContentBlock && variants[segment.id]?.body && (
+                          <button 
+                            type="button"
+                            onClick={() => setShowPreview(true)}
+                            className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium"
+                          >
+                            👁️ Preview & Style
+                          </button>
+                        )}
                       </div>
-                      <textarea 
-                        className="flex min-h-[200px] w-full rounded-md border border-slate-200 bg-white dark:bg-slate-950 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 dark:border-slate-800"
-                        placeholder="Your message goes here..."
-                        value={variants[segment.id]?.body || ''}
-                        onChange={(e) => setVariants({
-                          ...variants,
-                          [segment.id]: { ...variants[segment.id], body: e.target.value }
-                        })}
-                        required
-                      ></textarea>
-                    </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label className="text-sm font-semibold">CTA Link</Label>
@@ -771,11 +1017,51 @@ export default function CreateCampaign() {
           <Button type="button" variant="outline" onClick={() => navigate('/campaigns')}>
             Cancel
           </Button>
-          <Button type="submit" onClick={() => setSubmitAction('draft')} variant="secondary" className="gap-2 bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-800">
-            <Save className="h-4 w-4" /> Save Draft
-          </Button>
-          <Button type="submit" onClick={() => setSubmitAction('schedule')} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2" isLoading={isSubmitting && submitAction === 'schedule'}>
-            <Send className="h-4 w-4" /> {scheduleType === 'immediate' ? 'Send Now' : 'Schedule Campaign'}
+          <Button 
+            type="button"
+            onClick={async () => {
+              const form = document.getElementById('campaignForm');
+              if (form && !form.checkValidity()) {
+                form.reportValidity();
+                return;
+              }
+
+              setIsSubmitting(true);
+              try {
+                // If not saved as draft yet, create a quick draft so we have a campaign ID
+                if (!campaignId) {
+                  const formData = new FormData(form);
+                  const data = Object.fromEntries(formData);
+                  data.segments = segments;
+                  data.is_ab_test = isABTest;
+                  data.ab_test_type = abTestType;
+                  data.segmentation_mode = segmentationMode;
+                  data.variants = variants;
+                  
+                  const defaultVar = variants['default'] || {};
+                  data.subject = defaultVar.subject || '';
+                  data.body = defaultVar.body || '';
+                  data.cta_link = defaultVar.cta_link || data.cta_link || '';
+                  data.status = 'draft';
+                  
+                  const response = await api.post('/campaigns', data);
+                  if (response?.data?.id) {
+                    setCampaignId(response.data.id);
+                  }
+                }
+                
+                await extractAllCampaignVariables();
+                setCurrentStep(2);
+              } catch (err) {
+                console.error('Failed to transition to step 2:', err);
+              } finally {
+                setIsSubmitting(false);
+              }
+            }}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
+            isLoading={isSubmitting}
+          >
+            Continue to Preview & Mapping →
           </Button>
         </div>
       </form>
@@ -820,6 +1106,16 @@ export default function CreateCampaign() {
         subject={activeAiSegment ? variants[activeAiSegment]?.subject : ''}
         content={activeAiSegment ? variants[activeAiSegment]?.body : ''}
       />
+      
+      {/* Campaign Preview Modal */}
+      {showPreview && selectedTemplateData && activeAiSegment && variants[activeAiSegment] && (
+        <CampaignPreview 
+          template={selectedTemplateData}
+          body={variants[activeAiSegment].body}
+          subject={variants[activeAiSegment].subject}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
     </div>
   );
 }

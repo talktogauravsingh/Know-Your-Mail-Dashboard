@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import api from '../lib/api';
@@ -48,6 +48,7 @@ const blockGroups = [
       { type: 'heading', label: 'Heading', icon: <Type /> },
       { type: 'image', label: 'Image', icon: <Image /> },
       { type: 'button', label: 'Button', icon: <Square /> },
+      { type: 'html', label: 'HTML', icon: <Type /> },
       { type: 'divider', label: 'Divider', icon: <LayoutGrid /> },
       { type: 'spacer', label: 'Spacer', icon: <Upload /> },
     ],
@@ -59,6 +60,7 @@ const blockGroups = [
       { type: 'footer', label: 'Footer', icon: <Mail /> },
       { type: 'cta', label: 'CTA Banner', icon: <LayoutGrid /> },
       { type: 'social', label: 'Social Links', icon: <Columns /> },
+      { type: 'content', label: 'Content Zone', icon: <Type /> },
       { type: 'userInfo', label: 'User Info', icon: <Type /> },
       { type: 'receipt', label: 'Receipt', icon: <Image /> },
     ],
@@ -83,6 +85,7 @@ const dynamicVariables = [
   '{{amount}}',
   '{{payment_date}}',
   '{{donation_link}}',
+  '{{content}}',
 ];
 
 const initialSections = [
@@ -154,10 +157,48 @@ export default function TemplateDesigner() {
   const [showPreview, setShowPreview] = useState(false);
   const [testSendHtml, setTestSendHtml] = useState('');
   const [showTestSend, setShowTestSend] = useState(false);
+  const [useCompleteHtml, setUseCompleteHtml] = useState(false);
+  const [completeHtml, setCompleteHtml] = useState('');
+  const [fullHtmlStyle, setFullHtmlStyle] = useState({
+    background: '#ffffff',
+    textColor: '#0F172A',
+    fontSize: 16,
+    lineHeight: 1.5,
+    align: 'left',
+    padding: 24,
+  });
 
   const addToast = useStore((state) => state.addToast);
   const addTemplate = useStore((state) => state.addTemplate);
   const updateTemplate = useStore((state) => state.updateTemplate);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    if (id) {
+      api.get(`/email-templates/${id}`).then((response) => {
+        const t = response.data;
+        setTemplateId(t.id);
+        setTemplateName(t.template_name || t.name || '');
+        setSubject(t.subject || '');
+        setCategory(t.category || '');
+        setPreviewText(t.preview_text || '');
+        setStatus(t.status || 'draft');
+        if (t.json_design && Array.isArray(t.json_design)) {
+          setSections(t.json_design);
+          if (t.json_design.length > 0) {
+            setSelectedSectionId(t.json_design[0].id);
+          }
+        } else if (t.html_content) {
+          setUseCompleteHtml(true);
+          setCompleteHtml(t.html_content);
+        }
+      }).catch((err) => {
+        console.error('Failed to load template', err);
+        addToast('Failed to load template details', 'error');
+      });
+    }
+  }, [addToast]);
 
   const selectedSectionIndex = sections.findIndex(
     (section) => section.id === selectedSectionId
@@ -191,6 +232,16 @@ export default function TemplateDesigner() {
     });
   };
 
+  const getFullHtmlDocument = () => {
+    const html = String(completeHtml || '').trim();
+    if (!html) return '';
+    if (/^<!doctype|<html/i.test(html)) {
+      return html;
+    }
+
+    return `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><style>body{margin:0;padding:${fullHtmlStyle.padding}px;background:${fullHtmlStyle.background};color:${fullHtmlStyle.textColor};font-size:${fullHtmlStyle.fontSize}px;line-height:${fullHtmlStyle.lineHeight};text-align:${fullHtmlStyle.align};}</style></head><body>${html}</body></html>`;
+  };
+
   const addSection = (type) => {
     const nextId = Date.now();
     const newSection = {
@@ -206,6 +257,8 @@ export default function TemplateDesigner() {
           ? 'Your contribution helps us bring positive change to communities in need.'
           : type === 'footer'
           ? 'Use the footer section to add contact information and links.'
+          : type === 'html'
+          ? '<p>Paste your HTML code here.</p>'
           : '',
       buttonText: type === 'button' ? 'Call to action' : 'Learn more',
       align: 'left',
@@ -302,8 +355,12 @@ export default function TemplateDesigner() {
           .join('')}</div></div></section>`;
       case 'footer':
         return `<section style="${sectionStyle} background:#f8fafc; border-radius:28px; margin-bottom:28px; color:#475569;"><div style="max-width:720px; margin:0 auto; display:flex; flex-wrap:wrap; justify-content:space-between; gap:16px;"><div><p style="margin:0 0 8px; font-weight:700; color:#0f172a;">${escapeHtml(section.company)}</p><p style="margin:0 0 4px;">${escapeHtml(section.address)}</p><p style="margin:0;">${escapeHtml(section.email)}</p></div><p style="margin:0;">${escapeHtml(section.year)} © ${escapeHtml(section.company)}. All rights reserved.</p></div></section>`;
+      case 'html':
+        return `<section style="${sectionStyle}">${section.content || ''}</section>`;
       case 'heading':
         return `<section style="${sectionStyle} margin-bottom:28px;"><h2 style="margin:0; font-size:28px; font-weight:700;">${escapeHtml(section.heading)}</h2></section>`;
+      case 'content':
+        return `<div class="content-zone" style="${sectionStyle} border:2px dashed #cbd5e1; border-radius:12px; background:#f1f5f9; min-height:200px;">{{content}}</div>`;
       case 'button':
         return `<section style="${sectionStyle} margin-bottom:28px;"><a href="#" style="display:inline-block; padding:14px 28px; border-radius:999px; background:#4f46e5; color:#fff; text-decoration:none;">${escapeHtml(section.buttonText)}</a></section>`;
       case 'image':
@@ -324,6 +381,10 @@ export default function TemplateDesigner() {
   };
 
   const generateHtmlContent = () => {
+    if (useCompleteHtml && completeHtml.trim()) {
+      return getFullHtmlDocument();
+    }
+
     return `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${escapeHtml(templateName)}</title></head><body style="margin:0; padding:24px; background:#f8fafc; font-family:Inter, system-ui, sans-serif;">${sections.map(renderSectionHtml).join('')}</body></html>`;
   };
 
@@ -485,7 +546,7 @@ export default function TemplateDesigner() {
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden">
-        <div className="h-20 bg-white border-b border-slate-200 px-8 flex items-center justify-between">
+        <div className="min-h-[5rem] bg-white border-b border-slate-200 px-8 py-4 flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-3">
               <Link to="/templates" className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
@@ -535,7 +596,7 @@ export default function TemplateDesigner() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => saveTemplate('draft')}
@@ -589,34 +650,54 @@ export default function TemplateDesigner() {
                 <button className="text-sm text-slate-500 hover:text-slate-700">View in browser</button>
               </div>
 
-              <div className="p-10 space-y-6 bg-white">
-                {sections.length === 0 && (
-                  <div className="h-[500px] border-2 border-dashed border-slate-300 rounded-3xl flex flex-col items-center justify-center text-center">
-                    <div className="w-20 h-20 rounded-3xl bg-indigo-50 flex items-center justify-center mb-6">
-                      <Plus className="w-10 h-10 text-indigo-600" />
+              {useCompleteHtml ? (
+                <div className="p-10 bg-white">
+                  {!completeHtml.trim() ? (
+                    <div className="h-[500px] border-2 border-dashed border-slate-300 rounded-3xl flex flex-col items-center justify-center text-center">
+                      <div className="w-20 h-20 rounded-3xl bg-indigo-50 flex items-center justify-center mb-6">
+                        <Plus className="w-10 h-10 text-indigo-600" />
+                      </div>
+                      <h3 className="text-2xl font-semibold text-slate-900">Paste full HTML here</h3>
+                      <p className="text-slate-500 mt-3 max-w-md leading-7">Use the sidebar to paste your entire email HTML template and preview it here.</p>
                     </div>
-                    <h3 className="text-2xl font-semibold text-slate-900">Start Building Your Email</h3>
-                    <p className="text-slate-500 mt-3 max-w-md leading-7">Drag blocks from the left sidebar or click to add sections.</p>
-                  </div>
-                )}
+                  ) : (
+                    <iframe
+                      title="Full HTML preview"
+                      srcDoc={getFullHtmlDocument()}
+                      className="w-full min-h-[700px] rounded-[28px] border border-slate-200"
+                    />
+                  )}
+                </div>
+              ) : (
+                <div className="p-10 space-y-6 bg-white">
+                  {sections.length === 0 && (
+                    <div className="h-[500px] border-2 border-dashed border-slate-300 rounded-3xl flex flex-col items-center justify-center text-center">
+                      <div className="w-20 h-20 rounded-3xl bg-indigo-50 flex items-center justify-center mb-6">
+                        <Plus className="w-10 h-10 text-indigo-600" />
+                      </div>
+                      <h3 className="text-2xl font-semibold text-slate-900">Start Building Your Email</h3>
+                      <p className="text-slate-500 mt-3 max-w-md leading-7">Drag blocks from the left sidebar or click to add sections.</p>
+                    </div>
+                  )}
 
-                <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <SortableContext items={sections.map((section) => section.id)} strategy={verticalListSortingStrategy}>
-                    <div className="space-y-6">
-                      {sections.map((section) => (
-                        <SortableSection
-                          key={section.id}
-                          section={section}
-                          selectedSection={selectedSectionId}
-                          setSelectedSection={setSelectedSectionId}
-                          duplicateSection={duplicateSection}
-                          deleteSection={deleteSection}
-                        />
-                      ))}
-                    </div>
-                  </SortableContext>
-                </DndContext>
-              </div>
+                  <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                    <SortableContext items={sections.map((section) => section.id)} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-6">
+                        {sections.map((section) => (
+                          <SortableSection
+                            key={section.id}
+                            section={section}
+                            selectedSection={selectedSectionId}
+                            setSelectedSection={setSelectedSectionId}
+                            duplicateSection={duplicateSection}
+                            deleteSection={deleteSection}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -630,17 +711,46 @@ export default function TemplateDesigner() {
         </div>
         <div className="flex-1 overflow-y-auto p-6">
           {activeTab === 'content' ? (
-            selectedSection ? (
-              <SectionEditor
-                section={selectedSection}
-                updateSection={updateSection}
-                insertVariable={insertVariable}
-                deleteSection={deleteSection}
-                duplicateSection={duplicateSection}
-              />
-            ) : (
-              <div className="text-slate-500">Select a section to edit its content and properties.</div>
-            )
+            <>
+              <div className="rounded-2xl border border-slate-200 p-4 mb-6 bg-slate-50">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-slate-700">HTML Mode</p>
+                    <p className="text-xs text-slate-500 mt-1">Switch between block editor and full HTML template mode.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUseCompleteHtml((prev) => !prev)}
+                    className={`h-11 rounded-xl px-4 text-sm font-medium transition ${
+                      useCompleteHtml
+                        ? 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    }`}
+                  >
+                    {useCompleteHtml ? 'Use Blocks' : 'Use Full HTML'}
+                  </button>
+                </div>
+              </div>
+
+              {useCompleteHtml ? (
+                <FullHtmlEditor
+                  completeHtml={completeHtml}
+                  setCompleteHtml={setCompleteHtml}
+                  fullHtmlStyle={fullHtmlStyle}
+                  setFullHtmlStyle={setFullHtmlStyle}
+                />
+              ) : selectedSection ? (
+                <SectionEditor
+                  section={selectedSection}
+                  updateSection={updateSection}
+                  insertVariable={insertVariable}
+                  deleteSection={deleteSection}
+                  duplicateSection={duplicateSection}
+                />
+              ) : (
+                <div className="text-slate-500">Select a section to edit its content and properties.</div>
+              )}
+            </>
           ) : null}
 
           {activeTab === 'rows' ? (
@@ -797,8 +907,10 @@ function SectionEditor({ section, updateSection, insertVariable, deleteSection, 
     heading: 'Heading',
     button: 'Button',
     image: 'Image',
+    html: 'HTML block',
     divider: 'Divider',
     spacer: 'Spacer',
+    content: 'Content Zone',
     oneColumn: '1 Column',
     twoColumns: '2 Columns',
     threeColumns: '3 Columns',
@@ -876,14 +988,36 @@ function SectionEditor({ section, updateSection, insertVariable, deleteSection, 
           {section.type === 'image' && (
             <InputField label="Image URL" value={section.image || ''} onChange={(value) => setValue('image', value)} />
           )}
+
+          {section.type === 'html' && (
+            <TextareaField
+              label="Raw HTML"
+              value={section.content || ''}
+              onChange={(value) => setValue('content', value)}
+            />
+          )}
+
+          {section.type === 'content' && (
+            <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-2 h-2 rounded-full bg-indigo-600 mt-1 flex-shrink-0"></div>
+                <div>
+                  <p className="text-sm font-medium text-indigo-900">Campaign Content Zone</p>
+                  <p className="text-xs text-indigo-700 mt-1">This placeholder will be replaced with campaign body content when sending emails. Campaign content will be injected here during email merging.</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       <div>
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-slate-700">Text Styling</p>
-          <p className="text-xs text-slate-400">Applies to this block</p>
-        </div>
+        {section.type !== 'content' && (
+          <div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-700">Text Styling</p>
+              <p className="text-xs text-slate-400">Applies to this block</p>
+            </div>
 
         <div className="mt-4 space-y-4">
           <div>
@@ -976,6 +1110,8 @@ function SectionEditor({ section, updateSection, insertVariable, deleteSection, 
             </div>
           </div>
         </div>
+            </div>
+          )}
       </div>
 
       <div>
@@ -1018,6 +1154,97 @@ function SectionEditor({ section, updateSection, insertVariable, deleteSection, 
           <Trash2 className="w-4 h-4" />
           Delete Section
         </button>
+      </div>
+    </div>
+  );
+}
+
+function FullHtmlEditor({ completeHtml, setCompleteHtml, fullHtmlStyle, setFullHtmlStyle }) {
+  const setStyleValue = (key, value) => setFullHtmlStyle((prev) => ({ ...prev, [key]: value }));
+
+  return (
+    <div className="space-y-7">
+      <div>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-700">Complete HTML Template</p>
+            <p className="text-xs text-slate-500 mt-1">Paste the entire email HTML here to bypass the block editor.</p>
+          </div>
+        </div>
+
+        <TextareaField label="Complete HTML" value={completeHtml} onChange={setCompleteHtml} />
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-slate-700">Template styling</p>
+        <p className="text-xs text-slate-500 mt-1">These wrapper styles are applied when the pasted HTML is not a full document.</p>
+
+        <div className="mt-4 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium text-slate-700">Background</label>
+              <input
+                type="color"
+                value={fullHtmlStyle.background}
+                onChange={(e) => setStyleValue('background', e.target.value)}
+                className="mt-3 w-full h-12 rounded-xl border border-slate-200 p-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700">Text Color</label>
+              <input
+                type="color"
+                value={fullHtmlStyle.textColor}
+                onChange={(e) => setStyleValue('textColor', e.target.value)}
+                className="mt-3 w-full h-12 rounded-xl border border-slate-200 p-1"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium text-slate-700">Padding</label>
+              <input
+                type="number"
+                min={0}
+                value={fullHtmlStyle.padding}
+                onChange={(e) => setStyleValue('padding', Number(e.target.value))}
+                className="mt-3 w-full h-12 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700">Font Size</label>
+              <input
+                type="number"
+                min={10}
+                value={fullHtmlStyle.fontSize}
+                onChange={(e) => setStyleValue('fontSize', Number(e.target.value))}
+                className="mt-3 w-full h-12 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-slate-700">Line Height</label>
+            <input
+              type="number"
+              min={1}
+              step={0.1}
+              value={fullHtmlStyle.lineHeight}
+              onChange={(e) => setStyleValue('lineHeight', Number(e.target.value))}
+              className="mt-3 w-full h-12 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-slate-700">Alignment</label>
+            <div className="grid grid-cols-3 gap-3 mt-3">
+              <AlignButton icon={<AlignLeft />} active={fullHtmlStyle.align === 'left'} onClick={() => setStyleValue('align', 'left')} />
+              <AlignButton icon={<AlignCenter />} active={fullHtmlStyle.align === 'center'} onClick={() => setStyleValue('align', 'center')} />
+              <AlignButton icon={<AlignRight />} active={fullHtmlStyle.align === 'right'} onClick={() => setStyleValue('align', 'right')} />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1155,6 +1382,12 @@ function SortableSection({ section, selectedSection, setSelectedSection, duplica
         return (
           <div className="flex">
             <button className="rounded-2xl bg-indigo-600 px-8 py-3 text-white font-medium">{section.buttonText}</button>
+          </div>
+        );
+      case 'html':
+        return (
+          <div className="rounded-[28px] bg-slate-50 p-8 shadow-sm" style={{ paddingTop: section.padding?.top, paddingRight: section.padding?.right, paddingBottom: section.padding?.bottom, paddingLeft: section.padding?.left, textAlign: section.align }}>
+            <div dangerouslySetInnerHTML={{ __html: section.content || '<p className="text-slate-500">Paste your HTML code here.</p>' }} />
           </div>
         );
       case 'image':
