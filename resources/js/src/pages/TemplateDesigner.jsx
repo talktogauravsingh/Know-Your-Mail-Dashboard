@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import api from '../lib/api';
@@ -171,6 +171,34 @@ export default function TemplateDesigner() {
   const addToast = useStore((state) => state.addToast);
   const addTemplate = useStore((state) => state.addTemplate);
   const updateTemplate = useStore((state) => state.updateTemplate);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    if (id) {
+      api.get(`/email-templates/${id}`).then((response) => {
+        const t = response.data;
+        setTemplateId(t.id);
+        setTemplateName(t.template_name || t.name || '');
+        setSubject(t.subject || '');
+        setCategory(t.category || '');
+        setPreviewText(t.preview_text || '');
+        setStatus(t.status || 'draft');
+        if (t.json_design && Array.isArray(t.json_design)) {
+          setSections(t.json_design);
+          if (t.json_design.length > 0) {
+            setSelectedSectionId(t.json_design[0].id);
+          }
+        } else if (t.html_content) {
+          setUseCompleteHtml(true);
+          setCompleteHtml(t.html_content);
+        }
+      }).catch((err) => {
+        console.error('Failed to load template', err);
+        addToast('Failed to load template details', 'error');
+      });
+    }
+  }, [addToast]);
 
   const selectedSectionIndex = sections.findIndex(
     (section) => section.id === selectedSectionId

@@ -26,12 +26,14 @@ class Campaign extends Model
         'schedule_frequency',
         'schedule_days',
         'schedule_time',
+        'variable_mappings',
     ];
 
     protected $casts = [
         'variants' => 'array',
         'schedule_days' => 'array',
         'scheduled_at' => 'datetime',
+        'variable_mappings' => 'array',
     ];
 
     public function variants()

@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Campaign;
+use App\Models\EmailTemplate;
+use App\Models\Recipient;
+use App\Services\TemplateVariableEngine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +36,12 @@ class CampaignController extends Controller
             'name' => 'required|string|max:255',
             'subject' => 'required|string|max:255',
             'body' => 'required|string',
-            'template_id' => 'nullable|exists:email_templates,id',
+            'template_id' => [
+                'nullable',
+                Rule::exists('email_templates', 'id')->where(function ($query) {
+                    $query->where('organization_id', Auth::user()->organization_id ?? 1);
+                }),
+            ],
             'cta_link' => 'nullable',
             'sender_config_id' => 'nullable',
             'segments' => 'nullable|array',
@@ -51,6 +59,8 @@ class CampaignController extends Controller
             'schedule_frequency' => 'nullable|string|in:daily,weekly,monthly',
             'schedule_days' => 'nullable|array',
             'schedule_time' => 'nullable|string',
+            'variable_mappings' => 'nullable|array',
+            'variable_mappings.*' => 'nullable|string|max:255',
         ]);
 
         $campaign = Campaign::create([
@@ -68,6 +78,7 @@ class CampaignController extends Controller
             'schedule_frequency' => $validated['schedule_frequency'] ?? null,
             'schedule_days' => $validated['schedule_days'] ?? null,
             'schedule_time' => $validated['schedule_time'] ?? null,
+            'variable_mappings' => $validated['variable_mappings'] ?? null,
             'user_id' => Auth::id(),
         ]);
 
@@ -95,7 +106,12 @@ class CampaignController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'subject' => 'sometimes|required|string|max:255',
             'body' => 'sometimes|required|string',
-            'template_id' => 'nullable|exists:email_templates,id',
+            'template_id' => [
+                'nullable',
+                Rule::exists('email_templates', 'id')->where(function ($query) {
+                    $query->where('organization_id', Auth::user()->organization_id ?? 1);
+                }),
+            ],
             'cta_link' => 'nullable|string',
             'sender_config_id' => 'nullable',
             'audience_segment' => 'nullable|string',
@@ -114,6 +130,8 @@ class CampaignController extends Controller
             'schedule_frequency' => 'nullable|string|in:daily,weekly,monthly',
             'schedule_days' => 'nullable|array',
             'schedule_time' => 'nullable|string',
+            'variable_mappings' => 'nullable|array',
+            'variable_mappings.*' => 'nullable|string|max:255',
         ]);
 
         $campaign->update([
@@ -130,6 +148,7 @@ class CampaignController extends Controller
             'schedule_frequency' => $validated['schedule_frequency'] ?? $campaign->schedule_frequency,
             'schedule_days' => isset($validated['schedule_days']) ? $validated['schedule_days'] : $campaign->schedule_days,
             'schedule_time' => isset($validated['schedule_time']) ? $validated['schedule_time'] : $campaign->schedule_time,
+            'variable_mappings' => isset($validated['variable_mappings']) ? $validated['variable_mappings'] : $campaign->variable_mappings,
         ]);
 
         if (isset($validated['segments'])) {
@@ -237,28 +256,54 @@ class CampaignController extends Controller
     /**
      * Preview campaign with merged template content.
      * Accepts template_id + body + variables and returns merged HTML.
+     * Optionally accepts variable_mappings + csv_first_row for dynamic preview.
      */
     public function preview(Request $request)
     {
         $validated = $request->validate([
             'template_id' => 'required|exists:email_templates,id',
             'body' => 'required|string',
+            'subject' => 'nullable|string',
             'variables' => 'nullable|array',
+            'variable_mappings' => 'nullable|array',
+            'csv_first_row' => 'nullable|array',
         ]);
 
         try {
-            $template = \App\Models\EmailTemplate::findOrFail($validated['template_id']);
-            
+            $template = EmailTemplate::where('organization_id', Auth::user()->organization_id ?? 1)
+                ->findOrFail($validated['template_id']);
+
+            // Build variables from mappings + first CSV row if provided
+            $variables = $validated['variables'] ?? [];
+            $mappings = $validated['variable_mappings'] ?? [];
+            $csvRow = $validated['csv_first_row'] ?? [];
+
+            if (!empty($mappings) && !empty($csvRow)) {
+                foreach ($mappings as $templateVar => $csvHeader) {
+                    if ($csvHeader && isset($csvRow[$csvHeader])) {
+                        $variables[$templateVar] = $csvRow[$csvHeader];
+                    }
+                }
+            }
+
+            // Also substitute variables inside the body content itself
+            $engine = new TemplateVariableEngine();
+            $processedBody = $engine->render($validated['body'], $variables);
+            $processedSubject = isset($validated['subject'])
+                ? $engine->render($validated['subject'], $variables)
+                : '';
+
             $templateService = new \App\Services\EmailTemplateService();
             $htmlBody = $templateService->mergeWithContent(
                 $template,
-                $validated['body'],
-                $validated['variables'] ?? []
+                $processedBody,
+                $variables
             );
 
             return response()->json([
                 'success' => true,
                 'htmlBody' => $htmlBody,
+                'processedSubject' => $processedSubject,
                 'template' => $template->only(['id', 'template_name', 'subject']),
             ]);
         } catch (\Exception $e) {
@@ -267,5 +312,71 @@ class CampaignController extends Controller
                 'message' => 'Preview failed: ' . $e->getMessage(),
             ], 400);
         }
+    }
+
+    /**
+     * Extract all dynamic variables from template HTML + campaign body + subject.
+     * Returns a deduplicated list of variable names (excluding 'content').
+     */
+    public function extractVariables(Request $request)
+    {
+        $validated = $request->validate([
+            'template_id' => 'nullable|exists:email_templates,id',
+            'body' => 'nullable|string',
+            'subject' => 'nullable|string',
+        ]);
+
+        $engine = new TemplateVariableEngine();
+        $allVars = [];
+        $sources = [];
+
+        // 1. Extract from template HTML
+        if (!empty($validated['template_id'])) {
+            $template = EmailTemplate::where('organization_id', Auth::user()->organization_id ?? 1)
+                ->findOrFail($validated['template_id']);
+            $templateVars = $engine->extractVariables($template->html_content ?? '');
+            foreach ($templateVars as $v) {
+                if (!isset($sources[$v])) $sources[$v] = [];
+                $sources[$v][] = 'template';
+            }
+            $allVars = array_merge($allVars, $templateVars);
+        }
+
+        // 2. Extract from body content
+        if (!empty($validated['body'])) {
+            $bodyVars = $engine->extractVariables($validated['body']);
+            foreach ($bodyVars as $v) {
+                if (!isset($sources[$v])) $sources[$v] = [];
+                $sources[$v][] = 'content';
+            }
+            $allVars = array_merge($allVars, $bodyVars);
+        }
+
+        // 3. Extract from subject line
+        if (!empty($validated['subject'])) {
+            $subjectVars = $engine->extractVariables($validated['subject']);
+            foreach ($subjectVars as $v) {
+                if (!isset($sources[$v])) $sources[$v] = [];
+                $sources[$v][] = 'subject';
+            }
+            $allVars = array_merge($allVars, $subjectVars);
+        }
+
+        // Deduplicate and exclude 'content' (reserved for template content injection)
+        $uniqueVars = array_values(array_unique($allVars));
+        $uniqueVars = array_filter($uniqueVars, fn($v) => $v !== 'content');
+
+        $result = [];
+        foreach ($uniqueVars as $var) {
+            $result[] = [
+                'name' => $var,
+                'sources' => array_unique($sources[$var] ?? []),
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'variables' => array_values($result),
+        ]);
     }
 }

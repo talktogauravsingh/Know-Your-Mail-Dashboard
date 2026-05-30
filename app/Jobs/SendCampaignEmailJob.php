@@ -22,6 +22,16 @@ class SendCampaignEmailJob implements ShouldQueue
 
     protected $assignment;
 
+    /**
+     * Maximum number of attempts before the job is failed
+     */
+    public $tries = 3;
+
+    /**
+     * Number of seconds to wait before retrying the job
+     */
+    public $backoff = [10, 60, 300];  // 10s, 60s, 5min
+
     public function __construct(RecipientSegmentAssignment $assignment)
     {
         $this->assignment = $assignment;
@@ -91,10 +101,21 @@ class SendCampaignEmailJob implements ShouldQueue
 
         try {
             // Prepare variables for substitution
+            // Start with core fields that are always available
             $variables = [
                 'name' => $recipient->name ?? '',
                 'email' => $recipient->email,
             ];
+
+            // Apply dynamic variable mappings from campaign settings
+            // Maps template variables to CSV column headers stored in recipient attributes
+            $mappings = $campaign->variable_mappings ?? [];
+            $attributes = $recipient->attributes ?? [];
+            foreach ($mappings as $templateVar => $csvHeader) {
+                if ($csvHeader && isset($attributes[$csvHeader])) {
+                    $variables[$templateVar] = $attributes[$csvHeader];
+                }
+            }
 
             // Determine the email subject (variant subject always takes precedence)
             $subject = $variant->subject;
@@ -149,10 +170,20 @@ class SendCampaignEmailJob implements ShouldQueue
 
         } catch (\Exception $e) {
             Log::error("Failed to send email to {$recipient->email}: " . $e->getMessage());
-            $sendLog->update([
-                'status' => 'failed',
-                'response' => substr($e->getMessage(), 0, 255),
-            ]);
+            if ($sendLog) {
+                $sendLog->update([
+                    'status' => 'failed',
+                    'response' => substr($e->getMessage(), 0, 255),
+                ]);
+            }
+            
+            // Release the job back to the queue for retry
+            if ($this->attempts() <= $this->tries) {
+                $this->release($this->backoff[$this->attempts() - 1] ?? 300);
+            } else {
+                // Job exceeded max attempts, fail it permanently
+                $this->fail($e);
+            }
         }
     }
 }
