@@ -27,6 +27,7 @@ class TrackingController extends Controller
             if ($sendLog && !$sendLog->opened_at) {
                 $sendLog->update(['opened_at' => Carbon::now()]);
                 $this->trackingService->logTracking($sendLog, $request, 'open');
+                \App\Jobs\EvaluateTriggerAutomationJob::dispatch($sendLog, 'open');
             }
         } catch (\Exception $e) {
             Log::warning('Tracking open failed: ' . $e->getMessage());
@@ -46,6 +47,7 @@ class TrackingController extends Controller
 
     public function ClickMailTrack(Request $request)
     {
+        $url = $request->query('url');
         try {
             $sendLog = SendLog::find($request->route('sendLog'));
 
@@ -53,12 +55,12 @@ class TrackingController extends Controller
                 $sendLog->increment('clicks_count');
                 $sendLog->update(['last_activity_at' => now()]);
                 $this->trackingService->logTracking($sendLog, $request, 'click');
+                \App\Jobs\EvaluateTriggerAutomationJob::dispatch($sendLog, 'click', $url);
             }
         } catch (\Exception $e) {
             Log::warning('Tracking click failed: ' . $e->getMessage());
         }
         
-        $url = $request->query('url');
         if ($url) {
             return redirect($url);
         }

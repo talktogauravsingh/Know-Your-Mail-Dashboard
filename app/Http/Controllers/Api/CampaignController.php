@@ -17,6 +17,7 @@ class CampaignController extends Controller
     public function index(Request $request)
     {
         $campaigns = Campaign::where('organization_id', Auth::user()->organization_id ?? 1)
+            ->with(['variants'])
             ->withCount([
                 'sendLogs as sent_count',
                 'sendLogs as opened_count' => function ($query) {
@@ -46,6 +47,9 @@ class CampaignController extends Controller
             'sender_config_id' => 'nullable',
             'segments' => 'nullable|array',
             'segments.*.id' => 'nullable|string',
+            'segments.*.name' => 'nullable|string|max:255',
+            'segments.*.isDefault' => 'nullable|boolean',
+            'segments.*.priority' => 'nullable|integer',
             'segments.*.filters' => 'nullable|array',
             'segments.*.filters.*.field' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_]+$/'],
             'segments.*.filters.*.field_name' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_]+$/'],
@@ -92,6 +96,7 @@ class CampaignController extends Controller
     public function show($id)
     {
         $campaign = Campaign::where('organization_id', Auth::user()->organization_id ?? 1)
+            ->with(['variants'])
             ->findOrFail($id);
         
         return response()->json($campaign);
@@ -117,6 +122,9 @@ class CampaignController extends Controller
             'audience_segment' => 'nullable|string',
             'segments' => 'nullable|array',
             'segments.*.id' => 'nullable|string',
+            'segments.*.name' => 'nullable|string|max:255',
+            'segments.*.isDefault' => 'nullable|boolean',
+            'segments.*.priority' => 'nullable|integer',
             'segments.*.filters' => 'nullable|array',
             'segments.*.filters.*.field' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_]+$/'],
             'segments.*.filters.*.field_name' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_]+$/'],

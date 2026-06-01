@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         if (Schema::hasTable('payment_transactions') && $this->columnType('payment_transactions', 'status') !== 'integer') {
             DB::statement("
                 ALTER TABLE payment_transactions
@@ -57,6 +61,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         if (Schema::hasTable('payment_transactions') && $this->columnType('payment_transactions', 'status') === 'integer') {
             DB::statement("
                 ALTER TABLE payment_transactions

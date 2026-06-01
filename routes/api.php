@@ -127,3 +127,13 @@ Route::middleware('auth:sanctum')->prefix('smtp-configurations')->group(function
     Route::delete('/{smtpConfiguration}', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'destroy']);
     Route::post('/{smtpConfiguration}/activate', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'activate']);
 });
+
+Route::middleware('auth:sanctum')->prefix('automations')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'store']);
+    Route::get('/{automation}', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'show']);
+    Route::patch('/{automation}', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'update']);
+    Route::delete('/{automation}', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'destroy']);
+    Route::post('/{automation}/toggle', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'toggle']);
+});
+
