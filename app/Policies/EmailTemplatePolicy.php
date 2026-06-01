@@ -21,7 +21,8 @@ class EmailTemplatePolicy
      */
     public function view(User $user, EmailTemplate $template)
     {
-        return $user->organization_id === $template->organization_id;
+        return $user->organization_id === $template->organization_id
+            || $template->is_public;
     }
 
     /**

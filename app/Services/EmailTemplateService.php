@@ -131,6 +131,45 @@ class EmailTemplateService
         // Reconstruct the full HTML document
         return '<!doctype html><html><head>' . $purifiedHead . '</head><body style="' . e($bodyStyle) . '">' . $safeBody . '</body></html>';
     }
+
+    /**
+     * Generate a PNG thumbnail for the given template using a headless browser.
+     * Returns the publicly accessible URL (Storage::url) or null on failure.
+     *
+     * Note: this method requires the `spatie/browsershot` package and a working
+     * headless Chrome/Chromium environment. If the package is not installed this
+     * method will simply return null.
+     */
+    public function generateThumbnail(EmailTemplate $template): ?string
+    {
+        try {
+            if (!class_exists(\Spatie\Browsershot\Browsershot::class)) {
+                return null;
+            }
+
+            $html = $this->render($template, []);
+
+            $fileName = 'email-template-thumbnails/template-' . $template->id . '-' . time() . '.png';
+            $storagePath = storage_path('app/public/' . $fileName);
+
+            // Ensure directory exists
+            $dir = dirname($storagePath);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+
+            \Spatie\Browsershot\Browsershot::html($html)
+                ->windowSize(1200, 630)
+                ->deviceScaleFactor(2)
+                ->waitUntilNetworkIdle()
+                ->save($storagePath);
+
+            return \Illuminate\Support\Facades\Storage::url($fileName);
+        } catch (\Throwable $e) {
+            logger()->error('Thumbnail generation failed for template ' . $template->id . ': ' . $e->getMessage());
+            return null;
+        }
+    }
 }
 
 

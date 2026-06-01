@@ -6,6 +6,7 @@ use App\Http\Requests\StoreEmailTemplateRequest;
 use App\Http\Requests\UpdateEmailTemplateRequest;
 use App\Models\EmailTemplate;
 use App\Services\EmailTemplateService;
+use App\Jobs\GenerateTemplateThumbnail;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,9 +18,15 @@ class EmailTemplateController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $templates = EmailTemplate::where('organization_id', $request->user()->organization_id)
+        $organizationId = $request->user()->organization_id;
+
+        $templates = EmailTemplate::where(function ($query) use ($organizationId) {
+                $query->where('organization_id', $organizationId)
+                      ->orWhere('is_public', true);
+            })
             ->orderBy('updated_at', 'desc')
             ->get();
+
         return response()->json($templates);
     }
 
@@ -33,6 +40,12 @@ class EmailTemplateController extends Controller
         $data['created_by'] = $request->user()->id;
         $data['updated_by'] = $request->user()->id;
         $template = EmailTemplate::create($data);
+        // Dispatch a queued job to generate a thumbnail (best-effort, non-blocking)
+        try {
+            GenerateTemplateThumbnail::dispatch($template->id);
+        } catch (\Throwable $e) {
+            logger()->error('Failed to dispatch thumbnail job on store: ' . $e->getMessage());
+        }
         return response()->json($template, 201);
     }
 
@@ -54,6 +67,12 @@ class EmailTemplateController extends Controller
         $data = $request->validated();
         $data['updated_by'] = $request->user()->id;
         $template->update($data);
+        // Dispatch a queued job to regenerate the thumbnail (best-effort)
+        try {
+            GenerateTemplateThumbnail::dispatch($template->id);
+        } catch (\Throwable $e) {
+            logger()->error('Failed to dispatch thumbnail job on update: ' . $e->getMessage());
+        }
         return response()->json($template);
     }
 

@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import api from '../lib/api.js';
-import { mockTemplates } from '../lib/mockData';
 
 export const useStore = create((set, get) => ({
   user: null,
@@ -177,13 +176,19 @@ toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : '
   },
 
   // Templates – fetch from API
-  templates: mockTemplates,
+  templates: [],
   templatesLoading: false,
   fetchTemplates: async () => {
     set({ templatesLoading: true });
     try {
       const { data } = await api.get('/email-templates');
-      set({ templates: data, templatesLoading: false });
+      const normalized = (data ?? []).map((template) => ({
+        ...template,
+        name: template.template_name || template.name || template.slug || 'Untitled Template',
+        description: template.description || template.preview_text || template.subject || '',
+        avgOpenRate: template.avg_open_rate || template.avgOpenRate || '-',
+      }));
+      set({ templates: normalized, templatesLoading: false });
     } catch (error) {
       console.error('Failed to fetch templates:', error);
       set({ templatesLoading: false });
