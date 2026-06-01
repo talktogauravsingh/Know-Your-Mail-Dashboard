@@ -15,7 +15,9 @@ class Conversion extends Model
         'value',
         'currency',
         'event_time',
-        'metadata'
+        'metadata',
+        'cta_redirect_id',
+        'event_id',
     ];
 
     protected $casts = [
@@ -37,6 +39,11 @@ class Conversion extends Model
     public function campaign()
     {
         return $this->belongsTo(Campaign::class);
+    }
+
+    public function ctaRedirect()
+    {
+        return $this->belongsTo(CtaRedirect::class, 'cta_redirect_id');
     }
 }
 

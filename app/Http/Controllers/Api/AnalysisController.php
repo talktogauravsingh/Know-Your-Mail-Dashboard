@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Campaign;
+use App\Models\CtaRedirect;
 use App\Models\Recipient;
 use App\Models\SendLog;
 use App\Models\User;
@@ -225,6 +226,7 @@ class AnalysisController extends Controller
 
         $request->validate([
             'campaign_id' => 'required|exists:campaigns,id',
+            'redirect_uuid' => 'nullable|uuid|exists:cta_redirects,uuid',
             'email' => 'required|email',
             'value' => 'required|numeric|min:0',
             'currency' => 'string|max:3|default:USD',
@@ -233,13 +235,23 @@ class AnalysisController extends Controller
 
         $campaign = Campaign::forUser($user)->findOrFail($request->campaign_id);
 
-        Conversion::create([
+        $conversionData = [
             'campaign_id' => $request->campaign_id,
             'email' => $request->email,
             'value' => $request->value,
             'currency' => $request->currency ?? 'USD',
             'metadata' => $request->metadata,
-        ]);
+        ];
+
+        if ($request->redirect_uuid) {
+            $ctaRedirect = CtaRedirect::where('uuid', $request->redirect_uuid)->first();
+            if (!$ctaRedirect || $ctaRedirect->campaign_id !== $request->campaign_id) {
+                abort(422, 'Invalid conversion redirect identifier.');
+            }
+            $conversionData['cta_redirect_id'] = $ctaRedirect->id;
+        }
+
+        Conversion::create($conversionData);
 
         $convs = Conversion::where('campaign_id', $request->campaign_id)->forUserHierarchy($user);
         return response()->json([

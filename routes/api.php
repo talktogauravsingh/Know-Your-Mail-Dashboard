@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\BulkRecipientController;
 use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\Api\CampaignController;
+use App\Http\Controllers\Api\CtaRedirectController;
 use App\Http\Controllers\Tracking\TrackingController;
 
 Route::get('/user', function (Request $request) {
@@ -18,6 +19,13 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 Route::get('/insights/org', [\App\Http\Controllers\Api\SegmentationController::class, 'getOrgInsights'])->middleware('auth:sanctum');
+
+Route::post('/cta/redirect', [CtaRedirectController::class, 'redirect']);
+Route::get('/r/{token}', [CtaRedirectController::class, 'getRedirect'])->name('cta.redirect.get');
+Route::post('/cta/conversion', [CtaRedirectController::class, 'recordConversion']);
+Route::post('/conversions/server-event', [CtaRedirectController::class, 'recordServerEvent']);
+Route::post('/sdk/debug', [CtaRedirectController::class, 'debug']);
+Route::middleware('auth:sanctum')->post('/cta/generate-token', [CtaRedirectController::class, 'generateToken']);
 
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register'])->middleware('throttle:5,1');
