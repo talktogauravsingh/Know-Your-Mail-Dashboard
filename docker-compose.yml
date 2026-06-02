@@ -1,0 +1,56 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mail_tracker_app
+    restart: unless-stopped
+    volumes:
+      - .:/var/www/html
+    networks:
+      - mail_tracker_net
+    environment:
+      # These environment variables align with your .env
+      - APP_ENV=${APP_ENV:-local}
+      - DB_CONNECTION=${DB_CONNECTION:-pgsql}
+      - DB_HOST=${DB_HOST:-aws-1-ap-northeast-2.pooler.supabase.com}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_DATABASE=${DB_DATABASE:-postgres}
+      - DB_USERNAME=${DB_USERNAME:-postgres.dtlisdqyoticllzhufju}
+      - DB_PASSWORD=${DB_PASSWORD:-yUYYZYf3152uZyPa}
+      - CACHE_STORE=${CACHE_STORE:-redis}
+      - REDIS_CLIENT=${REDIS_CLIENT:-phpredis}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  web:
+    image: nginx:alpine
+    container_name: mail_tracker_nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - .:/var/www/html
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
+    networks:
+      - mail_tracker_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: mail_tracker_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mail_tracker_net
+
+networks:
+  mail_tracker_net:
+    driver: bridge
+
+volumes:
+  redis_data:
