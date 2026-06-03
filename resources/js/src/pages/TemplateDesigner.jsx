@@ -239,7 +239,7 @@ export default function TemplateDesigner() {
       return html;
     }
 
-    return `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><style>body{margin:0;padding:${fullHtmlStyle.padding}px;background:${fullHtmlStyle.background};color:${fullHtmlStyle.textColor};font-size:${fullHtmlStyle.fontSize}px;line-height:${fullHtmlStyle.lineHeight};text-align:${fullHtmlStyle.align};}</style></head><body>${html}</body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><style>body{margin:0;padding:${fullHtmlStyle.padding}px;background:${fullHtmlStyle.background};color:${fullHtmlStyle.textColor};font-size:${fullHtmlStyle.fontSize}px;line-height:${fullHtmlStyle.lineHeight};text-align:${fullHtmlStyle.align};box-sizing:border-box;overflow-wrap:break-word;word-break:break-word;}</style></head><body>${html}</body></html>`;
   };
 
   const addSection = (type) => {
@@ -262,10 +262,20 @@ export default function TemplateDesigner() {
           : '',
       buttonText: type === 'button' ? 'Call to action' : 'Learn more',
       align: 'left',
-      textColor: '#0F172A',
-      fontSize: 18,
+      textColor: type === 'content' ? '#475569' : '#0F172A',
+      backgroundColor:
+        type === 'hero'
+          ? '#f8fafc'
+          : type === 'featureRow'
+          ? '#ffffff'
+          : type === 'footer'
+          ? '#f8fafc'
+          : type === 'content'
+          ? '#f1f5f9'
+          : undefined,
+      fontSize: type === 'content' ? 16 : 18,
       fontWeight: 'medium',
-      lineHeight: 1.5,
+      lineHeight: type === 'content' ? 1.6 : 1.5,
       padding: { top: 24, right: 24, bottom: 24, left: 24 },
       cards:
         type === 'featureRow'
@@ -285,6 +295,7 @@ export default function TemplateDesigner() {
             ]
           : [],
       image: '',
+      linkUrl: '',
     };
     updateSections((prev) => [...prev, newSection]);
     setSelectedSectionId(nextId);
@@ -339,32 +350,56 @@ export default function TemplateDesigner() {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
 
+  const emailPreviewStyles = `
+    body{margin:0;padding:24px;background:#f8fafc;font-family:Inter,system-ui,sans-serif;box-sizing:border-box;overflow-wrap:break-word;word-break:break-word;}
+    .email-section{box-sizing:border-box;width:100%;overflow-wrap:break-word;word-break:break-word;}
+    .email-section .container{max-width:720px;width:100%;box-sizing:border-box;margin:0 auto;}
+    .feature-row{display:flex;flex-wrap:wrap;gap:16px;}
+    .feature-card{flex:1 1 calc(33.333% - 16px);min-width:220px;width:100%;box-sizing:border-box;background:#f8fafc;border-radius:24px;padding:20px;overflow-wrap:break-word;word-break:break-word;}
+    .feature-card h3,.feature-card p{overflow-wrap:break-word;word-break:break-word;}
+    .footer-row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px;}
+    .footer-row > div{min-width:0;}
+    .two-columns,.three-columns{display:flex;flex-wrap:wrap;gap:16px;}
+    .two-columns .column{flex:1 1 calc(50% - 16px);min-width:220px;width:100%;box-sizing:border-box;background:#f8fafc;border-radius:24px;padding:24px;}
+    .three-columns .column{flex:1 1 calc(33.333% - 16px);min-width:220px;width:100%;box-sizing:border-box;background:#f8fafc;border-radius:24px;padding:24px;}
+    .button-link{display:inline-block;padding:14px 28px;border-radius:999px;background:#4f46e5;color:#fff;text-decoration:none;}
+    @media (max-width: 620px) {
+      .feature-card,.two-columns .column,.three-columns .column{flex:1 1 100% !important;min-width:0 !important;width:100% !important;}
+    }
+  `;
+
   const renderSectionHtml = (section) => {
     const padding = section.padding || { top: 24, right: 24, bottom: 24, left: 24 };
-    const sectionStyle = `padding:${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px; text-align:${section.align || 'left'}; color:${section.textColor || '#0F172A'}; font-size:${section.fontSize || 18}px; line-height:${section.lineHeight || 1.5};`;
+    const defaultBackground = section.backgroundColor ?? (section.type === 'hero' ? '#f8fafc' : section.type === 'featureRow' ? '#ffffff' : section.type === 'footer' ? '#f8fafc' : section.type === 'content' ? '#f1f5f9' : '');
+    const backgroundStyle = defaultBackground ? `background:${defaultBackground};` : '';
+    const sectionStyle = `padding:${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px; text-align:${section.align || 'left'}; color:${section.textColor || '#0F172A'}; font-size:${section.fontSize || 18}px; line-height:${section.lineHeight || 1.5}; ${backgroundStyle} box-sizing:border-box; width:100%; overflow-wrap:break-word; word-break:break-word;`;
 
     switch (section.type) {
       case 'hero':
-        return `<section style="${sectionStyle} background:#f8fafc; border-radius:28px; margin-bottom:28px;"><div style="max-width:720px; margin:0 auto;"><p style="margin:0 0 12px; font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:#6366f1;">Hi ${escapeHtml('{{customer_name}}')},</p><h1 style="margin:0 0 16px; font-size:32px; font-weight:700;">${escapeHtml(section.heading)}</h1><p style="margin:0 0 24px;">${escapeHtml(section.content)}</p><a href="#" style="display:inline-block; padding:14px 28px; border-radius:999px; background:#4f46e5; color:#fff; text-decoration:none;">${escapeHtml(section.buttonText)}</a></div></section>`;
+        return `<section class="email-section" style="${sectionStyle} border-radius:28px; margin-bottom:28px;"><div class="container"><p style="margin:0 0 12px; font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:#6366f1;">Hi ${escapeHtml('{{customer_name}}')},</p><h1 style="margin:0 0 16px; font-size:32px; font-weight:700;">${escapeHtml(section.heading)}</h1><p style="margin:0 0 24px;">${escapeHtml(section.content)}</p><a href="#" class="button-link">${escapeHtml(section.buttonText)}</a></div></section>`;
       case 'featureRow':
-        return `<section style="${sectionStyle} background:#ffffff; border-radius:28px; margin-bottom:28px;"><div style="max-width:720px; margin:0 auto;"><h2 style="margin:0 0 24px; font-size:24px; font-weight:700;">${escapeHtml(section.title)}</h2><div style="display:flex; flex-wrap:wrap; gap:16px;">${section.cards
+        return `<section class="email-section" style="${sectionStyle} border-radius:28px; margin-bottom:28px;"><div class="container"><h2 style="margin:0 0 24px; font-size:24px; font-weight:700;">${escapeHtml(section.title)}</h2><div class="feature-row">${section.cards
           .map(
             (card) =>
-              `<div style="flex:1 1 calc(33.333% - 16px); min-width:220px; background:#f8fafc; border-radius:24px; padding:20px;"><h3 style="margin:0 0 12px; font-size:18px;">${escapeHtml(card.title)}</h3><p style="margin:0; color:#475569;">${escapeHtml(card.description)}</p></div>`
+              `<div class="feature-card"><h3 style="margin:0 0 12px; font-size:18px;">${escapeHtml(card.title)}</h3><p style="margin:0; color:#475569;">${escapeHtml(card.description)}</p></div>`
           )
           .join('')}</div></div></section>`;
       case 'footer':
-        return `<section style="${sectionStyle} background:#f8fafc; border-radius:28px; margin-bottom:28px; color:#475569;"><div style="max-width:720px; margin:0 auto; display:flex; flex-wrap:wrap; justify-content:space-between; gap:16px;"><div><p style="margin:0 0 8px; font-weight:700; color:#0f172a;">${escapeHtml(section.company)}</p><p style="margin:0 0 4px;">${escapeHtml(section.address)}</p><p style="margin:0;">${escapeHtml(section.email)}</p></div><p style="margin:0;">${escapeHtml(section.year)} © ${escapeHtml(section.company)}. All rights reserved.</p></div></section>`;
+        return `<section class="email-section" style="${sectionStyle} border-radius:28px; margin-bottom:28px; color:#475569;"><div class="container footer-row"><div><p style="margin:0 0 8px; font-weight:700; color:#0f172a;">${escapeHtml(section.company)}</p><p style="margin:0 0 4px;">${escapeHtml(section.address)}</p><p style="margin:0;">${escapeHtml(section.email)}</p></div><p style="margin:0;">${escapeHtml(section.year)} © ${escapeHtml(section.company)}. All rights reserved.</p></div></section>`;
       case 'html':
         return `<section style="${sectionStyle}">${section.content || ''}</section>`;
       case 'heading':
         return `<section style="${sectionStyle} margin-bottom:28px;"><h2 style="margin:0; font-size:28px; font-weight:700;">${escapeHtml(section.heading)}</h2></section>`;
       case 'content':
-        return `<div class="content-zone" style="${sectionStyle} border:2px dashed #cbd5e1; border-radius:12px; background:#f1f5f9; min-height:200px;">{{content}}</div>`;
+        return `<div class="content-zone" style="${sectionStyle} border:2px dashed #cbd5e1; border-radius:12px; min-height:200px;">{{content}}</div>`;
       case 'button':
         return `<section style="${sectionStyle} margin-bottom:28px;"><a href="#" style="display:inline-block; padding:14px 28px; border-radius:999px; background:#4f46e5; color:#fff; text-decoration:none;">${escapeHtml(section.buttonText)}</a></section>`;
-      case 'image':
-        return `<section style="${sectionStyle} margin-bottom:28px;"><div style="width:100%; min-height:240px; background:#e2e8f0; display:flex; align-items:center; justify-content:center; color:#64748b;">Image Placeholder</div></section>`;
+      case 'image': {
+        const imageMarkup = section.image
+          ? `<img src="${escapeHtml(section.image)}" alt="" style="width:100%; height:auto; display:block; border-radius:16px;" />`
+          : `<div style="width:100%; min-height:240px; background:#e2e8f0; display:flex; align-items:center; justify-content:center; color:#64748b;">Image Placeholder</div>`;
+        return `<section style="${sectionStyle} margin-bottom:28px;">${section.linkUrl ? `<a href="${escapeHtml(section.linkUrl)}" style="display:block; text-decoration:none;">${imageMarkup}</a>` : imageMarkup}</section>`;
+      }
       case 'divider':
         return `<section style="${sectionStyle} margin-bottom:28px;"><hr style="border:none; height:1px; background:#e2e8f0;" /></section>`;
       case 'spacer':
@@ -372,9 +407,9 @@ export default function TemplateDesigner() {
       case 'oneColumn':
         return `<section style="${sectionStyle} margin-bottom:28px;"><div style="background:#f8fafc; border-radius:24px; padding:24px;">1 Column layout block</div></section>`;
       case 'twoColumns':
-        return `<section style="${sectionStyle} margin-bottom:28px; display:flex; gap:16px; flex-wrap:wrap;"><div style="flex:1 1 45%; background:#f8fafc; border-radius:24px; padding:24px;">Column 1</div><div style="flex:1 1 45%; background:#f8fafc; border-radius:24px; padding:24px;">Column 2</div></section>`;
+        return `<section class="email-section" style="${sectionStyle} margin-bottom:28px;"><div class="container two-columns"><div class="column">Column 1</div><div class="column">Column 2</div></div></section>`;
       case 'threeColumns':
-        return `<section style="${sectionStyle} margin-bottom:28px; display:flex; gap:16px; flex-wrap:wrap;"><div style="flex:1 1 30%; background:#f8fafc; border-radius:24px; padding:24px;">Column 1</div><div style="flex:1 1 30%; background:#f8fafc; border-radius:24px; padding:24px;">Column 2</div><div style="flex:1 1 30%; background:#f8fafc; border-radius:24px; padding:24px;">Column 3</div></section>`;
+        return `<section class="email-section" style="${sectionStyle} margin-bottom:28px;"><div class="container three-columns"><div class="column">Column 1</div><div class="column">Column 2</div><div class="column">Column 3</div></div></section>`;
       default:
         return `<section style="${sectionStyle} margin-bottom:28px;"><p>${escapeHtml(section.content || '')}</p></section>`;
     }
@@ -385,7 +420,7 @@ export default function TemplateDesigner() {
       return getFullHtmlDocument();
     }
 
-    return `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${escapeHtml(templateName)}</title></head><body style="margin:0; padding:24px; background:#f8fafc; font-family:Inter, system-ui, sans-serif;">${sections.map(renderSectionHtml).join('')}</body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${escapeHtml(templateName)}</title><style>${emailPreviewStyles}</style></head><body style="margin:0; padding:24px; background:#f8fafc; font-family:Inter, system-ui, sans-serif; box-sizing:border-box; overflow-wrap:break-word; word-break:break-word;">${sections.map(renderSectionHtml).join('')}</body></html>`;
   };
 
   const mapTemplateForStore = (template) => ({
@@ -898,6 +933,8 @@ function SectionEditor({ section, updateSection, insertVariable, deleteSection, 
   const lineHeights = [1, 1.25, 1.5];
 
   const setValue = (key, value) => updateSection(section.id, { [key]: value });
+  const currentBackground = section.backgroundColor ?? (section.type === 'hero' ? '#f8fafc' : section.type === 'featureRow' ? '#ffffff' : section.type === 'footer' ? '#f8fafc' : section.type === 'content' ? '#f1f5f9' : '#ffffff');
+  const currentTextColor = section.textColor ?? '#0F172A';
 
   const sectionLabelMap = {
     hero: 'Hero section',
@@ -986,7 +1023,10 @@ function SectionEditor({ section, updateSection, insertVariable, deleteSection, 
           )}
 
           {section.type === 'image' && (
-            <InputField label="Image URL" value={section.image || ''} onChange={(value) => setValue('image', value)} />
+            <>
+              <InputField label="Image URL" value={section.image || ''} onChange={(value) => setValue('image', value)} />
+              <InputField label="CTA Link URL" value={section.linkUrl || ''} onChange={(value) => setValue('linkUrl', value)} />
+            </>
           )}
 
           {section.type === 'html' && (
@@ -1012,106 +1052,113 @@ function SectionEditor({ section, updateSection, insertVariable, deleteSection, 
       </div>
 
       <div>
-        {section.type !== 'content' && (
           <div>
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-slate-700">Text Styling</p>
               <p className="text-xs text-slate-400">Applies to this block</p>
             </div>
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="text-sm font-medium text-slate-700">Background Color</label>
+                <input
+                  type="color"
+                  value={currentBackground}
+                  onChange={(e) => setValue('backgroundColor', e.target.value)}
+                  className="mt-3 w-full h-12 rounded-xl border border-slate-200 p-1"
+                />
+              </div>
 
-        <div className="mt-4 space-y-4">
-          <div>
-            <label className="text-sm font-medium text-slate-700">Text Color</label>
-            <input
-              type="color"
-              value={section.textColor || '#0F172A'}
-              onChange={(e) => setValue('textColor', e.target.value)}
-              className="mt-3 w-full h-12 rounded-xl border border-slate-200 p-1"
-            />
-          </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700">Text Color</label>
+                <input
+                  type="color"
+                  value={currentTextColor}
+                  onChange={(e) => setValue('textColor', e.target.value)}
+                  className="mt-3 w-full h-12 rounded-xl border border-slate-200 p-1"
+                />
+              </div>
 
-          <div>
-            <label className="text-sm font-medium text-slate-700">Font Size</label>
-            <input
-              type="range"
-              min={12}
-              max={48}
-              value={section.fontSize || 18}
-              onChange={(e) => setValue('fontSize', Number(e.target.value))}
-              className="w-full mt-3"
-            />
-            <div className="mt-2 text-sm text-slate-500">{section.fontSize || 18}px</div>
-          </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700">Font Size</label>
+                <input
+                  type="range"
+                  min={12}
+                  max={48}
+                  value={section.fontSize || 18}
+                  onChange={(e) => setValue('fontSize', Number(e.target.value))}
+                  className="w-full mt-3"
+                />
+                <div className="mt-2 text-sm text-slate-500">{section.fontSize || 18}px</div>
+              </div>
 
-          <div>
-            <label className="text-sm font-medium text-slate-700">Font Weight</label>
-            <div className="grid grid-cols-4 gap-2 mt-3">
-              {fontWeights.map((weight) => (
-                <button
-                  key={weight}
-                  type="button"
-                  onClick={() => setValue('fontWeight', weight)}
-                  className={`h-11 rounded-xl border text-sm font-medium ${
-                    section.fontWeight === weight
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {weight.charAt(0).toUpperCase() + weight.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-slate-700">Line Height</label>
-            <div className="grid grid-cols-3 gap-2 mt-3">
-              {lineHeights.map((lineHeight) => (
-                <button
-                  key={lineHeight}
-                  type="button"
-                  onClick={() => setValue('lineHeight', lineHeight)}
-                  className={`h-11 rounded-xl border text-sm font-medium ${
-                    section.lineHeight === lineHeight
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {lineHeight}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-slate-700">Alignment</label>
-            <div className="grid grid-cols-3 gap-3 mt-3">
-              <AlignButton icon={<AlignLeft />} active={section.align === 'left'} onClick={() => setValue('align', 'left')} />
-              <AlignButton icon={<AlignCenter />} active={section.align === 'center'} onClick={() => setValue('align', 'center')} />
-              <AlignButton icon={<AlignRight />} active={section.align === 'right'} onClick={() => setValue('align', 'right')} />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-slate-700">Padding</label>
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              {['top', 'right', 'bottom', 'left'].map((side) => (
-                <div key={side}>
-                  <p className="text-xs uppercase text-slate-400 mb-2">{side}</p>
-                  <input
-                    type="number"
-                    min={0}
-                    value={section.padding?.[side] ?? 24}
-                    onChange={(e) => setValue('padding', { ...section.padding, [side]: Number(e.target.value) })}
-                    className="w-full h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500"
-                  />
+              <div>
+                <label className="text-sm font-medium text-slate-700">Font Weight</label>
+                <div className="grid grid-cols-4 gap-2 mt-3">
+                  {fontWeights.map((weight) => (
+                    <button
+                      key={weight}
+                      type="button"
+                      onClick={() => setValue('fontWeight', weight)}
+                      className={`h-11 rounded-xl border text-sm font-medium ${
+                        section.fontWeight === weight
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {weight.charAt(0).toUpperCase() + weight.slice(1)}
+                    </button>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700">Line Height</label>
+                <div className="grid grid-cols-3 gap-2 mt-3">
+                  {lineHeights.map((lineHeight) => (
+                    <button
+                      key={lineHeight}
+                      type="button"
+                      onClick={() => setValue('lineHeight', lineHeight)}
+                      className={`h-11 rounded-xl border text-sm font-medium ${
+                        section.lineHeight === lineHeight
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {lineHeight}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700">Alignment</label>
+                <div className="grid grid-cols-3 gap-3 mt-3">
+                  <AlignButton icon={<AlignLeft />} active={section.align === 'left'} onClick={() => setValue('align', 'left')} />
+                  <AlignButton icon={<AlignCenter />} active={section.align === 'center'} onClick={() => setValue('align', 'center')} />
+                  <AlignButton icon={<AlignRight />} active={section.align === 'right'} onClick={() => setValue('align', 'right')} />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700">Padding</label>
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  {['top', 'right', 'bottom', 'left'].map((side) => (
+                    <div key={side}>
+                      <p className="text-xs uppercase text-slate-400 mb-2">{side}</p>
+                      <input
+                        type="number"
+                        min={0}
+                        value={section.padding?.[side] ?? 24}
+                        onChange={(e) => setValue('padding', { ...section.padding, [side]: Number(e.target.value) })}
+                        className="w-full h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-            </div>
-          )}
       </div>
 
       <div>
@@ -1334,12 +1381,12 @@ function SortableSection({ section, selectedSection, setSelectedSection, duplica
               paddingLeft: section.padding?.left,
             }}
           >
-            <div className="max-w-2xl mx-auto" style={{ textAlign: section.align }}>
-              <p className="text-sm uppercase tracking-[0.35em] text-indigo-600">Hi {'{{customer_name}}'},</p>
-              <h2 className="text-3xl font-bold text-slate-900 mt-4">{section.heading}</h2>
-              <p className="mt-3 text-base text-slate-600">{section.content}</p>
+            <div className="max-w-2xl mx-auto break-words" style={{ textAlign: section.align }}>
+              <p className="text-sm uppercase tracking-[0.35em] text-indigo-600 break-words">Hi {'{{customer_name}}'},</p>
+              <h2 className="text-3xl font-bold text-slate-900 mt-4 break-words">{section.heading}</h2>
+              <p className="mt-3 text-base text-slate-600 break-words">{section.content}</p>
               <div className="mt-8 flex justify-center">
-                <button className="rounded-2xl bg-indigo-600 px-8 py-3 text-white font-medium shadow-lg shadow-indigo-100">
+                <button className="rounded-2xl bg-indigo-600 px-8 py-3 text-white font-medium shadow-lg shadow-indigo-100 break-words">
                   {section.buttonText}
                 </button>
               </div>
@@ -1352,12 +1399,12 @@ function SortableSection({ section, selectedSection, setSelectedSection, duplica
             <h2 className="text-xl font-semibold text-slate-900 mb-8">{section.title}</h2>
             <div className="grid gap-6 md:grid-cols-3">
               {section.cards.map((card, cardIndex) => (
-                <div key={cardIndex} className="rounded-3xl bg-white p-6 text-center shadow-sm border border-slate-200">
+                <div key={cardIndex} className="rounded-3xl bg-white p-6 text-center shadow-sm border border-slate-200 break-words">
                   <div className="mb-4 h-14 w-14 rounded-3xl bg-indigo-50 flex items-center justify-center mx-auto">
                     <Sparkles className="w-6 h-6 text-indigo-600" />
                   </div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">{card.title}</h3>
-                  <p className="text-sm text-slate-500">{card.description}</p>
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2 break-words">{card.title}</h3>
+                  <p className="text-sm text-slate-500 break-words">{card.description}</p>
                 </div>
               ))}
             </div>

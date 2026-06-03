@@ -27,6 +27,7 @@ export default function Templates() {
   const [currentTemplate, setCurrentTemplate] = useState(null);
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewMode, setPreviewMode] = useState('mobile');
   const [formData, setFormData] = useState({ name: '', category: 'Newsletter', description: '' });
 
   const handleOpenCreate = () => {
@@ -42,6 +43,7 @@ export default function Templates() {
     e.preventDefault();
     setModalMode('preview');
     setCurrentTemplate(template);
+    setPreviewMode('mobile');
     setIsModalOpen(true);
     setPreviewLoading(true);
     setPreviewHtml('');
@@ -231,7 +233,7 @@ export default function Templates() {
       {/* Modal Overlay */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-200 dark:border-slate-800">
+          <div className={`bg-white dark:bg-slate-950 rounded-2xl shadow-xl w-full overflow-hidden border border-slate-200 dark:border-slate-800 ${modalMode === 'preview' ? 'max-w-5xl' : 'max-w-lg'} max-h-[calc(100vh-4rem)] overflow-auto`}>
             <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-800">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
                 {modalMode === 'create' && 'Create Custom Template'}
@@ -264,14 +266,32 @@ export default function Templates() {
                     </p>
                   </div>
                   
-                  <div className="w-full">
+                  <div className="flex flex-col gap-3">
+                    <div className="inline-flex rounded-full bg-slate-100/80 dark:bg-slate-900/80 p-1 border border-slate-200 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewMode('mobile')}
+                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${previewMode === 'mobile' ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950 dark:text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50'}`}>
+                        Mobile
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewMode('desktop')}
+                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${previewMode === 'desktop' ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950 dark:text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50'}`}>
+                        Desktop
+                      </button>
+                    </div>
                     {previewLoading ? (
                       <div className="w-full h-64 flex items-center justify-center">
                         <Skeleton className="h-5 w-3/4" />
                       </div>
                     ) : (
-                      <div className="w-full h-[60vh] overflow-auto border border-slate-100 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-950 p-4">
-                        <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                      <div className="w-full flex justify-center">
+                        <div className={`overflow-hidden ${previewMode === 'mobile' ? 'max-w-[420px] rounded-[32px] border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 shadow-sm' : 'w-full max-w-[900px] rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 shadow-sm'}`}>
+                          <div className="h-[60vh] min-h-[420px] overflow-auto bg-white dark:bg-slate-950 p-4">
+                            <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
