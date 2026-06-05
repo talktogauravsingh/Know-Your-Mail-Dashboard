@@ -127,3 +127,25 @@ Route::middleware('auth:sanctum')->prefix('smtp-configurations')->group(function
     Route::delete('/{smtpConfiguration}', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'destroy']);
     Route::post('/{smtpConfiguration}/activate', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'activate']);
 });
+
+Route::middleware('auth:sanctum')->prefix('domains')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\SenderDomainController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\Api\SenderDomainController::class, 'store']);
+    Route::delete('/{id}', [\App\Http\Controllers\Api\SenderDomainController::class, 'destroy']);
+    Route::post('/{id}/verify', [\App\Http\Controllers\Api\SenderDomainController::class, 'verify']);
+    Route::post('/{id}/cloudflare', [\App\Http\Controllers\Api\SenderDomainController::class, 'provisionCloudflare']);
+});
+
+Route::middleware('auth:sanctum')->prefix('smtp-credentials')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\SmtpCredentialController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\Api\SmtpCredentialController::class, 'store']);
+    Route::put('/{id}', [\App\Http\Controllers\Api\SmtpCredentialController::class, 'update']);
+    Route::delete('/{id}', [\App\Http\Controllers\Api\SmtpCredentialController::class, 'destroy']);
+    Route::post('/{id}/test-send', [\App\Http\Controllers\Api\SmtpCredentialController::class, 'testSend']);
+});
+
+Route::middleware('auth:sanctum')->prefix('suppressions')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\SuppressionController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\Api\SuppressionController::class, 'store']);
+    Route::delete('/{id}', [\App\Http\Controllers\Api\SuppressionController::class, 'destroy']);
+});

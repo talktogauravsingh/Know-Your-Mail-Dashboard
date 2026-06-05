@@ -53,12 +53,10 @@ class SendCampaignEmailJob implements ShouldQueue
             ->where('status', 1)
             ->first();
         
-        // If config found, set dynamically. Otherwise it falls back to .env default
+        // If config found, set dynamically. Otherwise it falls back to organization SmtpCredential
         if ($config) {
-
             config([
                 'mail.default' => 'smtp',
-
                 'mail.mailers.smtp.transport' => 'smtp',
                 'mail.mailers.smtp.host' => $config->host,
                 'mail.mailers.smtp.port' => $config->port,
@@ -67,7 +65,6 @@ class SendCampaignEmailJob implements ShouldQueue
                     : null,
                 'mail.mailers.smtp.username' => $config->username,
                 'mail.mailers.smtp.password' => trim($config->password),
-
                 'mail.from' => [
                     'address' => $config->from_address,
                     'name' => $config->from_name,
@@ -77,7 +74,50 @@ class SendCampaignEmailJob implements ShouldQueue
             app()->forgetInstance('mail.manager');
             app()->forgetInstance('mailer');
         } else {
-            Log::warning("SMTP Config not found for Campaign {$campaign->id}, using default.");
+            // Re-evaluate using our generated SmtpCredential for the organization
+            $credential = \App\Models\SmtpCredential::where('organization_id', $campaign->organization_id)
+                ->where('is_active', true)
+                ->whereNotNull('encrypted_password')
+                ->first();
+
+            if ($credential) {
+                try {
+                    $plainPassword = \Illuminate\Support\Facades\Crypt::decryptString($credential->encrypted_password);
+                    $fromDomain = $credential->domain?->domain;
+                    
+                    if (!$fromDomain) {
+                        // Fall back to first verified domain under organization
+                        $verifiedDomain = \App\Models\SenderDomain::where('organization_id', $campaign->organization_id)
+                            ->where('status', 'verified')
+                            ->first();
+                        $fromDomain = $verifiedDomain?->domain;
+                    }
+
+                    if ($fromDomain) {
+                        config([
+                            'mail.default' => 'smtp',
+                            'mail.mailers.smtp.transport' => 'smtp',
+                            'mail.mailers.smtp.host' => '127.0.0.1',
+                            'mail.mailers.smtp.port' => 25,
+                            'mail.mailers.smtp.encryption' => null,
+                            'mail.mailers.smtp.username' => $credential->username,
+                            'mail.mailers.smtp.password' => $plainPassword,
+                            'mail.from' => [
+                                'address' => 'campaign@' . $fromDomain,
+                                'name' => $campaign->name ?? 'KYM Campaign',
+                            ],
+                        ]);
+                        app()->forgetInstance('mail.manager');
+                        app()->forgetInstance('mailer');
+                    } else {
+                        Log::warning("No verified domain found for SmtpCredential in Campaign {$campaign->id}.");
+                    }
+                } catch (\Exception $e) {
+                    Log::error("Failed to decrypt SMTP Credential password for Campaign {$campaign->id}: " . $e->getMessage());
+                }
+            } else {
+                Log::warning("SMTP Config and SmtpCredential not found for Campaign {$campaign->id}, using default.");
+            }
         }
 
         $sendLog = SendLog::where('campaign_id', $campaign->id)

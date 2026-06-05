@@ -19,9 +19,10 @@ services:
       - DB_USERNAME=${DB_USERNAME:-postgres.dtlisdqyoticllzhufju}
       - DB_PASSWORD=${DB_PASSWORD:-yUYYZYf3152uZyPa}
       - CACHE_STORE=${CACHE_STORE:-redis}
-      - REDIS_CLIENT=${REDIS_CLIENT:-phpredis}
+      - REDIS_CLIENT=${REDIS_CLIENT:-predis}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-kym_encryption_secret_key_32_bytes_long_key_!}
 
   web:
     image: nginx:alpine
