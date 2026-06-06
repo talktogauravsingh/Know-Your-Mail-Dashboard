@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Http;
+use Psr\Http\Message\ResponseInterface;
 
 class EmailAIService
 {
@@ -34,6 +36,25 @@ class EmailAIService
             'status' => $response->status(),
             'body' => $response->body(),
         ];
+    }
+
+    public function generateStream(array $payload): ResponseInterface
+    {
+        $client = new Client([
+            'base_uri' => rtrim($this->base, '/') . '/',
+            'timeout' => 0,
+            'http_errors' => false,
+        ]);
+
+        return $client->post('api/v1/email/generate-stream', [
+            'headers' => [
+                'X-API-Key' => $this->key,
+                'Accept' => 'text/event-stream',
+                'Content-Type' => 'application/json',
+            ],
+            'json' => $payload,
+            'stream' => true,
+        ]);
     }
 
     public function spamCheck(array $payload): array

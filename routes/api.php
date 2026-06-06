@@ -101,6 +101,7 @@ Route::get('/c/{requestUserId}', [TrackingController::class, 'ClickMailTrack']);
 Route::prefix('v1')->group(function () {
     Route::post('spam/check', [\App\Http\Controllers\Api\EmailAIController::class, 'spamCheck']);
     Route::post('email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate']);
+    Route::post('email/generate-stream', [\App\Http\Controllers\Api\EmailAIController::class, 'generateStream']);
     Route::post('email/rewrite', [\App\Http\Controllers\Api\EmailAIController::class, 'rewrite']);
     Route::post('email/score', [\App\Http\Controllers\Api\EmailAIController::class, 'score']);
     Route::get('health', [\App\Http\Controllers\Api\EmailAIController::class, 'health']);

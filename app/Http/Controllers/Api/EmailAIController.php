@@ -10,6 +10,7 @@ use App\Http\Requests\ScoreEmailAIRequest;
 use App\Http\Resources\EmailAIVariantResource;
 use App\Models\EmailAIVariant;
 use App\Services\EmailAIService;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmailAIController extends Controller
 {
@@ -51,6 +52,47 @@ class EmailAIController extends Controller
                 'request' => $data,
                 'source' => 'email-ai-service',
             ],
+        ]);
+    }
+
+    public function generateStream(GenerateEmailAIRequest $request): StreamedResponse
+    {
+        $data = $request->validated();
+
+        try {
+            $remote = $this->service->generateStream($data);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'error' => true,
+                'message' => 'AI streaming service unavailable',
+                'details' => $e->getMessage(),
+            ], 503);
+        }
+
+        if ($remote->getStatusCode() >= 400) {
+            return response()->json([
+                'error' => true,
+                'status' => $remote->getStatusCode(),
+                'body' => (string) $remote->getBody(),
+            ], $remote->getStatusCode());
+        }
+
+        return response()->stream(function () use ($remote) {
+            $body = $remote->getBody();
+
+            while (!$body->eof()) {
+                echo $body->read(1024);
+                flush();
+
+                if (connection_aborted()) {
+                    break;
+                }
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'Connection' => 'keep-alive',
+            'X-Accel-Buffering' => 'no',
         ]);
     }
 
