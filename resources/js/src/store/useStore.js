@@ -14,6 +14,15 @@ export const useStore = create((set, get) => ({
   billingLoading: false,
   billingCheckoutLoading: false,
 
+  // Custom microservices state
+  domains: [],
+  domainsLoading: false,
+  smtpCredentials: [],
+  smtpCredentialsLoading: false,
+  suppressions: [],
+  suppressionsTotal: 0,
+  suppressionsLoading: false,
+
   // Persistence helpers
   persistAuth: (user, token) => {
     localStorage.setItem('authUser', JSON.stringify(user));
@@ -332,6 +341,170 @@ toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : '
       get().addToast('SMTP configuration activated successfully', 'success');
     } catch (error) {
       get().addToast(error.response?.data?.message || 'Failed to activate SMTP configuration', 'error');
+    }
+  },
+
+  // Domains
+  fetchDomains: async () => {
+    set({ domainsLoading: true });
+    try {
+      const { data } = await api.get('/domains');
+      set({ domains: data, domainsLoading: false });
+    } catch (error) {
+      get().addToast('Failed to fetch domains', 'error');
+      set({ domainsLoading: false });
+    }
+  },
+  addDomain: async (domainName) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.post('/domains', { domain: domainName });
+      get().fetchDomains();
+      get().addToast('Domain registered successfully', 'success');
+      return data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to register domain', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  deleteDomain: async (id) => {
+    try {
+      await api.delete(`/domains/${id}`);
+      get().fetchDomains();
+      get().addToast('Domain removed successfully', 'success');
+    } catch (error) {
+      get().addToast('Failed to remove domain', 'error');
+    }
+  },
+  verifyDomain: async (id) => {
+    try {
+      const { data } = await api.post(`/domains/${id}/verify`);
+      get().fetchDomains();
+      if (data.status === 'verified') {
+        get().addToast('Domain verified successfully!', 'success');
+      } else {
+        get().addToast('Domain DNS verification check completed.', 'success');
+      }
+      return data;
+    } catch (error) {
+      get().addToast('DNS verification check failed', 'error');
+    }
+  },
+  provisionCloudflare: async (id, payload) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.post(`/domains/${id}/cloudflare`, payload);
+      get().fetchDomains();
+      if (data.status === 'verified') {
+        get().addToast('Cloudflare records added and domain verified successfully!', 'success');
+      } else {
+        get().addToast('Cloudflare records added successfully. Verifying...', 'success');
+      }
+      return data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to provision Cloudflare DNS records', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  // SMTP Credentials (Haraka Relay)
+  fetchSmtpCredentials: async () => {
+    set({ smtpCredentialsLoading: true });
+    try {
+      const { data } = await api.get('/smtp-credentials');
+      set({ smtpCredentials: data, smtpCredentialsLoading: false });
+    } catch (error) {
+      get().addToast('Failed to fetch SMTP relay credentials', 'error');
+      set({ smtpCredentialsLoading: false });
+    }
+  },
+  addSmtpCredential: async (payload) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.post('/smtp-credentials', {
+        username: payload.username,
+        rateLimitPerHour: payload.rateLimit,
+        domainId: payload.domainId || null
+      });
+      get().fetchSmtpCredentials();
+      get().addToast('SMTP credential generated successfully', 'success');
+      return data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to generate SMTP credential', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  updateSmtpCredential: async (id, payload) => {
+    try {
+      await api.put(`/smtp-credentials/${id}`, payload);
+      get().fetchSmtpCredentials();
+      get().addToast('SMTP credential updated successfully', 'success');
+    } catch (error) {
+      get().addToast('Failed to update SMTP credential', 'error');
+    }
+  },
+  deleteSmtpCredential: async (id) => {
+    try {
+      await api.delete(`/smtp-credentials/${id}`);
+      get().fetchSmtpCredentials();
+      get().addToast('SMTP credential revoked successfully', 'success');
+    } catch (error) {
+      get().addToast('Failed to revoke SMTP credential', 'error');
+    }
+  },
+  testSmtpCredential: async (id, payload) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.post(`/smtp-credentials/${id}/test-send`, payload);
+      get().addToast(data.message || 'Test email sent successfully!', 'success');
+      return data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to send test email', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  // Suppressions
+  fetchSuppressions: async (params = {}) => {
+    set({ suppressionsLoading: true });
+    try {
+      const { data } = await api.get('/suppressions', { params });
+      set({
+        suppressions: data.items,
+        suppressionsTotal: data.total,
+        suppressionsLoading: false
+      });
+    } catch (error) {
+      get().addToast('Failed to fetch suppressions', 'error');
+      set({ suppressionsLoading: false });
+    }
+  },
+  addSuppression: async (payload) => {
+    set({ isLoading: true });
+    try {
+      await api.post('/suppressions', payload);
+      get().addToast('Email added to suppression list', 'success');
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to add suppression', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  deleteSuppression: async (id) => {
+    try {
+      await api.delete(`/suppressions/${id}`);
+      get().addToast('Suppression removed successfully', 'success');
+    } catch (error) {
+      get().addToast('Failed to remove suppression', 'error');
     }
   },
 }));

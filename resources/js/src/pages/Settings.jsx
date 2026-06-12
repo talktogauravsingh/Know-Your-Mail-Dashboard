@@ -21,8 +21,13 @@ import {
     Plus,
     Trash2,
     Server,
+    KeyRound,
+    Ban,
 } from "lucide-react";
 import { useStore } from "../store/useStore";
+import SenderDomains from "./settings/SenderDomains";
+import SmtpCredentials from "./settings/SmtpCredentials";
+import Suppressions from "./settings/Suppressions";
 
 function formatMoney(amountMinor = 0, currency = "INR") {
     const safeAmountMinor = Number(amountMinor) || 0;
@@ -175,8 +180,10 @@ export default function Settings() {
     const tabs = [
         { id: "profile", label: "My Profile", icon: User },
         { id: "team", label: "Team Management", icon: Users },
-        { id: "integrations", label: "Email Integrations", icon: Mail },
+        { id: "integrations", label: "Third-Party SMTP", icon: Mail },
         { id: "domains", label: "Sender Domains", icon: Globe },
+        { id: "smtp-credentials", label: "SMTP Relay Keys", icon: KeyRound },
+        { id: "suppressions", label: "Suppression List", icon: Ban },
     ];
 
     return (
@@ -445,64 +452,15 @@ export default function Settings() {
                     )}
 
                     {activeTab === "domains" && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between">
-                                    <div>
-                                        <CardTitle>Sender Domains</CardTitle>
-                                        <CardDescription>
-                                            Authenticate your domains to improve
-                                            deliverability.
-                                        </CardDescription>
-                                    </div>
-                                    <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
-                                        <Globe className="w-4 h-4" /> Add Domain
-                                    </Button>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
-                                        <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
-                                            <div className="flex items-center gap-3">
-                                                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                                                <div>
-                                                    <p className="font-bold text-sm text-slate-900 dark:text-slate-50">
-                                                        emailtracker.io
-                                                    </p>
-                                                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                                                        Authenticated (DKIM,
-                                                        SPF, DMARC)
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Button variant="ghost" size="sm">
-                                                Manage DNS
-                                            </Button>
-                                        </div>
-                                        <div className="flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-900/50">
-                                            <div className="flex items-center gap-3">
-                                                <AlertCircle className="w-5 h-5 text-amber-500" />
-                                                <div>
-                                                    <p className="font-bold text-sm text-slate-900 dark:text-slate-50">
-                                                        marketing-updates.com
-                                                    </p>
-                                                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                                                        Pending Verification - 2
-                                                        records missing
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="bg-white dark:bg-slate-950"
-                                            >
-                                                Verify Now
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                        <SenderDomains setActiveTab={setActiveTab} />
+                    )}
+
+                    {activeTab === "smtp-credentials" && (
+                        <SmtpCredentials />
+                    )}
+
+                    {activeTab === "suppressions" && (
+                        <Suppressions />
                     )}
 
                     {activeTab === "integrations" && (

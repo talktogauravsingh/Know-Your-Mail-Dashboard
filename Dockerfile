@@ -3,25 +3,12 @@ FROM php:8.3-fpm-alpine
 # Set working directory
 WORKDIR /var/www/html
 
-# Install essential system dependencies and PHP extensions
-# Added postgresql-dev for pdo_pgsql since .env uses PostgreSQL
-RUN apk update && apk add --no-cache \
-    postgresql-dev \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
-    libzip-dev \
-    zip \
-    unzip \
-    git \
-    linux-headers \
-    $PHPIZE_DEPS \
-    && pecl install redis \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_pgsql gd zip pcntl \
-    && docker-php-ext-enable redis \
-    && apk del $PHPIZE_DEPS \
-    && rm -rf /var/cache/apk/*
+# Install mlocati's PHP extension installer to speed up extension building
+ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
+
+RUN chmod +x /usr/local/bin/install-php-extensions && \
+    apk update && apk add --no-cache git zip unzip && \
+    install-php-extensions pdo_pgsql
 
 # Install Composer securely from the official image
 COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
