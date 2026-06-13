@@ -6,7 +6,7 @@ export const useStore = create((set, get) => ({
   user: null,
   token: null,
   authInitialized: false,
-  theme: 'light',
+  theme: localStorage.getItem('theme') || 'light',
   isLoading: false,
   billingSummary: null,
   billingPlans: [],
@@ -94,7 +94,11 @@ export const useStore = create((set, get) => ({
     }
   },
 
-toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
+  toggleTheme: () => set((state) => {
+    const newTheme = state.theme === 'light' ? 'dark' : 'light';
+    localStorage.setItem('theme', newTheme);
+    return { theme: newTheme };
+  }),
 
   // Toasts
   toasts: [],
