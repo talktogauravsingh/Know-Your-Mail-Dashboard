@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Tracking;
 use App\Http\Controllers\Controller;
 use App\Http\Services\Tracking\TrackingService;
 use App\Models\SendLog;
+use App\Jobs\EnrichTrackingDataJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -27,6 +28,12 @@ class TrackingController extends Controller
             if ($sendLog && !$sendLog->opened_at) {
                 $sendLog->update(['opened_at' => Carbon::now()]);
                 $this->trackingService->logTracking($sendLog, $request, 'open');
+                dispatch(new EnrichTrackingDataJob(
+                    $sendLog->id,
+                    $request->ip(),
+                    $request->header('User-Agent', ''),
+                    $request->header('Referer', '')
+                ));
             }
         } catch (\Exception $e) {
             Log::warning('Tracking open failed: ' . $e->getMessage());
@@ -53,6 +60,12 @@ class TrackingController extends Controller
                 $sendLog->increment('clicks_count');
                 $sendLog->update(['last_activity_at' => now()]);
                 $this->trackingService->logTracking($sendLog, $request, 'click');
+                dispatch(new EnrichTrackingDataJob(
+                    $sendLog->id,
+                    $request->ip(),
+                    $request->header('User-Agent', ''),
+                    $request->header('Referer', '')
+                ));
             }
         } catch (\Exception $e) {
             Log::warning('Tracking click failed: ' . $e->getMessage());

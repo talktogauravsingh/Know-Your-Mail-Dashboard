@@ -88,11 +88,9 @@ class TrackingService
         $os = $this->getOSName($userAgent);
         $deviceType = $this->getDeviceType($userAgent);
         $referrer = $this->getReferrer($request);
-        $region = $this->getRegion($ipAddress);
 
         return [
             'ip_address' => $ipAddress,
-            'region' => $region,
             'browser' => $browser,
             'os' => $os,
             'device_type' => $deviceType,
@@ -107,7 +105,6 @@ class TrackingService
         $sendLog->update([
             'tracking_data' => $data,
             'last_activity_at' => now(),
-            'region' => $data['region']
         ]);
         return $data;
     }
