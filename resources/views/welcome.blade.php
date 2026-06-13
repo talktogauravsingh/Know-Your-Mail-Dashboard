@@ -10,6 +10,13 @@
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
+        <!-- Theme Initialization to prevent FOUC -->
+        <script>
+            if (localStorage.getItem('theme') === 'dark') {
+                document.documentElement.classList.add('dark');
+            }
+        </script>
+
         <!-- Styles / Scripts -->
         @viteReactRefresh
         @vite(['resources/css/app.css', 'resources/js/src/main.jsx'])
