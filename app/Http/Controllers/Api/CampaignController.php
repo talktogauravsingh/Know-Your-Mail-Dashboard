@@ -34,8 +34,8 @@ class CampaignController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'subject' => 'required|string|max:255',
-            'body' => 'required|string',
+            'subject' => 'nullable|string|max:255',
+            'body' => 'nullable|string',
             'template_id' => [
                 'nullable',
                 Rule::exists('email_templates', 'id')->where(function ($query) {
@@ -61,13 +61,15 @@ class CampaignController extends Controller
             'schedule_time' => 'nullable|string',
             'variable_mappings' => 'nullable|array',
             'variable_mappings.*' => 'nullable|string|max:255',
+            'wizard_step' => 'nullable|integer|min:1|max:5',
+            'recipient_source' => 'nullable|string|in:org,campaign',
         ]);
 
         $campaign = Campaign::create([
             'organization_id' => Auth::user()->organization_id ?? 1,
             'name' => $validated['name'],
-            'subject' => $validated['subject'],
-            'body' => $validated['body'],
+            'subject' => $validated['subject'] ?? '',
+            'body' => $validated['body'] ?? '',
             'template_id' => $validated['template_id'] ?? null,
             'cta_url' => $this->formatUrl($validated['cta_link'] ?? null),
             'sender_config_id' => $validated['sender_config_id'] ?? null,
@@ -79,6 +81,8 @@ class CampaignController extends Controller
             'schedule_days' => $validated['schedule_days'] ?? null,
             'schedule_time' => $validated['schedule_time'] ?? null,
             'variable_mappings' => $validated['variable_mappings'] ?? null,
+            'wizard_step' => $validated['wizard_step'] ?? 1,
+            'recipient_source' => $validated['recipient_source'] ?? 'campaign',
             'user_id' => Auth::id(),
         ]);
 
@@ -92,7 +96,64 @@ class CampaignController extends Controller
     public function show($id)
     {
         $campaign = Campaign::where('organization_id', Auth::user()->organization_id ?? 1)
+            ->with(['variants.filterGroups.filters', 'template'])
             ->findOrFail($id);
+
+        $moduleType = $campaign->recipient_source === 'org' ? 1 : 2;
+        $moduleId = $campaign->recipient_source === 'org' ? ($campaign->organization_id ?? 1) : $campaign->id;
+
+        $insights = DB::table('campaign_csv_insights')
+            ->where('module_type', $moduleType)
+            ->where('module_id', $moduleId)
+            ->get();
+        
+        $headers = $insights->pluck('field_name')->toArray();
+        if (!in_array('email', $headers)) {
+            array_unshift($headers, 'email');
+        }
+        if (!in_array('name', $headers)) {
+            $headers[] = 'name';
+        }
+        if (!in_array('phone', $headers)) {
+            $headers[] = 'phone';
+        }
+
+        $sampleRecipients = DB::table('recipients')
+            ->where('module_type', $moduleType)
+            ->where('module_id', $moduleId)
+            ->limit(5)
+            ->get();
+
+        $previewRows = [];
+        foreach ($sampleRecipients as $r) {
+            $attrs = json_decode($r->attributes, true) ?: [];
+            $previewRows[] = array_merge([
+                'email' => $r->email,
+                'name' => $r->name,
+                'phone' => $r->phone,
+            ], $attrs);
+        }
+
+        $totalRows = DB::table('recipients')
+            ->where('module_type', $moduleType)
+            ->where('module_id', $moduleId)
+            ->count();
+            
+        $validRows = DB::table('recipients')
+            ->where('module_type', $moduleType)
+            ->where('module_id', $moduleId)
+            ->where('is_valid', true)
+            ->count();
+
+        $invalidRows = $totalRows - $validRows;
+
+        $campaign->recipient_preview = [
+            'headers' => $headers,
+            'preview_rows' => $previewRows,
+            'total_rows' => $totalRows,
+            'valid_rows' => $validRows,
+            'invalid_rows' => $invalidRows,
+        ];
         
         return response()->json($campaign);
     }
@@ -104,8 +165,8 @@ class CampaignController extends Controller
 
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'subject' => 'sometimes|required|string|max:255',
-            'body' => 'sometimes|required|string',
+            'subject' => 'sometimes|nullable|string|max:255',
+            'body' => 'sometimes|nullable|string',
             'template_id' => [
                 'nullable',
                 Rule::exists('email_templates', 'id')->where(function ($query) {
@@ -132,23 +193,27 @@ class CampaignController extends Controller
             'schedule_time' => 'nullable|string',
             'variable_mappings' => 'nullable|array',
             'variable_mappings.*' => 'nullable|string|max:255',
+            'wizard_step' => 'nullable|integer|min:1|max:5',
+            'recipient_source' => 'nullable|string|in:org,campaign',
         ]);
 
         $campaign->update([
             'name' => $validated['name'] ?? $campaign->name,
-            'subject' => $validated['subject'] ?? $campaign->subject,
-            'body' => $validated['body'] ?? $campaign->body,
-            'template_id' => $validated['template_id'] ?? $campaign->template_id,
+            'subject' => array_key_exists('subject', $validated) ? $validated['subject'] : $campaign->subject,
+            'body' => array_key_exists('body', $validated) ? $validated['body'] : $campaign->body,
+            'template_id' => array_key_exists('template_id', $validated) ? $validated['template_id'] : $campaign->template_id,
             'cta_url' => isset($validated['cta_link']) ? $this->formatUrl($validated['cta_link']) : $campaign->cta_url,
-            'sender_config_id' => $validated['sender_config_id'] ?? $campaign->sender_config_id,
+            'sender_config_id' => array_key_exists('sender_config_id', $validated) ? $validated['sender_config_id'] : $campaign->sender_config_id,
             'segmentation_mode' => $request->input('segmentation_mode', $campaign->segmentation_mode),
             'status' => $validated['status'] ?? $campaign->status,
             'schedule_type' => $validated['schedule_type'] ?? $campaign->schedule_type,
-            'scheduled_at' => isset($validated['scheduled_at']) ? $validated['scheduled_at'] : $campaign->scheduled_at,
-            'schedule_frequency' => $validated['schedule_frequency'] ?? $campaign->schedule_frequency,
-            'schedule_days' => isset($validated['schedule_days']) ? $validated['schedule_days'] : $campaign->schedule_days,
-            'schedule_time' => isset($validated['schedule_time']) ? $validated['schedule_time'] : $campaign->schedule_time,
-            'variable_mappings' => isset($validated['variable_mappings']) ? $validated['variable_mappings'] : $campaign->variable_mappings,
+            'scheduled_at' => array_key_exists('scheduled_at', $validated) ? $validated['scheduled_at'] : $campaign->scheduled_at,
+            'schedule_frequency' => array_key_exists('schedule_frequency', $validated) ? $validated['schedule_frequency'] : $campaign->schedule_frequency,
+            'schedule_days' => array_key_exists('schedule_days', $validated) ? $validated['schedule_days'] : $campaign->schedule_days,
+            'schedule_time' => array_key_exists('schedule_time', $validated) ? $validated['schedule_time'] : $campaign->schedule_time,
+            'variable_mappings' => array_key_exists('variable_mappings', $validated) ? $validated['variable_mappings'] : $campaign->variable_mappings,
+            'wizard_step' => $validated['wizard_step'] ?? $campaign->wizard_step,
+            'recipient_source' => $validated['recipient_source'] ?? $campaign->recipient_source,
         ]);
 
         if (isset($validated['segments'])) {

@@ -44,17 +44,20 @@ class EnrichTrackingDataJob implements ShouldQueue
         $os         = $trackingService->getOSName($this->userAgent);
         $deviceType = $trackingService->getDeviceType($this->userAgent);
 
+        $existing = $sendLog->tracking_data ?? [];
+        $newData = [
+            'ip_address'  => $this->ipAddress,
+            'region'      => $region,
+            'browser'     => $browser,
+            'os'          => $os,
+            'device_type' => $deviceType,
+            'user_agent'  => $this->userAgent,
+            'referrer'    => $this->referrer,
+        ];
+
         $sendLog->update([
             'region'        => $region,
-            'tracking_data' => [
-                'ip_address'  => $this->ipAddress,
-                'region'      => $region,
-                'browser'     => $browser,
-                'os'          => $os,
-                'device_type' => $deviceType,
-                'user_agent'  => $this->userAgent,
-                'referrer'    => $this->referrer,
-            ],
+            'tracking_data' => array_merge($existing, $newData),
         ]);
 
         Log::debug("EnrichTrackingDataJob: send_log #{$this->sendLogId} enriched with region={$region}");

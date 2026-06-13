@@ -70,6 +70,7 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/campaigns" element={<Campaigns />} />
           <Route path="/campaigns/new" element={<CreateCampaign />} />
+          <Route path="/campaigns/:id/edit" element={<CreateCampaign />} />
           <Route path="/campaigns/:id" element={<CampaignAnalytics />} />
           <Route path="/templates" element={<Templates />} />
           <Route path="/templates/builder" element={<TemplateBuilder />} />
