@@ -142,6 +142,7 @@ export default function CreateCampaign() {
   const smtpConfigurations = useStore((state) => state.smtpConfigurations);
   const templates = useStore((state) => state.templates);
   const fetchTemplates = useStore((state) => state.fetchTemplates);
+  const fetchSmtpConfigurations = useStore((state) => state.fetchSmtpConfigurations);
   const user = useStore((state) => state.user);
   const selectedTemplate = templates.find(t => String(t.id) === String(templateId));
 
@@ -150,7 +151,8 @@ export default function CreateCampaign() {
 
   useEffect(() => {
     fetchTemplates().catch(() => {});
-  }, [fetchTemplates]);
+    fetchSmtpConfigurations().catch(() => {});
+  }, [fetchTemplates, fetchSmtpConfigurations]);
 
   useEffect(() => {
     if (templateId && selectedTemplate) {

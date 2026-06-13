@@ -90,9 +90,23 @@ class AnalysisController extends Controller
         // Hourly Opens
         $hourlyOpens = [];
         $startTime = $campaign->created_at;
+        $endTime = $startTime->copy()->addHours(10);
+        
+        $openedAtList = (clone $sendLogs)
+            ->whereBetween('opened_at', [$startTime, $endTime])
+            ->pluck('opened_at')
+            ->map(function($date) {
+                return \Carbon\Carbon::parse($date);
+            });
+
         for ($i = 0; $i < 10; $i++) {
             $time = $startTime->copy()->addHours($i);
-            $count = (clone $sendLogs)->whereBetween('opened_at', [$time, $time->copy()->addHour()])->count();
+            $nextTime = $time->copy()->addHour();
+            
+            $count = $openedAtList->filter(function($openedAt) use ($time, $nextTime) {
+                return $openedAt->between($time, $nextTime);
+            })->count();
+            
             $hourlyOpens[] = ['time' => $time->format('H:i'), 'opens' => $count];
         }
 
@@ -276,18 +290,33 @@ class AnalysisController extends Controller
 
         // Trends (last 7 days)
         $trends = [];
+        $startDate = now()->subDays(6)->startOfDay();
+        $dateStrings = [];
         for ($i = 6; $i >= 0; $i--) {
-            $date = now()->subDays($i)->format('Y-m-d');
-            $dayLogs = SendLog::whereHas('campaign', function($q) use ($user) {
+            $dateStrings[] = now()->subDays($i)->format('Y-m-d');
+        }
+        
+        $trendData = SendLog::whereHas('campaign', function($q) use ($user) {
                 $q->where('organization_id', $user->organization_id);
-            })->whereDate('sent_at', $date);
-            
-            $daySent = (clone $dayLogs)->count();
-            $dayOpened = (clone $dayLogs)->whereNotNull('opened_at')->count();
+            })
+            ->where('sent_at', '>=', $startDate)
+            ->select(
+                DB::raw('DATE(sent_at) as sent_date'),
+                DB::raw('COUNT(*) as total_sent'),
+                DB::raw('COUNT(opened_at) as total_opened')
+            )
+            ->groupBy(DB::raw('DATE(sent_at)'))
+            ->get()
+            ->keyBy('sent_date');
+
+        foreach ($dateStrings as $dateStr) {
+            $dayData = $trendData->get($dateStr);
+            $daySent = $dayData ? $dayData->total_sent : 0;
+            $dayOpened = $dayData ? $dayData->total_opened : 0;
             $dayOpenRate = $daySent > 0 ? round(($dayOpened / $daySent) * 100, 1) : 0;
             
             $trends[] = [
-                'date' => now()->subDays($i)->format('D'),
+                'date' => \Carbon\Carbon::parse($dateStr)->format('D'),
                 'openRate' => $dayOpenRate
             ];
         }

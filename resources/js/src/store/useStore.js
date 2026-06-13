@@ -89,9 +89,6 @@ export const useStore = create((set, get) => ({
       const { data } = await api.get('/user');
       const token = get().token;
       get().persistAuth(data, token);
-      get().fetchSmtpConfigurations();
-      get().fetchBillingSummary();
-      get().fetchBillingPlans();
     } catch {
       get().clearAuth();
     }
