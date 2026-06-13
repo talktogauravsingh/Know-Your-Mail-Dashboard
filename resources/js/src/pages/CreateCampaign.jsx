@@ -4,7 +4,7 @@ import { Button } from '../components/ui/Button';
 import { Input, Label } from '../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import { Select } from '../components/ui/Select';
-import { ArrowLeft, Save, Send, Layers, CheckCircle2, AlertCircle, Upload, Calendar, Clock, Sparkles, Wand2, Activity, Filter, Users } from 'lucide-react';
+import { ArrowLeft, Save, Send, Layers, CheckCircle2, AlertCircle, Upload, Calendar, Clock, Sparkles, Wand2, Activity, Filter, Users, Loader2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { CsvPreviewPanel } from '../components/CsvPreview';
 import { SegmentationEngine } from '../components/SegmentationEngine';

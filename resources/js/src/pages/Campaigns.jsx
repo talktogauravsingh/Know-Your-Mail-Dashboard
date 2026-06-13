@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
+import api from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
@@ -30,6 +31,7 @@ export default function Campaigns() {
     fetchCampaigns, 
     addToast 
   } = useStore();
+  const navigate = useNavigate();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -142,23 +144,144 @@ export default function Campaigns() {
     return date.toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric' });
   };
 
-  // Duplicate Action (Mocked locally in state)
-  const handleDuplicate = (campaign) => {
-    const cloned = {
-      ...campaign,
-      id: Math.floor(Math.random() * 10000) + 2000,
-      name: `${campaign.name} (Copy)`,
-      status: 'draft',
-      sent_count: 0,
-      opened_count: 0,
-      total_clicks: 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-    
-    useStore.setState({ campaigns: [cloned, ...campaigns] });
-    addToast(`Campaign "${campaign.name}" duplicated as Draft!`, 'success');
+  const getDuplicateName = (originalName, existingNames) => {
+    let newName = '';
+    const copyRegex = /\s\(Copy\)$/;
+    const copyNumRegex = /\s\(Copy\s(\d+)\)$/;
+
+    if (copyNumRegex.test(originalName)) {
+      const match = originalName.match(copyNumRegex);
+      const num = parseInt(match[1], 10);
+      const base = originalName.replace(copyNumRegex, '');
+      newName = `${base} (Copy ${num + 1})`;
+    } else if (copyRegex.test(originalName)) {
+      const base = originalName.replace(copyRegex, '');
+      newName = `${base} (Copy 1)`;
+    } else {
+      newName = `${originalName} (Copy)`;
+    }
+
+    let finalName = newName;
+    let attempt = 1;
+    while (existingNames.includes(finalName.toLowerCase())) {
+      if (copyNumRegex.test(finalName)) {
+        const match = finalName.match(copyNumRegex);
+        const num = parseInt(match[1], 10);
+        const base = finalName.replace(copyNumRegex, '');
+        finalName = `${base} (Copy ${num + 1})`;
+      } else if (copyRegex.test(finalName)) {
+        const base = finalName.replace(copyRegex, '');
+        finalName = `${base} (Copy 1)`;
+      } else {
+        finalName = `${finalName} (Copy ${attempt})`;
+        attempt++;
+      }
+    }
+    return finalName;
+  };
+
+  const handleDuplicate = async (campaign) => {
     setActiveMenuId(null);
+    try {
+      const existingNames = campaigns.map(c => (c.name || '').toLowerCase());
+      const newName = getDuplicateName(campaign.name || 'Untitled', existingNames);
+
+      const response = await api.get(`/campaigns/${campaign.id}`);
+      const fullCampaign = response.data;
+
+      const formattedSegments = [];
+      const formattedVariants = {};
+
+      if (fullCampaign.variants && fullCampaign.variants.length > 0) {
+        fullCampaign.variants.forEach((v) => {
+          const isDefault = v.is_default || v.name === 'Default';
+          const segmentId = isDefault ? 'default' : `temp_${v.id}`;
+          
+          const filters = [];
+          if (v.filter_groups && v.filter_groups.length > 0) {
+            v.filter_groups[0].filters.forEach(f => {
+              filters.push({
+                field: f.field_name,
+                operator: f.operator,
+                value: f.field_value
+              });
+            });
+          }
+
+          formattedSegments.push({
+            id: segmentId,
+            name: v.name,
+            isDefault: isDefault,
+            filters: filters,
+            priority: v.priority
+          });
+
+          formattedVariants[segmentId] = {
+            subject: v.subject || '',
+            body: v.body || '',
+            cta_link: v.cta_url || ''
+          };
+        });
+      }
+
+      const duplicatePayload = {
+        name: newName,
+        subject: fullCampaign.subject || '',
+        body: fullCampaign.body || '',
+        template_id: fullCampaign.template_id,
+        cta_link: fullCampaign.cta_url,
+        sender_config_id: fullCampaign.sender_config_id,
+        segmentation_mode: fullCampaign.segmentation_mode || 'single',
+        segments: formattedSegments,
+        variants: formattedVariants,
+        status: 'draft',
+        schedule_type: fullCampaign.schedule_type || 'immediate',
+        scheduled_at: fullCampaign.scheduled_at,
+        schedule_frequency: fullCampaign.schedule_frequency,
+        schedule_days: fullCampaign.schedule_days,
+        schedule_time: fullCampaign.schedule_time,
+        variable_mappings: fullCampaign.variable_mappings,
+        wizard_step: fullCampaign.wizard_step || 1,
+        recipient_source: fullCampaign.recipient_source || 'campaign',
+      };
+
+      await api.post('/campaigns', duplicatePayload);
+      await fetchCampaigns(currentPage);
+      addToast(`Campaign "${campaign.name}" duplicated as "${newName}" (Draft)!`, 'success');
+    } catch (error) {
+      console.error('Duplication failed:', error);
+      addToast('Failed to duplicate campaign', 'error');
+    }
+  };
+
+  const [refreshingId, setRefreshingId] = useState(null);
+
+  const handleRefreshCampaign = async (campaignId) => {
+    setRefreshingId(campaignId);
+    try {
+      await fetchCampaigns(currentPage);
+      addToast('Metrics refreshed successfully!', 'success');
+    } catch (err) {
+      console.error('Refresh failed:', err);
+      addToast('Failed to refresh metrics', 'error');
+    } finally {
+      setRefreshingId(null);
+    }
+  };
+
+  const handleRescheduleCampaign = async (campaign) => {
+    setActiveMenuId(null);
+    try {
+      await api.patch(`/campaigns/${campaign.id}`, {
+        status: 'draft',
+        wizard_step: 5,
+      });
+      addToast(`Campaign "${campaign.name}" reset to draft. Redirecting...`, 'success');
+      navigate(`/campaigns/${campaign.id}/edit`);
+    } catch (err) {
+      console.error(err);
+      addToast('Failed to reschedule campaign', 'error');
+    }
   };
 
   // Delete Action (Mocked locally in state)
@@ -381,13 +504,13 @@ export default function Campaigns() {
                   {/* Actions Grid */}
                   <TableCell className="text-center py-1 pr-6 relative">
                     <div className="flex items-center justify-center gap-2">
-                      {/* Resend / Duplicate quick action */}
+                      {/* Refresh Metrics quick action */}
                       <button 
-                        onClick={() => handleDuplicate(c)} 
-                        title="Duplicate Campaign"
+                        onClick={() => handleRefreshCampaign(c.id)} 
+                        title="Refresh Metrics"
                         className="p-1 rounded text-[#626F86] hover:text-[#0052CC] dark:hover:text-[#0052CC] hover:bg-[#F4F5F7] dark:hover:bg-slate-900 transition-colors cursor-pointer"
                       >
-                        <RotateCcw className="h-4 w-4" />
+                        <RotateCcw className={`h-4 w-4 ${refreshingId === c.id ? 'animate-spin text-[#0052CC]' : ''}`} />
                       </button>
 
                       {/* Edit or Analytics Icon depending on status */}
@@ -440,6 +563,14 @@ export default function Campaigns() {
                         >
                           Duplicate Copy
                         </button>
+                        {status === 'completed' && (
+                          <button 
+                            onClick={() => handleRescheduleCampaign(c)}
+                            className="w-full text-left px-4 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-indigo-600 font-medium"
+                          >
+                            Reschedule Campaign
+                          </button>
+                        )}
                         <button 
                           onClick={() => handleDelete(c.id, c.name)}
                           className="w-full text-left px-4 py-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 font-medium border-t border-slate-100 dark:border-slate-800 mt-1"
