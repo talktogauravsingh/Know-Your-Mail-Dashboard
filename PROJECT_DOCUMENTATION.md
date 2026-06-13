@@ -3,7 +3,7 @@
 > **Version:** 1.0 · **Last updated:** June 2026
 > **Author:** VP of Engineering · **Status:** Production-ready for 100-user launch
 
----
+
 
 ## Table of Contents
 
@@ -19,7 +19,7 @@
 10. [Cost Analysis (100 Users)](#10-cost-analysis-100-users)
 11. [Scaling Roadmap](#11-scaling-roadmap)
 
----
+
 
 ## 1. Product Overview
 
@@ -45,7 +45,7 @@
 - Marketing agencies managing multiple client domains
 - SaaS companies needing white-label email sending capabilities
 
----
+
 
 ## 2. System Architecture
 
@@ -97,7 +97,7 @@
 3. **Multi-Tenant by Default** — Every resource is scoped to an `organization_id`. No data leaks between tenants.
 4. **Custom DKIM at the Application Layer** — We sign emails with per-domain DKIM keys using Nodemailer before handing them to the relay provider, ensuring full authentication alignment.
 
----
+
 
 ## 3. Service Breakdown
 
@@ -127,7 +127,7 @@
 - Suppression list management (bounces/complaints)
 - Billing dashboard with plans, history, and subscription renewals
 
----
+
 
 ### 3.2 — `kym-relay-services` (Node.js Monorepo)
 
@@ -192,7 +192,7 @@
 - **Bot opens** — Crawler/spider detection via User-Agent
 - **Proxy prefetches** — Apple Mail Privacy Protection (MPP), Google Image Proxy, Yahoo proxy detection
 
----
+
 
 ### 3.3 — Landing Page
 
@@ -202,7 +202,7 @@
 | Hosting | Cloudflare Pages |
 | Domain | `knowyourmail.in` |
 
----
+
 
 ## 4. Email Delivery Pipeline (End-to-End)
 
@@ -258,7 +258,7 @@ Email arrives in recipient's inbox
 └────────────────────────────────────────────────────────────────┘
 ```
 
----
+
 
 ## 5. Technology Stack
 
@@ -304,7 +304,7 @@ Email arrives in recipient's inbox
 | DNS/CDN | Cloudflare |
 | Payments | Razorpay |
 
----
+
 
 ## 6. API Surface
 
@@ -345,7 +345,7 @@ Email arrives in recipient's inbox
 | **Admin** | `GET /admin/organizations`, `/relay-providers`, `POST /admin/relay-providers` | JWT (Admin) |
 | **Health** | `GET /health` | Public |
 
----
+
 
 ## 7. Database Schema Overview
 
@@ -382,7 +382,7 @@ organizations
 └── roles / permissions / role_permissions / user_permissions
 ```
 
----
+
 
 ## 8. DNS & Email Authentication
 
@@ -405,7 +405,7 @@ For each customer domain, the following DNS records must be configured:
 
 > **Critical Lesson Learned:** When using Mailgun as a relay, always disable their tracking (`o:tracking=no`) and DKIM signing (`o:dkim=no`) to prevent body modification that breaks our custom DKIM signature. Also, DMARC requires exactly ONE `_dmarc` TXT record — duplicate records cause immediate DMARC FAIL.
 
----
+
 
 ## 9. Infrastructure & Deployment Guide
 
@@ -450,7 +450,414 @@ Hetzner CX23 (2 vCPU, 4GB RAM, 40GB SSD)
 4. **Cloudflare** — Free DNS, free CDN, free SSL, free DDoS protection. Also hosts the landing page via Pages (free).
 5. **Mailgun/SES** — Use Mailgun Foundation ($35/mo for 50K emails) for convenience, or switch to Amazon SES ($0.10/1K emails) for maximum savings.
 
----
+
+
+### 9.1 — Server Configuration Requirements
+
+#### Minimum Hardware Specifications
+
+| Resource | Minimum (100 Users) | Recommended (100 Users) | Growth (500 Users) |
+|:---|:---|:---|:---|
+| **CPU** | 2 vCPU | 2 vCPU (shared) | 4 vCPU |
+| **RAM** | 2 GB | 4 GB | 8 GB |
+| **Disk** | 20 GB SSD | 40 GB SSD | 80 GB SSD |
+| **Bandwidth** | 1 TB/mo | 5 TB/mo | 20 TB/mo |
+| **OS** | Ubuntu 22.04 LTS | Ubuntu 24.04 LTS | Ubuntu 24.04 LTS |
+
+**RAM Breakdown (Estimated at Idle/Low Load):**
+
+| Service | RAM Usage |
+|:---|:---|
+| Laravel (PHP-FPM, 4 workers) | ~200 MB |
+| Nginx | ~20 MB |
+| Haraka (SMTP Server) | ~80 MB |
+| BullMQ Worker (Node.js) | ~120 MB |
+| Tracker (Fastify) | ~60 MB |
+| Redis 7 | ~50 MB |
+| OS + Docker overhead | ~300 MB |
+| **Total** | **~830 MB** |
+
+> 2 GB is the absolute minimum. 4 GB gives comfortable headroom for burst traffic (campaign dispatch with 10K+ recipients).
+
+
+
+#### Operating System & Software Prerequisites
+
+| Software | Required Version | Purpose |
+|:---|:---|:---|
+| **Ubuntu Linux** | 22.04+ LTS | Server OS |
+| **Docker Engine** | 24.0+ | Container runtime |
+| **Docker Compose** | 2.20+ | Multi-container orchestration |
+| **Node.js** | 22.x LTS | Relay services, Worker, Tracker |
+| **PHP** | 8.3+ | Laravel backend |
+| **Composer** | 2.7+ | PHP dependency manager |
+| **Nginx** | 1.24+ | Reverse proxy / static file server |
+| **Git** | 2.40+ | Code deployment |
+| **Certbot** | Latest | Let's Encrypt SSL certificates (or use Cloudflare proxy) |
+
+**Installation (Ubuntu 24.04):**
+
+```bash
+# System essentials
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y curl git unzip nginx certbot python3-certbot-nginx
+
+# Docker
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+
+# Node.js 22 (via NodeSource)
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# PHP 8.3 + Extensions
+sudo add-apt-repository ppa:ondrej/php -y
+sudo apt install -y php8.3 php8.3-fpm php8.3-pgsql php8.3-redis \
+    php8.3-curl php8.3-mbstring php8.3-xml php8.3-zip php8.3-bcmath
+
+# Composer
+curl -sS https://getcomposer.org/installer | php
+sudo mv composer.phar /usr/local/bin/composer
+```
+
+
+
+#### Network & Firewall Configuration
+
+**Required Open Ports:**
+
+| Port | Protocol | Service | Direction | Notes |
+|:---|:---|:---|:---|:---|
+| **22** | TCP | SSH | Inbound | Admin access (restrict to your IP) |
+| **25** | TCP | SMTP | Inbound | Haraka — receives email from Laravel |
+| **80** | TCP | HTTP | Inbound | Nginx → Laravel SPA + API |
+| **443** | TCP | HTTPS | Inbound | Nginx → Laravel SPA + API (SSL) |
+| **587** | TCP | SMTP Submission | Inbound | Haraka — authenticated submission |
+| **3000** | TCP | Relay API | Internal only | Fastify API server |
+| **3001** | TCP | Tracker | Internal only | Fastify tracking server |
+| **5432** | TCP | PostgreSQL | Outbound (to RDS/Supabase) | Database connection |
+| **6379** | TCP | Redis | Internal only | BullMQ job queue |
+| **9000** | TCP | PHP-FPM | Internal only | Nginx ↔ PHP-FPM (Docker network) |
+
+**UFW Firewall Rules:**
+
+```bash
+# Reset and set defaults
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+# SSH (restrict to your IP for production)
+sudo ufw allow 22/tcp
+
+# Web traffic
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+# SMTP (required for email relay)
+sudo ufw allow 25/tcp
+sudo ufw allow 587/tcp
+
+# Enable firewall
+sudo ufw enable
+```
+
+> **Security Note:** Ports 3000, 3001, 6379, and 9000 should **never** be exposed to the public internet. They communicate only over Docker's internal bridge network or `127.0.0.1`.
+
+
+
+#### Database Configuration (PostgreSQL)
+
+##### Option 1: AWS RDS PostgreSQL (Recommended)
+
+**Instance Configuration:**
+
+| Parameter | Value |
+|:---|:---|
+| **Engine** | PostgreSQL 16.x |
+| **Instance Class** | db.t4g.micro (2 vCPU, 1 GB RAM) |
+| **Storage** | 20 GB gp3 SSD (3,000 IOPS baseline) |
+| **Multi-AZ** | No (Single-AZ for cost savings at 100 users) |
+| **Encryption** | Yes (AES-256, AWS managed keys) |
+| **Backup Retention** | 7 days (automated PITR) |
+| **Maintenance Window** | Sunday 03:00–04:00 UTC |
+| **Public Access** | No (VPC-only if on EC2) / Yes with IP whitelist (if on Hetzner) |
+
+**RDS Parameter Group Tuning (for db.t4g.micro):**
+
+| Parameter | Default | Recommended | Why |
+|:---|:---|:---|:---|
+| `shared_buffers` | 128 MB | `{DBInstanceClassMemory/4}` (~256 MB) | Standard PostgreSQL tuning |
+| `effective_cache_size` | 4 GB | `{DBInstanceClassMemory*3/4}` (~768 MB) | Helps query planner choose index scans |
+| `work_mem` | 4 MB | `8MB` | Sorting/hashing in queries |
+| `maintenance_work_mem` | 64 MB | `128MB` | Faster VACUUM, CREATE INDEX |
+| `max_connections` | 100 | `50` | Reduce memory per-connection overhead |
+| `log_min_duration_statement` | -1 (off) | `1000` (1s) | Log slow queries for debugging |
+| `idle_in_transaction_session_timeout` | 0 (off) | `60000` (60s) | Kill idle transactions |
+
+**Connection String Format:**
+
+```bash
+# RDS (EC2 in same VPC — no SSL needed for internal)
+DATABASE_URL=postgresql://kym_user:kym_password@kym-db.xxxxx.ap-south-1.rds.amazonaws.com:5432/knowyourmail
+
+# RDS (External — always use SSL)
+DATABASE_URL=postgresql://kym_user:kym_password@kym-db.xxxxx.ap-south-1.rds.amazonaws.com:5432/knowyourmail?sslmode=require
+
+# Supabase (current)
+DATABASE_URL=postgresql://postgres.xxxxx:password@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres
+```
+
+##### Option 2: Supabase (Current Setup)
+
+| Parameter | Free | Pro ($25/mo) |
+|:---|:---|:---|
+| **Storage** | 500 MB | 8 GB |
+| **RAM** | 500 MB (shared) | 1 GB (dedicated) |
+| **Connections** | Direct + pooled | Direct + pooled |
+| **Backups** | None | Daily + PITR (7 days) |
+| **Inactivity Pause** | After 7 days | Never |
+
+##### Option 3: Self-Hosted PostgreSQL (On VPS)
+
+```bash
+# Docker Compose addition (if self-hosting on Hetzner)
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: kym-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kym_user
+      POSTGRES_PASSWORD: <strong_password>
+      POSTGRES_DB: knowyourmail
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"  # Bind to localhost only!
+    command: >
+      postgres
+        -c shared_buffers=256MB
+        -c effective_cache_size=768MB
+        -c work_mem=8MB
+        -c maintenance_work_mem=128MB
+        -c max_connections=50
+        -c log_min_duration_statement=1000
+```
+
+##### Database Schema Setup
+
+Run Laravel migrations to create all required tables:
+
+```bash
+# From the mail-tracker directory
+cd mail-tracker
+php artisan migrate --force
+```
+
+This creates **48 migration files** producing the following core tables:
+
+| Table Group | Tables | Purpose |
+|:---|:---|:---|
+| **Auth & RBAC** | `users`, `organizations`, `roles`, `permissions`, `role_permissions`, `user_permissions`, `personal_access_tokens` | Multi-tenant auth, Sanctum tokens |
+| **Campaigns** | `campaigns`, `campaign_variants`, `segment_filter_groups`, `segment_filters`, `campaign_csv_insights`, `recipients`, `recipient_segment_assignments` | Campaign management and segmentation |
+| **Email Sending** | `send_logs`, `smtp_configurations`, `ip_addresses` | Legacy dispatch tracking, SMTP configs |
+| **Relay & Tracking** | `messages`, `message_recipients`, `tracked_links`, `events`, `daily_analytics`, `relay_providers` | SMTP relay pipeline, open/click tracking |
+| **Domains & DKIM** | `sender_domains`, `smtp_credentials` | Domain verification, DKIM keys, SMTP auth |
+| **Webhooks** | `webhooks`, `webhook_logs` | Customer webhook subscriptions and dispatch logs |
+| **Templates** | `email_templates` | GrapesJS email template storage |
+| **Payments** | `payment_transactions`, `payment_provider_events`, `organization_subscriptions` | Razorpay billing lifecycle |
+| **AI & Analytics** | `ai_logs`, `conversions` | AI generation history, conversion tracking |
+| **Security** | `ip_reputation`, `suppressions` | Abuse detection, bounce/complaint suppression |
+
+**Key PostgreSQL Extensions Required:**
+
+```sql
+-- These are typically available by default on RDS and Supabase
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";  -- UUID generation
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";   -- Encryption functions
+```
+
+**Recommended Indexes (for high-traffic tables):**
+
+```sql
+-- message_recipients: frequently queried by status and message_id
+CREATE INDEX idx_message_recipients_status ON message_recipients (status);
+CREATE INDEX idx_message_recipients_message_id ON message_recipients (message_id);
+
+-- events: queried by recipient_id and event_type
+CREATE INDEX idx_events_recipient_id ON events (recipient_id);
+CREATE INDEX idx_events_type ON events (event_type);
+
+-- daily_analytics: unique constraint serves as index
+-- Already has: UNIQUE (organization_id, domain_id, date)
+
+-- suppressions: email lookup per org
+CREATE INDEX idx_suppressions_org_email ON suppressions (organization_id, email);
+```
+
+
+
+#### Redis Configuration
+
+| Parameter | Value |
+|:---|:---|
+| **Version** | Redis 7.x (Alpine) |
+| **Purpose** | BullMQ job queue, Laravel cache |
+| **Max Memory** | 50-100 MB (sufficient for 100 users) |
+| **Persistence** | AOF (append-only file) for queue durability |
+| **Bind** | `127.0.0.1` only (never expose to internet) |
+
+**Docker Configuration (from docker-compose.yml):**
+
+```yaml
+redis:
+  image: redis:7-alpine
+  container_name: kym-redis
+  command: redis-server --appendonly yes --maxmemory 100mb --maxmemory-policy allkeys-lru
+  volumes:
+    - redisdata:/data
+  ports:
+    - "127.0.0.1:6379:6379"  # Localhost only!
+  restart: unless-stopped
+```
+
+> **Note:** Both `mail-tracker` (Laravel cache/queue) and `kym-relay-services` (BullMQ) connect to the same Redis instance. Ensure they use different database indices (`REDIS_DB=0` for Laravel, default `0` for BullMQ) or key prefixes to avoid collision.
+
+
+
+#### Nginx Reverse Proxy Configuration
+
+**Production Nginx config** (serving Laravel SPA + API with SSL):
+
+```nginx
+server {
+    listen 80;
+    server_name app.knowyourmail.in;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name app.knowyourmail.in;
+
+    # SSL (Let's Encrypt or Cloudflare Origin)
+    ssl_certificate     /etc/letsencrypt/live/app.knowyourmail.in/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/app.knowyourmail.in/privkey.pem;
+
+    root /var/www/html/mail-tracker/public;
+    index index.php;
+    charset utf-8;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Gzip compression
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml;
+
+    # Laravel SPA + API
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # PHP-FPM
+    location ~ \.php$ {
+        fastcgi_pass 127.0.0.1:9000;  # or app:9000 in Docker
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_hide_header X-Powered-By;
+    }
+
+    # Static asset caching
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2|ttf)$ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Block dotfiles
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+
+    # Client upload size (for CSV imports)
+    client_max_body_size 50M;
+}
+
+# Tracking server proxy (optional — if using custom tracking domain)
+server {
+    listen 443 ssl http2;
+    server_name track.knowyourmail.in;
+
+    ssl_certificate     /etc/letsencrypt/live/track.knowyourmail.in/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/track.knowyourmail.in/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+
+
+#### Haraka SMTP Server Configuration
+
+**Config files** located at `kym-relay-services/apps/haraka/config/`:
+
+| File | Purpose | Current Value |
+|:---|:---|:---|
+| `me` | SMTP hostname (EHLO banner) | `smtp.knowyourmail.com` |
+| `smtp.json` | Listening ports and process config | `0.0.0.0:25,0.0.0.0:587` |
+| `connection.ini` | SMTP protocol settings | RFC 1869 strict, SMTPUTF8, greeting |
+| `plugins` | Plugin load order | 8 custom plugins (see pipeline) |
+| `host_list` | Accepted domains | Internal relay domains |
+
+**Plugin Pipeline (load order):**
+
+```
+auth_backend       → SMTP LOGIN auth against PostgreSQL
+validate_domain    → Verify sender domain belongs to org
+rate_limit         → Per-org/credential rate limiting (Redis)
+abuse_detection    → Content-based spam pattern detection
+inject_tracking    → Tracking pixel/link rewrite
+store_message      → Save metadata to PostgreSQL + parse body
+dkim_sign          → DKIM signing (delegated to Worker)
+route_relay        → Queue to BullMQ (email-delivery queue)
+```
+
+**Critical Settings for Production:**
+
+```json
+// smtp.json — Production config
+{
+  "listen": "0.0.0.0:25,0.0.0.0:587",
+  "port": 25,
+  "nodes": 2,         // Increase for multi-core (1 per CPU core)
+  "daemonize": false   // Keep false for Docker
+}
+```
+
+```ini
+; connection.ini — Production settings
+[main]
+strict_rfc1869=true
+smtputf8=true
+
+[message]
+greeting[]=KnowYourMail ESMTP
+
+[max]
+line_length=512
+data_line_length=992
+```
+
+> **Important:** Port 25 requires the server to have a **clean IP reputation** and a valid **rDNS (PTR) record**. Many cloud providers (AWS, GCP) block port 25 by default — you must request an unblock. Hetzner allows port 25 on all VPS plans.
 
 ## 10. Cost Analysis (100 Users)
 
@@ -468,7 +875,7 @@ Hetzner CX23 (2 vCPU, 4GB RAM, 40GB SSD)
 | Database Size (Year 1) | ~200MB | Messages, recipients, events, analytics |
 | CSV/Asset Storage (Year 1) | ~2GB | Uploaded CSVs, email templates, exports |
 
----
+
 
 ### 10.1 — AWS-Native Architecture Analysis (RDS + S3)
 
@@ -558,7 +965,7 @@ AWS ap-south-1 (Mumbai)
 5. **S3 Free Tier**: 5GB free for 12 months
 6. **EC2 Free Tier**: t3.micro free for 12 months (upgrade to t3.small for $15/mo when needed)
 
----
+
 
 ### Option D: AWS-Native (RDS + S3 + SES) — ₹4,250/mo
 
@@ -605,7 +1012,7 @@ AWS ap-south-1 (Mumbai)
 
 > **Cost Saving Tip:** Purchase a **1-year Reserved Instance** for EC2 t3.small to save ~40%: $15.18 → ~$9.49/mo. This brings Year 2+ total to **~$46/mo (₹3,840)**.
 
----
+
 
 ### S3 Integration: What to Store
 
@@ -622,7 +1029,7 @@ AWS ap-south-1 (Mumbai)
 - Laravel: Use `league/flysystem-aws-s3-v3` adapter — swap `FILESYSTEM_DISK=s3` in `.env`
 - Node.js: Use `@aws-sdk/client-s3` (already in your dependencies for SES)
 
----
+
 
 ### Option A: Ultra-Budget (Self-Managed) — ₹2,600/mo
 
@@ -649,7 +1056,7 @@ AWS ap-south-1 (Mumbai)
 
 > **Note:** Amazon SES costs ~$0.10 per 1,000 emails. At 200K emails/mo = $20/mo. First 12 months get 3,000 free emails/mo.
 
----
+
 
 ### Option B: Balanced (Recommended for Launch) — ₹5,200/mo
 
@@ -677,7 +1084,7 @@ AWS ap-south-1 (Mumbai)
 
 > **Why Mailgun Foundation?** 50K included emails/mo + $1.30 per additional 1K. The extra 150K emails = $195 overage. **If you exceed 50K regularly, switch to SES ($20/mo for 200K).**
 
----
+
 
 ### Option C: Hybrid Optimal — ₹3,000/mo (VP's Recommendation)
 
@@ -708,7 +1115,7 @@ AWS ap-south-1 (Mumbai)
 4. Set up daily `pg_dump` cron to AWS S3 Free Tier (5GB) as backup strategy
 5. Upgrade Supabase to Pro ($25/mo) only when you approach 400MB database size
 
----
+
 
 ### Cost Comparison Summary
 
@@ -725,7 +1132,7 @@ AWS ap-south-1 (Mumbai)
 | **File Storage** | Local disk | Local disk | S3 (cron backup) | S3 (native, pre-signed URLs) |
 | **DB-to-App Latency** | Cross-internet | Cross-internet | Cross-internet | Sub-millisecond (same VPC) |
 
----
+
 
 ### Cost Per Customer
 
@@ -737,7 +1144,7 @@ AWS ap-south-1 (Mumbai)
 
 > **Pricing Recommendation:** Charge ₹499/mo (~$6/mo) per user for basic plan. At 100 users = ₹49,900/mo revenue vs ₹2,342–₹5,683 cost = **87-95% gross margin**.
 
----
+
 
 ### Variable Costs That Scale
 
@@ -751,7 +1158,7 @@ AWS ap-south-1 (Mumbai)
 
 > **Verdict:** At 500+ users, **Amazon SES is the clear winner** — saving $1,235/mo over Mailgun. Your architecture already supports SES via the worker's `deliverEmail()` function, so switching is a config change, not a code change.
 
----
+
 
 ## 11. Scaling Roadmap
 
@@ -787,7 +1194,7 @@ AWS ap-south-1 (Mumbai)
 >
 > If budget is extremely tight and you need to ship for under ₹2,500/mo, start with **Option C (Hetzner + Supabase Free + SES)** and plan an AWS migration at 200+ users when cross-cloud latency starts hurting performance.
 
----
+
 
 ## Appendix: Quick Reference
 
@@ -841,7 +1248,7 @@ php artisan queue:listen --tries=1 --timeout=0
 composer dev
 ```
 
----
+
 
 > **Document maintained by:** VP of Engineering, KnowYourMail
 > **Next review:** After reaching 100-user milestone
