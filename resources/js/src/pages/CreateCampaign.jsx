@@ -22,6 +22,7 @@ export default function CreateCampaign() {
   const [searchParams] = useSearchParams();
   const templateId = searchParams.get('template');
   
+  const [campaignName, setCampaignName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isABTest, setIsABTest] = useState(false);
   const [abTestType, setAbTestType] = useState('subject'); // 'subject' or 'content'
@@ -108,6 +109,11 @@ export default function CreateCampaign() {
       const hasContent = checkTemplateHasContentBlock(selectedTemplateData);
       setTemplateHasContentBlock(hasContent);
       
+      // Update campaign name if not custom edited
+      if (!campaignName) {
+        setCampaignName(`${selectedTemplateData.template_name || selectedTemplateData.name || 'Template'} Campaign`);
+      }
+      
       // Populate default segment variant
       setVariants(prev => ({
         ...prev,
@@ -161,14 +167,18 @@ export default function CreateCampaign() {
     // If no campaignId, create a quick draft first so we can link the CSV and insights
     if (!currentCampaignId) {
       try {
+        const draftName = campaignName.trim() || `Draft: ${file.name.split('.')[0]}`;
         const campaignResponse = await api.post('/campaigns', {
-          name: `Draft: ${file.name.split('.')[0]}`,
+          name: draftName,
           subject: 'Campaign Subject',
           body: 'Email content goes here...',
           sender_config_id: smtpConfigurations[0]?.id || 1,
         });
         currentCampaignId = campaignResponse.data.id;
         setCampaignId(currentCampaignId);
+        if (!campaignName.trim()) {
+          setCampaignName(draftName);
+        }
       } catch (err) {
         console.error('Failed to create draft campaign', err);
         return;
@@ -247,6 +257,7 @@ export default function CreateCampaign() {
       const data = Object.fromEntries(formData);
       
       // Include additional state data
+      data.name = campaignName;
       data.segments = segments;
       data.is_ab_test = isABTest;
       data.ab_test_type = abTestType;
@@ -571,7 +582,14 @@ export default function CreateCampaign() {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="name">Campaign Name</Label>
-              <Input id="name" name="name" defaultValue={selectedTemplate ? `${selectedTemplate.name} Campaign` : ''} placeholder="e.g. Summer Sale 2026" required />
+              <Input 
+                id="name" 
+                name="name" 
+                value={campaignName} 
+                onChange={(e) => setCampaignName(e.target.value)} 
+                placeholder="e.g. Summer Sale 2026" 
+                required 
+              />
             </div>
 
             {/* Removed Global Subject Line - now handled per segment in Content card */}
@@ -1028,26 +1046,30 @@ export default function CreateCampaign() {
 
               setIsSubmitting(true);
               try {
+                const formData = form ? new FormData(form) : new FormData();
+                const data = Object.fromEntries(formData);
+                data.name = campaignName;
+                data.segments = segments;
+                data.is_ab_test = isABTest;
+                data.ab_test_type = abTestType;
+                data.segmentation_mode = segmentationMode;
+                data.variants = variants;
+                
+                const defaultVar = variants['default'] || {};
+                data.subject = defaultVar.subject || '';
+                data.body = defaultVar.body || '';
+                data.cta_link = defaultVar.cta_link || data.cta_link || '';
+                data.status = 'draft';
+
                 // If not saved as draft yet, create a quick draft so we have a campaign ID
                 if (!campaignId) {
-                  const formData = new FormData(form);
-                  const data = Object.fromEntries(formData);
-                  data.segments = segments;
-                  data.is_ab_test = isABTest;
-                  data.ab_test_type = abTestType;
-                  data.segmentation_mode = segmentationMode;
-                  data.variants = variants;
-                  
-                  const defaultVar = variants['default'] || {};
-                  data.subject = defaultVar.subject || '';
-                  data.body = defaultVar.body || '';
-                  data.cta_link = defaultVar.cta_link || data.cta_link || '';
-                  data.status = 'draft';
-                  
                   const response = await api.post('/campaigns', data);
                   if (response?.data?.id) {
                     setCampaignId(response.data.id);
                   }
+                } else {
+                  // Update the draft with current values
+                  await updateCampaign(campaignId, data);
                 }
                 
                 await extractAllCampaignVariables();
