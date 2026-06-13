@@ -1,3 +1,6 @@
+<!-- cSpell:disable -->
+<!-- markdownlint-disable -->
+
 # KnowYourMail — Complete Project Documentation
 
 > **Version:** 1.0 · **Last updated:** June 2026
