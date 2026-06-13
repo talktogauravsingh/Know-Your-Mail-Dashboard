@@ -862,342 +862,94 @@ data_line_length=992
 
 > **Important:** Port 25 requires the server to have a **clean IP reputation** and a valid **rDNS (PTR) record**. Many cloud providers (AWS, GCP) block port 25 by default — you must request an unblock. Hetzner allows port 25 on all VPS plans.
 
-## 10. Cost Analysis (100 Users)
+## 10. Cost Analysis & Pricing Model
 
-### Assumptions
+### 10.1 — Target Volume & Assumptions
+
+The following cost analysis is based on the positioning of KnowYourMail as an **Email Intelligence Platform**, targeting Growth and SaaS segments rather than micro-startups.
 
 | Parameter | Value | Rationale |
 |:---|:---|:---|
-| Active Users | 100 | Initial launch target |
-| Avg Campaigns/User/Month | 4 | Weekly newsletter cadence |
-| Avg Recipients/Campaign | 500 | Small-to-mid business lists |
-| Total Emails/Month | 200,000 | 100 × 4 × 500 |
+| Active Customers | 125 | Target within 6-12 months |
+| Target Segments | Growth / Agency / SaaS | High volume, high value |
+| Avg Emails/Customer/Month | 150,000 | Reflects standard SaaS/Agency volume |
+| Total Emails/Month | ~18.7M | 125 × 150,000 |
+| AI Requests/Month | 2.5M tokens | Gen/Rewrite + Spam Scoring |
 | Avg Open Rate | 25% | Industry average |
 | Avg Click Rate | 3% | Industry average |
-| Tracking Events/Month | ~56,000 | Opens + clicks |
-| Database Size (Year 1) | ~200MB | Messages, recipients, events, analytics |
-| CSV/Asset Storage (Year 1) | ~2GB | Uploaded CSVs, email templates, exports |
 
+### 10.2 — Customer Pricing Model
 
+Positioned as an Email Intelligence Platform, our pricing is reverse-engineered for a target of **₹5 Lakh MRR** within 6 months.
 
-### 10.1 — AWS-Native Architecture Analysis (RDS + S3)
+| Tier | Starter | Growth | Agency | Enterprise |
+| :--- | :--- | :--- | :--- | :--- |
+| **Price** | **₹999 /mo** | **₹2,999 /mo** | **₹7,999 /mo** | **₹25,000+ /mo** |
+| **Email Volume** | 10,000 | 50,000 | 200,000 | Custom |
+| **Overage** | ₹100 per 1k | ₹80 per 1k | ₹50 per 1k | Custom |
+| **Domains** | 1 Domain | 5 Domains | Unlimited | Unlimited |
+| **AI Usage** | Pay-as-you-go | 100 Credits | 500 Credits | Unlimited |
+| **Deliverability** | Basic Tracking | Advanced Insights | White-label | Dedicated IP, SLA |
 
-#### Should You Move to AWS RDS + S3?
+**Additional Revenue Opportunities:**
+- Domain Health Monitoring (₹299/month)
+- Deliverability Audit (₹999 one-time)
+- Domain Reputation Tracking (₹499/month)
+- Agency White Label Add-on (₹4,999/month)
 
-**Short answer: Yes, but with a specific deployment strategy.**
+> **Note:** Customers do NOT bring their own AWS SES accounts (except Enterprise) so we maintain complete UX control and capture maximum margin.
 
-Moving to AWS RDS PostgreSQL + S3 is the **right architectural decision** for KnowYourMail, but the *how* matters more than the *what*. Here's a VP-level breakdown:
+### 10.3 — Monthly Operating Costs
 
-#### ✅ Why RDS PostgreSQL Makes Sense
+Based on 18.7M emails/month (125 active customers).
 
-| Factor | Supabase (Current) | AWS RDS PostgreSQL |
-|:---|:---|:---|
-| **Automated Backups** | ❌ Free / ✅ Pro ($25) | ✅ Included (7-day PITR) |
-| **Inactivity Pause** | ⚠️ Pauses after 7 days (Free) | ❌ Never pauses |
-| **Performance Tuning** | Limited | Full parameter group control |
-| **Connection Pooling** | Built-in Supavisor | RDS Proxy available ($$$) or self-host PgBouncer |
-| **Read Replicas** | ❌ Not on Free/Pro | ✅ Easy to add |
-| **Multi-AZ (HA)** | ❌ Not available | ✅ One-click |
-| **Monitoring** | Basic dashboard | CloudWatch (deep metrics, alerts) |
-| **AWS Ecosystem** | Separate network | Same VPC as SES, S3, Lambda |
-| **Storage Limit** | 500MB Free / 8GB Pro | 20GB included (expandable) |
-| **Vendor Lock-in** | Low (standard PG) | Low (standard PG) |
+**Infrastructure Costs (Option D - AWS Native):**
+* Compute (EC2 t3.medium): $41.00 (₹3,400)
+* Database (RDS db.t4g.small): $34.00 (₹2,800)
+* Email Relay (SES - 18.7M emails): $1,870 (₹155,000)
+* Storage & Bandwidth (S3/Net): $50.00 (₹4,150)
+* Deliverability Tools (GlockApps/Seed testing): $150.00 (₹12,450)
+* **Total Infra:** **~₹177,800/mo**
 
-#### ✅ Why S3 Makes Sense
+**Variable & Operational Costs:**
+* AI API Costs (Claude 3.5 Sonnet + Gemini 1.5 Flash): ~$50.00 (₹4,150)
+* Customer Support (Part-time L1/L2): $300.00 (₹24,900)
+* **Total Ops:** **~₹29,050/mo**
 
-Your platform handles several types of file assets:
+**Total Platform Cost:** ~₹206,850/mo
 
-| Asset Type | Current Storage | Problem | S3 Solution |
+### 10.4 — Infrastructure Strategy Verdict
+
+| Option | Verdict | Description | Monthly Cost |
 |:---|:---|:---|:---|
-| CSV recipient uploads | Local disk (VPS) | Lost if VPS dies, not scalable | S3 Standard — durable, versioned |
-| Email template assets | Database BLOBs or disk | Bloats DB, slow retrieval | S3 + CloudFront CDN |
-| Export files (analytics) | Generated on-the-fly | No persistence | S3 with pre-signed URLs |
-| Database backups | Manual `pg_dump` | Unreliable, no automation | RDS automated → S3 snapshots |
-
-**S3 is essentially free at your scale** — 5GB free for 12 months, then $0.023/GB/month. Even at 10GB = $0.23/mo.
-
-#### ⚠️ Critical Consideration: Cross-Cloud Latency
-
-> **This is the most important architectural decision.**
-
-Your VPS is on **Hetzner (Germany)**. If you use AWS RDS in **ap-south-1 (Mumbai)**, every database query crosses the public internet — adding **50-150ms latency per round-trip**.
-
-**Impact on KnowYourMail:**
-- Haraka plugin `store_message.js` makes 2-3 DB queries per incoming email
-- Worker `deliverEmail()` makes 3-5 DB queries per email sent
-- Tracker makes 2-3 DB queries per open/click event
-- At 200K emails/mo ≈ 1M+ DB round-trips/mo
-
-**Two viable strategies:**
-
-| Strategy | Description | Latency | Cost |
-|:---|:---|:---|:---|
-| **A. All-AWS** | Move VPS to AWS EC2 (same region as RDS) | ~1ms | Higher VPS cost (~$8-15/mo) |
-| **B. Hetzner + Self-hosted PG** | Run PostgreSQL on the Hetzner VPS itself | ~0.1ms | $0 extra (VPS has the RAM) |
-
-**VP Recommendation:** Go **All-AWS** if you're committing to RDS. The whole point of RDS is being in the same VPC — don't put an ocean between your app and database.
-
-#### Recommended AWS-Native Architecture (Option D)
-
-```
-AWS ap-south-1 (Mumbai)
-├── EC2 t3.small (2 vCPU, 2GB RAM) — All services
-│   ├── Coolify or Docker Compose
-│   ├── Laravel App + Nginx
-│   ├── Haraka SMTP Server
-│   ├── BullMQ Worker
-│   ├── Tracker Server
-│   └── Redis 7 (self-hosted)
-├── RDS db.t4g.micro (2 vCPU, 1GB RAM, 20GB SSD)
-│   └── PostgreSQL 16 — Single-AZ
-├── S3 Standard
-│   ├── CSV uploads
-│   ├── Email template assets
-│   ├── Database backup exports
-│   └── Analytics exports
-├── SES (Same region — zero-latency email sending)
-├── DNS/CDN: Cloudflare (free tier)
-└── Landing Page: Cloudflare Pages (free)
-```
-
-**Why this works:**
-1. **EC2 → RDS**: Same VPC, sub-millisecond latency
-2. **EC2 → SES**: Same region, zero network hop for email sending
-3. **EC2 → S3**: Same region, instant file access
-4. **RDS Free Tier**: 12 months free (db.t4g.micro)
-5. **S3 Free Tier**: 5GB free for 12 months
-6. **EC2 Free Tier**: t3.micro free for 12 months (upgrade to t3.small for $15/mo when needed)
-
-
-
-### Option D: AWS-Native (RDS + S3 + SES) — ₹4,250/mo
-
-> **Best for:** Production-grade infrastructure with full AWS ecosystem benefits. All services in the same region for minimum latency.
-
-#### Year 1 (With AWS Free Tier)
-
-| Service | Provider | Plan | Monthly (USD) | Monthly (INR ≈) |
-|:---|:---|:---|---:|---:|
-| Compute (2vCPU/2GB) | AWS EC2 | t3.small (On-Demand) | $15.18 | ₹1,268 |
-| Database | AWS RDS | db.t4g.micro (Free Tier) | $0.00 | ₹0 |
-| RDS Storage (20GB gp3) | AWS RDS | Free Tier | $0.00 | ₹0 |
-| File Storage | AWS S3 | Standard (Free Tier 5GB) | $0.00 | ₹0 |
-| Email Relay | AWS SES | Pay-as-you-go | $20.00 | ₹1,670 |
-| DNS/CDN/SSL | Cloudflare | Free | $0.00 | ₹0 |
-| Landing Page | Cloudflare Pages | Free | $0.00 | ₹0 |
-| Domains (2) | Namecheap | Annual (amortized) | $3.00 | ₹250 |
-| Monitoring | AWS CloudWatch | Free Tier (10 metrics) | $0.00 | ₹0 |
-| **TOTAL (Year 1)** | | | **$38.18** | **≈ ₹3,188** |
-
-#### Year 2+ (Post Free Tier)
-
-| Service | Provider | Plan | Monthly (USD) | Monthly (INR ≈) |
-|:---|:---|:---|---:|---:|
-| Compute (2vCPU/2GB) | AWS EC2 | t3.small (On-Demand) | $15.18 | ₹1,268 |
-| Database | AWS RDS | db.t4g.micro | $11.68 | ₹975 |
-| RDS Storage (20GB gp3) | AWS RDS | 20GB | $2.30 | ₹192 |
-| RDS Automated Backups | AWS RDS | 20GB (included free) | $0.00 | ₹0 |
-| File Storage (5GB) | AWS S3 | Standard | $0.12 | ₹10 |
-| S3 Requests (est.) | AWS S3 | ~10K PUT + 50K GET/mo | $0.07 | ₹6 |
-| Email Relay | AWS SES | Pay-as-you-go | $20.00 | ₹1,670 |
-| DNS/CDN/SSL | Cloudflare | Free | $0.00 | ₹0 |
-| Landing Page | Cloudflare Pages | Free | $0.00 | ₹0 |
-| Domains (2) | Namecheap | Annual (amortized) | $3.00 | ₹250 |
-| Monitoring | AWS CloudWatch | Basic | $0.00 | ₹0 |
-| **TOTAL (Year 2+)** | | | **$52.35** | **≈ ₹4,371** |
-
-| | Year 1 Monthly | Year 2+ Monthly | Year 1 Annual | Year 2+ Annual |
-|:---|---:|---:|---:|---:|
-| **USD** | $38.18 | $52.35 | $458.16 | $628.20 |
-| **INR** | ₹3,188 | ₹4,371 | ₹38,256 | ₹52,452 |
-
-> **Why EC2 t3.small and not t3.micro?** The t3.micro has only 1GB RAM — not enough to run Laravel + Haraka + Worker + Tracker + Redis simultaneously. The t3.small (2GB) provides a comfortable margin. If you find 2GB tight, consider t3.medium (4GB) at ~$30/mo.
-
-> **Cost Saving Tip:** Purchase a **1-year Reserved Instance** for EC2 t3.small to save ~40%: $15.18 → ~$9.49/mo. This brings Year 2+ total to **~$46/mo (₹3,840)**.
-
-
-
-### S3 Integration: What to Store
-
-| Asset | S3 Path Pattern | Storage Class | Lifecycle Rule |
-|:---|:---|:---|:---|
-| CSV Uploads | `s3://kym-assets/{org_id}/imports/{file}.csv` | Standard | Move to IA after 30 days |
-| Email Template HTML | `s3://kym-assets/{org_id}/templates/{id}/` | Standard | Keep indefinitely |
-| Template Images | `s3://kym-assets/{org_id}/templates/{id}/images/` | Standard | Keep indefinitely |
-| DB Backups | `s3://kym-backups/rds/{date}/` | Standard-IA | Delete after 90 days |
-| Analytics Exports | `s3://kym-assets/{org_id}/exports/{date}.csv` | Standard-IA | Delete after 30 days |
-
-**Implementation Notes:**
-- Use **pre-signed URLs** for secure direct uploads from the frontend (no server relay needed)
-- Laravel: Use `league/flysystem-aws-s3-v3` adapter — swap `FILESYSTEM_DISK=s3` in `.env`
-- Node.js: Use `@aws-sdk/client-s3` (already in your dependencies for SES)
-
-
-
-### Option A: Ultra-Budget (Self-Managed) — ₹2,600/mo
-
-> **Best for:** Solo founder who is comfortable with Linux and Docker.
-
-| Service | Provider | Plan | Monthly (USD) | Monthly (INR ≈) |
-|:---|:---|:---|---:|---:|
-| VPS (2vCPU/4GB) | Hetzner | CX23 | $4.49 | ₹375 |
-| IPv4 Address | Hetzner | Add-on | $0.56 | ₹47 |
-| Database | Supabase | Free | $0.00 | ₹0 |
-| Email Relay | Amazon SES | Pay-as-you-go | $20.00 | ₹1,670 |
-| DNS/CDN/SSL | Cloudflare | Free | $0.00 | ₹0 |
-| Landing Page | Cloudflare Pages | Free | $0.00 | ₹0 |
-| Deployment | Coolify | Self-hosted (Free) | $0.00 | ₹0 |
-| Domain (`knowyourmail.in`) | Namecheap | Annual (amortized) | $1.50 | ₹125 |
-| Domain (`promptbook.co.in`) | — | Annual (amortized) | $1.50 | ₹125 |
-| Monitoring | UptimeRobot | Free | $0.00 | ₹0 |
-| **TOTAL** | | | **$28.05** | **≈ ₹2,342** |
-
-| | Monthly | Annual |
-|:---|---:|---:|
-| **USD** | $28.05 | $336.60 |
-| **INR** | ₹2,342 | ₹28,104 |
-
-> **Note:** Amazon SES costs ~$0.10 per 1,000 emails. At 200K emails/mo = $20/mo. First 12 months get 3,000 free emails/mo.
-
-
-
-### Option B: Balanced (Recommended for Launch) — ₹5,200/mo
-
-> **Best for:** Launching a real product with proper reliability and less operational overhead.
-
-| Service | Provider | Plan | Monthly (USD) | Monthly (INR ≈) |
-|:---|:---|:---|---:|---:|
-| VPS (2vCPU/4GB) | Hetzner | CX23 | $4.49 | ₹375 |
-| IPv4 Address | Hetzner | Add-on | $0.56 | ₹47 |
-| Database | Supabase | Pro | $25.00 | ₹2,088 |
-| Email Relay | Mailgun | Foundation (50K) | $35.00 | ₹2,923 |
-| DNS/CDN/SSL | Cloudflare | Free | $0.00 | ₹0 |
-| Landing Page | Cloudflare Pages | Free | $0.00 | ₹0 |
-| Deployment | Coolify | Self-hosted (Free) | $0.00 | ₹0 |
-| Domains (2) | Namecheap | Annual (amortized) | $3.00 | ₹250 |
-| Monitoring | UptimeRobot | Free | $0.00 | ₹0 |
-| **TOTAL** | | | **$68.05** | **≈ ₹5,683** |
-
-| | Monthly | Annual |
-|:---|---:|---:|
-| **USD** | $68.05 | $816.60 |
-| **INR** | ₹5,683 | ₹68,196 |
-
-> **Why Supabase Pro?** Automatic daily backups, no inactivity pause, 8GB database storage, and dedicated compute. Worth it for production data you can't afford to lose.
-
-> **Why Mailgun Foundation?** 50K included emails/mo + $1.30 per additional 1K. The extra 150K emails = $195 overage. **If you exceed 50K regularly, switch to SES ($20/mo for 200K).**
-
-
-
-### Option C: Hybrid Optimal — ₹3,000/mo (VP's Recommendation)
-
-> **Best for:** Maximum cost efficiency while maintaining production reliability.
-
-| Service | Provider | Plan | Monthly (USD) | Monthly (INR ≈) |
-|:---|:---|:---|---:|---:|
-| VPS (2vCPU/4GB) | Hetzner | CX23 | $4.49 | ₹375 |
-| IPv4 Address | Hetzner | Add-on | $0.56 | ₹47 |
-| Database | Supabase | Free → Pro when needed | $0.00 | ₹0 |
-| Email Relay | Amazon SES | Pay-as-you-go | $20.00 | ₹1,670 |
-| DNS/CDN/SSL | Cloudflare | Free | $0.00 | ₹0 |
-| Landing Page | Cloudflare Pages | Free | $0.00 | ₹0 |
-| Deployment | Coolify | Self-hosted (Free) | $0.00 | ₹0 |
-| Domains (2) | Namecheap | Annual (amortized) | $3.00 | ₹250 |
-| Automated Backups | Cron + S3 (Free tier) | DIY | $0.00 | ₹0 |
-| **TOTAL** | | | **$28.05** | **≈ ₹2,342** |
-
-| | Monthly | Annual |
-|:---|---:|---:|
-| **USD** | $28.05 | $336.60 |
-| **INR** | ₹2,342 | ₹28,104 |
-
-**Strategy:**
-1. Start with Supabase Free (500MB) — sufficient for first 6 months
-2. Use Amazon SES as primary relay — 18x cheaper than Mailgun at scale
-3. Keep Mailgun as secondary/fallback provider (your existing account works on free tier for testing)
-4. Set up daily `pg_dump` cron to AWS S3 Free Tier (5GB) as backup strategy
-5. Upgrade Supabase to Pro ($25/mo) only when you approach 400MB database size
-
-
-
-### Cost Comparison Summary
-
-| | Option A (Ultra-Budget) | Option B (Balanced) | Option C (Hybrid) | Option D (AWS-Native) |
-|:---|---:|---:|---:|---:|
-| **Monthly (USD)** | $28 | $68 | $28 | $38 (Yr1) / $52 (Yr2+) |
-| **Monthly (INR)** | ₹2,342 | ₹5,683 | ₹2,342 | ₹3,188 (Yr1) / ₹4,371 (Yr2+) |
-| **Annual (USD)** | $337 | $817 | $337 | $458 (Yr1) / $628 (Yr2+) |
-| **Annual (INR)** | ₹28,104 | ₹68,196 | ₹28,104 | ₹38,256 (Yr1) / ₹52,452 (Yr2+) |
-| **Reliability** | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| **Maintenance** | High | Low | Medium | Low |
-| **Scalability** | Manual | Easy | Easy | Best (AWS native) |
-| **DB Backups** | Manual | Supabase managed | Manual (S3 cron) | Automated PITR (7 days) |
-| **File Storage** | Local disk | Local disk | S3 (cron backup) | S3 (native, pre-signed URLs) |
-| **DB-to-App Latency** | Cross-internet | Cross-internet | Cross-internet | Sub-millisecond (same VPC) |
-
-
-
-### Cost Per Customer
-
-| Metric | Option A | Option B | Option C | Option D (Yr2+) |
-|:---|---:|---:|---:|---:|
-| **Cost/User/Month** | $0.28 | $0.68 | $0.28 | $0.52 |
-| **Cost/Email Sent** | $0.00014 | $0.00034 | $0.00014 | $0.00026 |
-| **Break-even price/user** | $1/mo | $2/mo | $1/mo | $1.50/mo |
-
-> **Pricing Recommendation:** Charge ₹499/mo (~$6/mo) per user for basic plan. At 100 users = ₹49,900/mo revenue vs ₹2,342–₹5,683 cost = **87-95% gross margin**.
-
-
-
-### Variable Costs That Scale
-
-| Cost Driver | Rate | At 100 Users | At 500 Users | At 1000 Users |
-|:---|:---|---:|---:|---:|
-| Amazon SES Emails | $0.10/1K | $20 | $100 | $200 |
-| Mailgun Foundation + Overage | $35 + $1.30/1K | $230 | $1,335 | $2,635 |
-| Supabase Storage (if Pro) | $25 base + $0.125/GB | $25 | $30 | $40 |
-| Hetzner VPS Upgrade | CX33 (4vCPU/8GB) | — | $8.49 | $16 |
-| Bandwidth (Hetzner) | 20TB included | $0 | $0 | $0 |
-
-> **Verdict:** At 500+ users, **Amazon SES is the clear winner** — saving $1,235/mo over Mailgun. Your architecture already supports SES via the worker's `deliverEmail()` function, so switching is a config change, not a code change.
-
-
+| **Option A (Ultra Budget)** | ❌ **Rejected** | Supabase Free is too risky for production data. | ~$28 |
+| **Option B (Balanced)** | ⚠️ **Partially Approved** | Mailgun is too expensive at scale. | ~$68+ |
+| **Option C (Hybrid)** | ✅ **Approved (Bootstrap)** | Hetzner + SES + Supabase Free. Best for cash-tight launch. | ~$28+ |
+| **Option D (AWS Native)** | ✅ **Approved (Scale)** | EC2 + RDS + SES. Move here once hitting ₹50K MRR. | ~$80+ |
 
 ## 11. Scaling Roadmap
 
-### Path A: Hetzner + Supabase (Budget-First)
+### Path 1: Bootstrap Launch (Option C)
 
-| Phase | Users | Infrastructure | Monthly Cost |
-|:---|:---|:---|---:|
-| Launch | 0–100 | Hetzner CX23 + Supabase Free + SES | ~$28 |
-| Growth | 100–500 | Hetzner CX33 + Supabase Pro + SES | ~$55 |
-| Scale | 500–2000 | 2× Hetzner VPS + Supabase Pro + SES + Dedicated IP | ~$150 |
-| Enterprise | 2000+ | Multi-region + Self-hosted PG replication | ~$500+ |
+**Status:** Initial Launch Phase
+**Infrastructure:** Hetzner CX23 + Supabase Free + Amazon SES
+**Cost:** ~$28/month (+ variable SES volume)
+**Action:** Validate the product, onboard first 10-20 paying customers, and establish MRR without burning cash.
 
-### Path B: AWS-Native (RDS + S3 + SES) — Recommended ⭐
+### Path 2: Scale (Option D - AWS Native) ⭐
 
-| Phase | Users | Infrastructure | Monthly Cost |
-|:---|:---|:---|---:|
-| Launch | 0–100 | EC2 t3.small + RDS db.t4g.micro (Free) + S3 + SES | ~$38 (Yr1) |
-| Growth | 100–500 | EC2 t3.medium + RDS db.t4g.small + S3 + SES | ~$80 |
-| Scale | 500–2000 | EC2 t3.large + RDS db.t4g.medium + S3 + SES + Dedicated IP | ~$180 |
-| Enterprise | 2000+ | ECS/EKS + RDS Multi-AZ + ElastiCache + CloudFront | ~$600+ |
-
-**Why Path B is recommended:**
+**Status:** Post ₹50K MRR or 50 Customers
+**Infrastructure:** AWS EC2 t3.medium + RDS db.t4g.small + S3 + SES
+**Cost:** ~$80/month (+ variable SES volume)
+**Why AWS Native?**
 1. **Zero latency** between compute and database (same VPC)
 2. **SES in same region** — fastest email dispatch, no cross-network hop
-3. **S3 native** — pre-signed URLs, lifecycle rules, versioning built-in
-4. **Automated DB backups** — 7-day PITR included at no extra cost
-5. **Linear scaling** — upgrade instance types with a click, add read replicas as needed
-6. **Single bill** — one AWS invoice for compute, database, storage, email, and monitoring
+3. **Automated DB backups** — 7-day PITR included at no extra cost
+4. **Single bill** — one AWS invoice for compute, database, storage, and email
 
 ### VP's Final Recommendation
-
-> **For launch (100 users):** Start with **Option D (AWS-Native)** at **₹3,188/mo (Year 1)** to build on a production-grade foundation from day one. The AWS Free Tier gives you 12 months to validate the product before costs step up to ₹4,371/mo.
->
-> If budget is extremely tight and you need to ship for under ₹2,500/mo, start with **Option C (Hetzner + Supabase Free + SES)** and plan an AWS migration at 200+ users when cross-cloud latency starts hurting performance.
-
-
+> **For launch:** Start with **Option C** to validate the market. 
+> **For scale:** Migrate to **Option D** once the platform hits ₹50K MRR or 50 active customers. The product architecture allows for an easy transition since all email is sent via queue workers, and changing the database or infrastructure mostly requires updating connection strings and deployment targets.
 
 ## Appendix: Quick Reference
 
