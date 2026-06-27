@@ -72,7 +72,7 @@ class KymConsoleController extends Controller
 
         $request->validate([
             'plan_key' => 'nullable|string',
-            'status' => 'nullable|string|in:active,paused',
+            'status' => 'nullable|string|in:active,paused,cancelled,expired,trial,past_due,free',
             'credits' => 'nullable|array',
             'credits.*.feature_key' => 'required|string',
             'credits.*.credits_balance' => 'required|integer|min:0',
@@ -108,7 +108,7 @@ class KymConsoleController extends Controller
         }
 
         // 2. Status Update (Pause/Resume)
-        if ($request->has('status')) {
+        if ($request->has('status') && in_array($request->status, ['active', 'paused'])) {
             $sub = OrganizationSubscription::where('organization_id', $org->id)->first();
             if ($sub && $request->plan_key !== 'free') {
                 $newStatus = $request->status === 'paused'
