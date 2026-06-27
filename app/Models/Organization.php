@@ -9,8 +9,14 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Organization extends Model
 {
     protected $fillable = [
-        'name'
+        'name',
+        'org_type',
     ];
+
+    public function organizationType(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(OrganizationType::class, 'org_type');
+    }
 
     public function subscription(): HasOne
     {

@@ -26,23 +26,52 @@ class AuthTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-public function test_can_register_user()
+    public function test_can_send_otp()
     {
-        $response = $this->postJson('/api/auth/register', [
-            'name' => 'Test User',
-            'email' => 'newuser@example.com',
-            'password' => 'password',
-            'password_confirmation' => 'password',
+        $response = $this->postJson('/api/auth/send-otp', [
+            'name' => 'Test OTP User',
+            'email' => 'sendotp@example.com',
+            'phone_number' => '1234567890'
         ]);
 
-$response->assertStatus(200)
+        $response->assertStatus(200)
+                 ->assertJsonPath('message', 'OTP sent successfully to your email.');
+
+        $this->assertNotNull(\Illuminate\Support\Facades\Cache::get('signup_otp_sendotp@example.com'));
+    }
+
+    public function test_can_register_user()
+    {
+        $email = 'newuser@example.com';
+        $otp = '123456';
+        \Illuminate\Support\Facades\Cache::put('signup_otp_' . $email, $otp, 600);
+
+        $response = $this->postJson('/api/auth/register', [
+            'name' => 'Test User',
+            'email' => $email,
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'otp' => $otp,
+            'phone_number' => '1234567890',
+            'organization_type' => 'marketing',
+            'organization_name' => 'Acme Agency'
+        ]);
+
+        $response->assertStatus(200)
                  ->assertJsonStructure([
                      'user' => ['id', 'name', 'email', 'role'],
                      'token'
                  ])
                  ->assertJsonPath('user.email', 'newuser@example.com');
 
-        $this->assertDatabaseHas('users', ['email' => 'newuser@example.com']);
+        $this->assertDatabaseHas('users', [
+            'email' => 'newuser@example.com',
+            'phone_number' => '1234567890'
+        ]);
+        
+        $this->assertDatabaseHas('organizations', [
+            'name' => 'Acme Agency'
+        ]);
     }
 
     public function test_can_login_user()

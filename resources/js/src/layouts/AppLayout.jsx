@@ -20,6 +20,14 @@ export default function AppLayout() {
   const { user, logout, theme, toggleTheme, billingSummary, fetchBillingSummary } = useStore();
   const location = useLocation();
   const currentPlanName = billingSummary?.current_plan?.name || 'Free';
+  const userRoleSlug = user?.role?.slug;
+  const isSettingsAllowed = userRoleSlug === 'super-admin' || userRoleSlug === 'admin' || userRoleSlug === 'root';
+  const filteredNavigation = navigation.filter(item => {
+    if (item.href === '/settings') {
+      return isSettingsAllowed;
+    }
+    return true;
+  });
 
   // Sync theme to document root
   useEffect(() => {
@@ -53,7 +61,7 @@ export default function AppLayout() {
 
         <div className="flex-1 overflow-y-auto py-2">
           <nav className="space-y-1 px-3">
-            {navigation.map((item) => {
+            {filteredNavigation.map((item) => {
               const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
               return (
                 <Link

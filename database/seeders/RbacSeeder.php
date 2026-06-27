@@ -14,6 +14,9 @@ class RbacSeeder extends Seeder
      */
     public function run(): void
     {
+        if (!Role::where('slug', 'root')->exists()) {
+            Role::create(['name' => 'Root', 'slug' => 'root']);
+        }
         if (!Role::where('slug', 'super-admin')->exists()) {
             Role::create(['name' => 'Super Admin', 'slug' => 'super-admin']);
         }
@@ -67,6 +70,7 @@ class RbacSeeder extends Seeder
             Permission::create(['name' => 'Track Conversions', 'slug' => 'track_conversions']);
         }
 
+        $rootRole = Role::where('slug', 'root')->first();
         $superAdminRole = Role::where('slug', 'super-admin')->first();
         $adminRole = Role::where('slug', 'admin')->first();
         $managerRole = Role::where('slug', 'manager')->first();
@@ -77,28 +81,35 @@ class RbacSeeder extends Seeder
         $manageRoles = Permission::where('slug', 'manage_roles')->first();
         $viewPermissions = Permission::where('slug', 'view_permissions')->first();
         $managePermissions = Permission::where('slug', 'manage_permissions')->first();
-$createManager = Permission::where('slug', 'create_manager')->first();
+        $createManager = Permission::where('slug', 'create_manager')->first();
         $trackEvents = Permission::where('slug', 'track_events')->first();
         $trackConversions = Permission::where('slug', 'track_conversions')->first();
         $viewHierAnalysis = Permission::where('slug', 'view_hierarchical_analysis')->first();
         $viewCampAnalysis = Permission::where('slug', 'view_campaign_analysis')->first();
 
+        if ($rootRole && $viewRoles) {
+            $rootRole->permissions()->syncWithoutDetaching([
+                $viewRoles->id, $manageRoles->id ?? 0, $viewPermissions->id ?? 0, $managePermissions->id ?? 0, $createManager->id ?? 0,
+                $trackEvents->id ?? 0, $trackConversions->id ?? 0,
+                $viewHierAnalysis->id ?? 0, $viewCampAnalysis->id ?? 0
+            ]);
+        }
         if ($superAdminRole && $viewRoles) {
-$superAdminRole->permissions()->syncWithoutDetaching([
+            $superAdminRole->permissions()->syncWithoutDetaching([
                 $viewRoles->id, $manageRoles->id ?? 0, $viewPermissions->id ?? 0, $managePermissions->id ?? 0, $createManager->id ?? 0,
                 $trackEvents->id ?? 0, $trackConversions->id ?? 0,
                 $viewHierAnalysis->id ?? 0, $viewCampAnalysis->id ?? 0
             ]);
         }
         if ($adminRole && $viewRoles) {
-$adminRole->permissions()->syncWithoutDetaching([
+            $adminRole->permissions()->syncWithoutDetaching([
                 $viewRoles->id, $manageRoles->id ?? 0, $viewPermissions->id ?? 0, $managePermissions->id ?? 0,
                 $trackEvents->id ?? 0, $trackConversions->id ?? 0,
                 $viewHierAnalysis->id ?? 0, $viewCampAnalysis->id ?? 0
             ]);
         }
         if ($managerRole && $viewRoles) {
-$managerRole->permissions()->syncWithoutDetaching([
+            $managerRole->permissions()->syncWithoutDetaching([
                 $viewRoles->id, $createManager->id ?? 0,
                 $trackEvents->id ?? 0, $trackConversions->id ?? 0,
                 $viewHierAnalysis->id ?? 0, $viewCampAnalysis->id ?? 0

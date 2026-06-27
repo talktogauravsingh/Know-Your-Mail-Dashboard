@@ -14,21 +14,29 @@ use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Tracking\TrackingController;
 
 Route::get('/user', function (Request $request) {
-    return $request->user();
+    return $request->user()->load('role.permissions');
 })->middleware('auth:sanctum');
 
 Route::get('/insights/org', [\App\Http\Controllers\Api\SegmentationController::class, 'getOrgInsights'])->middleware('auth:sanctum');
 
 Route::prefix('auth')->group(function () {
+    Route::post('send-otp', [AuthController::class, 'sendOtp'])->middleware('throttle:5,1');
     Route::post('register', [AuthController::class, 'register'])->middleware('throttle:5,1');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
     Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
     Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
+    Route::post('reset-temporary-password', [AuthController::class, 'resetTemporaryPassword'])->middleware('throttle:5,1');
 });
 
 Route::middleware('auth:sanctum')->prefix('managers')->group(function () {
     Route::post('/', [AuthController::class, 'createManager'])->middleware('permissions:create_manager');
+});
+
+Route::middleware('auth:sanctum')->prefix('organization/users')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\OrganizationUserController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\Api\OrganizationUserController::class, 'store']);
+    Route::delete('/{user}', [\App\Http\Controllers\Api\OrganizationUserController::class, 'destroy']);
 });
 
 Route::middleware(['auth:sanctum', 'permissions:view_roles'])->prefix('roles')->group(function () {
