@@ -14,7 +14,7 @@ use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Tracking\TrackingController;
 
 Route::get('/user', function (Request $request) {
-    return $request->user();
+    return $request->user()->load('role');
 })->middleware('auth:sanctum');
 
 Route::get('/insights/org', [\App\Http\Controllers\Api\SegmentationController::class, 'getOrgInsights'])->middleware('auth:sanctum');
@@ -148,4 +148,9 @@ Route::middleware('auth:sanctum')->prefix('suppressions')->group(function () {
     Route::get('/', [\App\Http\Controllers\Api\SuppressionController::class, 'index']);
     Route::post('/', [\App\Http\Controllers\Api\SuppressionController::class, 'store']);
     Route::delete('/{id}', [\App\Http\Controllers\Api\SuppressionController::class, 'destroy']);
+});
+
+Route::middleware('auth:sanctum')->prefix('admin/kym')->group(function () {
+    Route::get('/organizations', [\App\Http\Controllers\Api\Admin\KymConsoleController::class, 'index']);
+    Route::post('/organizations/{id}/update', [\App\Http\Controllers\Api\Admin\KymConsoleController::class, 'update']);
 });
