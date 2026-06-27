@@ -21,6 +21,11 @@ export default function AppLayout() {
   const location = useLocation();
   const currentPlanName = billingSummary?.current_plan?.name || 'Free';
 
+  // Fetch billing details globally on mount
+  useEffect(() => {
+    fetchBillingSummary().catch(() => {});
+  }, [fetchBillingSummary]);
+
   // Sync theme to document root
   useEffect(() => {
     if (theme === 'dark') {

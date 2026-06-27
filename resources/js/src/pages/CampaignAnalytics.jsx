@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../components/ui/Card';
+import FeatureGateLock from '../components/ui/FeatureGateLock';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
@@ -66,10 +67,12 @@ export default function CampaignAnalytics() {
         </Button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex space-x-1 rounded-lg bg-slate-100 dark:bg-slate-800/50 p-1 w-fit">
-        {['overview', 'user-insights', 'recipients'].map((tab) => (
-          <button
+      {/* Tabs and Content Wrapper */}
+      <FeatureGateLock feature="advanced_analytics">
+        {/* Tabs Menu */}
+        <div className="flex space-x-1 rounded-lg bg-slate-100 dark:bg-slate-800/50 p-1 w-fit">
+          {['overview', 'user-insights', 'recipients'].map((tab) => (
+            <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
@@ -320,6 +323,7 @@ export default function CampaignAnalytics() {
           </div>
         </div>
       )}
+      </FeatureGateLock>
     </div>
   );
 }

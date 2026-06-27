@@ -30,6 +30,25 @@ class SenderDomainController extends Controller
      */
     public function store(Request $request)
     {
+        $orgId = (int) $request->user()->organization_id;
+        $quota = app(\App\Services\FeatureGateService::class)->checkQuota('custom_domain', $orgId);
+        if (!$quota['has_access']) {
+            return response()->json([
+                'error' => 'feature_locked',
+                'message' => 'Custom Domain verification is not included in your current plan. Please upgrade.'
+            ], 403);
+        }
+
+        if ($quota['remaining'] !== null) {
+            $existingCount = SenderDomain::where('organization_id', $orgId)->count();
+            if ($existingCount >= $quota['remaining']) {
+                return response()->json([
+                    'error' => 'quota_exceeded',
+                    'message' => "You have reached the maximum limit of {$quota['remaining']} custom domains for your plan. Please upgrade to add more."
+                ], 403);
+            }
+        }
+
         $request->validate([
             'domain' => [
                 'required',
