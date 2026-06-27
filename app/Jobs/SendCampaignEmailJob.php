@@ -182,13 +182,14 @@ class SendCampaignEmailJob implements ShouldQueue
             }
 
             // Add tracking pixel to the HTML body
-            $trackingUrl = url("/api/track/open/{$sendLog->id}");
+            $trackingBase = rtrim(env('TRACKING_BASE_URL', config('app.url')), '/');
+            $trackingUrl = "{$trackingBase}/api/track/open/{$sendLog->id}";
             $trackingPixel = "<img src='{$trackingUrl}' width='1' height='1' style='display:none;' />";
             
             // Add CTA tracking if there is one
             $ctaLink = $variant->cta_url;
             if ($ctaLink) {
-                $trackedCta = url("/api/track/click/{$sendLog->id}?url=" . urlencode($ctaLink));
+                $trackedCta = "{$trackingBase}/api/track/click/{$sendLog->id}?url=" . urlencode($ctaLink);
                 // Append CTA link if not already in body
                 if (!str_contains($htmlBody, $ctaLink)) {
                     $htmlBody .= "<br><br><a href='{$trackedCta}'>Click Here</a>";
@@ -208,20 +209,45 @@ class SendCampaignEmailJob implements ShouldQueue
 
             Log::info("Sent email to {$recipient->email} for campaign {$campaign->id} using Variant: {$variant->name}");
 
+            // Auto-complete campaign if this was the last pending email
+            $hasPending = SendLog::where('campaign_id', $campaign->id)
+                ->where('status', 'pending')
+                ->exists();
+            if (!$hasPending) {
+                $campaign->update(['status' => 'completed']);
+                Log::info("Campaign {$campaign->id} marked as completed after successful dispatch.");
+            }
+
         } catch (\Exception $e) {
             Log::error("Failed to send email to {$recipient->email}: " . $e->getMessage());
-            if ($sendLog) {
-                $sendLog->update([
-                    'status' => 'failed',
-                    'response' => substr($e->getMessage(), 0, 255),
-                ]);
-            }
             
-            // Release the job back to the queue for retry
-            if ($this->attempts() <= $this->tries) {
+            // Release the job back to the queue for retry if attempts remaining
+            if ($this->attempts() < $this->tries) {
+                if ($sendLog) {
+                    $sendLog->update([
+                        'status' => 'pending', // keep as pending to allow retrying
+                        'response' => substr($e->getMessage(), 0, 255),
+                    ]);
+                }
                 $this->release($this->backoff[$this->attempts() - 1] ?? 300);
             } else {
                 // Job exceeded max attempts, fail it permanently
+                if ($sendLog) {
+                    $sendLog->update([
+                        'status' => 'failed',
+                        'response' => substr($e->getMessage(), 0, 255),
+                    ]);
+                }
+                
+                // Auto-complete campaign if this was the last pending email
+                $hasPending = SendLog::where('campaign_id', $campaign->id)
+                    ->where('status', 'pending')
+                    ->exists();
+                if (!$hasPending) {
+                    $campaign->update(['status' => 'completed']);
+                    Log::info("Campaign {$campaign->id} marked as completed after dispatch failure limit.");
+                }
+                
                 $this->fail($e);
             }
         }

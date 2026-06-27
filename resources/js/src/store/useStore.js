@@ -124,13 +124,31 @@ export const useStore = create((set, get) => ({
   
   // Campaigns - Replace mocks with API
   campaigns: [],
+  campaignsMetadata: null,
   currentCampaign: null,
   campaignsLoading: false,
-  fetchCampaigns: async () => {
+  fetchCampaigns: async (page = 1) => {
     set({ campaignsLoading: true });
     try {
-      const { data } = await api.get('/campaigns');
-      set({ campaigns: data.data || data }); // handle pagination
+      const { data } = await api.get(`/campaigns?page=${page}`);
+      if (data && data.data) {
+        set({ 
+          campaigns: data.data,
+          campaignsMetadata: {
+            current_page: data.current_page,
+            last_page: data.last_page,
+            per_page: data.per_page,
+            total: data.total,
+            from: data.from,
+            to: data.to
+          }
+        });
+      } else {
+        set({ 
+          campaigns: data || [],
+          campaignsMetadata: null
+        });
+      }
     } catch (error) {
       console.error('Failed to fetch campaigns:', error);
     } finally {
@@ -193,7 +211,27 @@ export const useStore = create((set, get) => ({
     set({ templatesLoading: true });
     try {
       const { data } = await api.get('/email-templates');
-      set({ templates: data, templatesLoading: false });
+      
+      const mappedTemplates = data.map((t, index) => {
+        const colors = [
+          'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400',
+          'bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400',
+          'bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400',
+          'bg-purple-50 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400',
+          'bg-rose-50 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400',
+          'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400'
+        ];
+        return {
+          id: t.id,
+          name: t.template_name || t.name || 'Untitled Template',
+          category: t.category || 'Newsletter',
+          description: t.description || t.preview_text || t.subject || 'No description provided.',
+          avgOpenRate: t.avg_open_rate || t.avgOpenRate || '-',
+          color: t.color || colors[index % colors.length]
+        };
+      });
+
+      set({ templates: mappedTemplates, templatesLoading: false });
     } catch (error) {
       console.error('Failed to fetch templates:', error);
       set({ templatesLoading: false });

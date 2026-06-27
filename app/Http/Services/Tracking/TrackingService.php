@@ -102,8 +102,9 @@ class TrackingService
     public function logTracking(\App\Models\SendLog $sendLog, \Illuminate\Http\Request $request, $event = null)
     {
         $data = $this->getTrackingData($request);
+        $existing = $sendLog->tracking_data ?? [];
         $sendLog->update([
-            'tracking_data' => $data,
+            'tracking_data' => array_merge($existing, $data),
             'last_activity_at' => now(),
         ]);
         return $data;

@@ -22,8 +22,15 @@
     --color-slate-850: #162032; /* Deep Graphite custom shade for backgrounds */
 
     /* Soft UI Radii */
-    --radius-soft: 16px;
-    --radius-softer: 24px;
+    --radius-soft: 0px;
+    --radius-softer: 0px;
+    --radius-xs: 0px;
+    --radius-sm: 0px;
+    --radius-md: 0px;
+    --radius-lg: 0px;
+    --radius-xl: 0px;
+    --radius-2xl: 0px;
+    --radius-3xl: 0px;
 }
 
 /* ─── Skeleton shimmer animation ────────────────────────────────────────────

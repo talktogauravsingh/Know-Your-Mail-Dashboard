@@ -27,6 +27,8 @@ class Campaign extends Model
         'schedule_days',
         'schedule_time',
         'variable_mappings',
+        'wizard_step',
+        'recipient_source',
     ];
 
     protected $casts = [
@@ -34,6 +36,7 @@ class Campaign extends Model
         'schedule_days' => 'array',
         'scheduled_at' => 'datetime',
         'variable_mappings' => 'array',
+        'wizard_step' => 'integer',
     ];
 
     public function variants()
