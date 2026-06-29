@@ -8,31 +8,18 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('send_logs', function (Blueprint $table) {
-            $table->unsignedBigInteger('recipient_id')->nullable();
-            $table->unsignedBigInteger('variant_id')->nullable();
-
-            $table->string('provider_message_id')->nullable();
-
-            $table->timestamp('sent_at')->nullable();
-            $table->timestamp('clicked_at')->nullable();
-
-            if (!Schema::hasColumn('send_logs', 'status')) {
-                $table->enum('status', ['pending','sent','failed','opened','clicked'])
-                      ->default('pending');
+            if (!Schema::hasColumn('send_logs', 'recipient_id')) {
+                $table->unsignedBigInteger('recipient_id')->nullable();
             }
-
+            if (!Schema::hasColumn('send_logs', 'variant_id')) {
+                $table->unsignedBigInteger('variant_id')->nullable();
+            }
             if (!Schema::hasColumn('send_logs', 'provider_message_id')) {
                 $table->string('provider_message_id')->nullable();
             }
-
             if (!Schema::hasColumn('send_logs', 'sent_at')) {
                 $table->timestamp('sent_at')->nullable();
             }
-
-            if (!Schema::hasColumn('send_logs', 'opened_at')) {
-                $table->timestamp('opened_at')->nullable();
-            }
-
             if (!Schema::hasColumn('send_logs', 'clicked_at')) {
                 $table->timestamp('clicked_at')->nullable();
             }

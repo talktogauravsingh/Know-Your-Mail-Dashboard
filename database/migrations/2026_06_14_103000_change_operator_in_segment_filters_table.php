@@ -8,8 +8,10 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration {
     public function up(): void
     {
-        // For PostgreSQL, we drop the check constraint first to prevent check violations
-        DB::statement('ALTER TABLE segment_filters DROP CONSTRAINT IF EXISTS segment_filters_operator_check');
+        if (DB::getDriverName() === 'pgsql') {
+            // For PostgreSQL, we drop the check constraint first to prevent check violations
+            DB::statement('ALTER TABLE segment_filters DROP CONSTRAINT IF EXISTS segment_filters_operator_check');
+        }
         
         Schema::table('segment_filters', function (Blueprint $table) {
             $table->string('operator', 20)->default('=')->change();
@@ -18,6 +20,8 @@ return new class extends Migration {
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE segment_filters ADD CONSTRAINT segment_filters_operator_check CHECK (operator::text IN ('='::text, '!='::text, 'in'::text, 'not_in'::text, 'contains'::text, 'starts_with'::text))");
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("ALTER TABLE segment_filters ADD CONSTRAINT segment_filters_operator_check CHECK (operator::text IN ('='::text, '!='::text, 'in'::text, 'not_in'::text, 'contains'::text, 'starts_with'::text))");
+        }
     }
 };

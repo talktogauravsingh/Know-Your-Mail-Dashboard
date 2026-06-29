@@ -106,57 +106,126 @@ class AssignSegmentsJob implements ShouldQueue
             $value = strtolower(trim($value));
         }
 
-        switch ($op) {
-            case '=':
-                $query->whereRaw("attributes->>? = ?", [$field, $value]);
-                break;
-            case '!=':
-                $query->whereRaw("attributes->>? != ?", [$field, $value]);
-                break;
-            case '>':
-                if (is_numeric($value)) {
-                    $query->whereRaw("CAST(attributes->>? AS numeric) > ?", [$field, floatval($value)]);
-                } else {
-                    $query->whereRaw("attributes->>? > ?", [$field, $value]);
-                }
-                break;
-            case '<':
-                if (is_numeric($value)) {
-                    $query->whereRaw("CAST(attributes->>? AS numeric) < ?", [$field, floatval($value)]);
-                } else {
-                    $query->whereRaw("attributes->>? < ?", [$field, $value]);
-                }
-                break;
-            case '>=':
-                if (is_numeric($value)) {
-                    $query->whereRaw("CAST(attributes->>? AS numeric) >= ?", [$field, floatval($value)]);
-                } else {
-                    $query->whereRaw("attributes->>? >= ?", [$field, $value]);
-                }
-                break;
-            case '<=':
-                if (is_numeric($value)) {
-                    $query->whereRaw("CAST(attributes->>? AS numeric) <= ?", [$field, floatval($value)]);
-                } else {
-                    $query->whereRaw("attributes->>? <= ?", [$field, $value]);
-                }
-                break;
-            case 'in':
-                $values = array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
-                $placeholders = implode(',', array_fill(0, count($values), '?'));
-                $query->whereRaw("attributes->>? IN ({$placeholders})", array_merge([$field], $values));
-                break;
-            case 'not_in':
-                $values = array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
-                $placeholders = implode(',', array_fill(0, count($values), '?'));
-                $query->whereRaw("attributes->>? NOT IN ({$placeholders})", array_merge([$field], $values));
-                break;
-            case 'contains':
-                $query->whereRaw("attributes->>? LIKE ?", [$field, "%{$value}%"]);
-                break;
-            case 'starts_with':
-                $query->whereRaw("attributes->>? LIKE ?", [$field, "{$value}%"]);
-                break;
+        $this->applyJsonFilter($query, $field, $op, $value);
+    }
+
+    protected function applyJsonFilter($query, $field, $op, $value)
+    {
+        $driver = DB::getDriverName();
+        $isPostgres = ($driver === 'pgsql');
+        $isMysql = ($driver === 'mysql');
+        $isSqlite = ($driver === 'sqlite');
+
+        if ($isPostgres) {
+            switch ($op) {
+                case '=':
+                    $query->whereRaw("attributes->>? = ?", [$field, $value]);
+                    break;
+                case '!=':
+                    $query->whereRaw("attributes->>? != ?", [$field, $value]);
+                    break;
+                case '>':
+                    if (is_numeric($value)) {
+                        $query->whereRaw("CAST(attributes->>? AS numeric) > ?", [$field, floatval($value)]);
+                    } else {
+                        $query->whereRaw("attributes->>? > ?", [$field, $value]);
+                    }
+                    break;
+                case '<':
+                    if (is_numeric($value)) {
+                        $query->whereRaw("CAST(attributes->>? AS numeric) < ?", [$field, floatval($value)]);
+                    } else {
+                        $query->whereRaw("attributes->>? < ?", [$field, $value]);
+                    }
+                    break;
+                case '>=':
+                    if (is_numeric($value)) {
+                        $query->whereRaw("CAST(attributes->>? AS numeric) >= ?", [$field, floatval($value)]);
+                    } else {
+                        $query->whereRaw("attributes->>? >= ?", [$field, $value]);
+                    }
+                    break;
+                case '<=':
+                    if (is_numeric($value)) {
+                        $query->whereRaw("CAST(attributes->>? AS numeric) <= ?", [$field, floatval($value)]);
+                    } else {
+                        $query->whereRaw("attributes->>? <= ?", [$field, $value]);
+                    }
+                    break;
+                case 'in':
+                    $values = array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
+                    $placeholders = implode(',', array_fill(0, count($values), '?'));
+                    $query->whereRaw("attributes->>? IN ({$placeholders})", array_merge([$field], $values));
+                    break;
+                case 'not_in':
+                    $values = array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
+                    $placeholders = implode(',', array_fill(0, count($values), '?'));
+                    $query->whereRaw("attributes->>? NOT IN ({$placeholders})", array_merge([$field], $values));
+                    break;
+                case 'contains':
+                    $query->whereRaw("attributes->>? LIKE ?", [$field, "%{$value}%"]);
+                    break;
+                case 'starts_with':
+                    $query->whereRaw("attributes->>? LIKE ?", [$field, "{$value}%"]);
+                    break;
+            }
+        } else {
+            // MySQL and SQLite use JSON_UNQUOTE(JSON_EXTRACT(attributes, $.field))
+            // The path must be formatted as '$.fieldName'
+            $path = "$.{$field}";
+            
+            switch ($op) {
+                case '=':
+                    $query->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(attributes, ?)) = ?", [$path, $value]);
+                    break;
+                case '!=':
+                    $query->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(attributes, ?)) != ?", [$path, $value]);
+                    break;
+                case '>':
+                    if (is_numeric($value)) {
+                        $query->whereRaw("CAST(JSON_UNQUOTE(JSON_EXTRACT(attributes, ?)) AS decimal(15,4)) > ?", [$path, floatval($value)]);
+                    } else {
+                        $query->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(attributes, ?)) > ?", [$path, $value]);
+                    }
+                    break;
+                case '<':
+                    if (is_numeric($value)) {
+                        $query->whereRaw("CAST(JSON_UNQUOTE(JSON_EXTRACT(attributes, ?)) AS decimal(15,4)) < ?", [$path, floatval($value)]);
+                    } else {
+                        $query->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(attributes, ?)) < ?", [$path, $value]);
+                    }
+                    break;
+                case '>=':
+                    if (is_numeric($value)) {
+                        $query->whereRaw("CAST(JSON_UNQUOTE(JSON_EXTRACT(attributes, ?)) AS decimal(15,4)) >= ?", [$path, floatval($value)]);
+                    } else {
+                        $query->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(attributes, ?)) >= ?", [$path, $value]);
+                    }
+                    break;
+                case '<=':
+                    if (is_numeric($value)) {
+                        $query->whereRaw("CAST(JSON_UNQUOTE(JSON_EXTRACT(attributes, ?)) AS decimal(15,4)) <= ?", [$path, floatval($value)]);
+                    } else {
+                        $query->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(attributes, ?)) <= ?", [$path, $value]);
+                    }
+                    break;
+                case 'in':
+                    $values = array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
+                    $placeholders = implode(',', array_fill(0, count($values), '?'));
+                    $query->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(attributes, ?)) IN ({$placeholders})", array_merge([$path], $values));
+                    break;
+                case 'not_in':
+                    $values = array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
+                    $placeholders = implode(',', array_fill(0, count($values), '?'));
+                    $query->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(attributes, ?)) NOT IN ({$placeholders})", array_merge([$path], $values));
+                    break;
+                case 'contains':
+                    $query->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(attributes, ?)) LIKE ?", [$path, "%{$value}%"]);
+                    break;
+                case 'starts_with':
+                    $query->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(attributes, ?)) LIKE ?", [$path, "{$value}%"]);
+                    break;
+            }
         }
     }
 }
