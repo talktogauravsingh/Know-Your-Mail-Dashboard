@@ -5,7 +5,7 @@ import { Search, FileSpreadsheet } from 'lucide-react';
  * VariableAutocomplete — renders a floating dropdown when user types `{{`
  * in a text input or textarea. Shows searchable CSV headers to insert as variables.
  */
-export function VariableAutocomplete({ inputRef, value, csvHeaders = [], onChange, fieldType = 'textarea' }) {
+export function VariableAutocomplete({ inputId, value, csvHeaders = [], onChange, fieldType = 'textarea' }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -16,7 +16,7 @@ export function VariableAutocomplete({ inputRef, value, csvHeaders = [], onChang
 
   // Detect `{{` typing pattern — reads directly from the DOM element for immediacy
   useEffect(() => {
-    const el = inputRef?.current;
+    const el = document.getElementById(inputId);
     if (!el) return;
 
     const handler = (e) => {
@@ -51,7 +51,7 @@ export function VariableAutocomplete({ inputRef, value, csvHeaders = [], onChang
 
     el.addEventListener('input', handler);
     return () => el.removeEventListener('input', handler);
-  }, [inputRef, fieldType]);
+  }, [inputId, fieldType]);
 
   // Close on click outside
   useEffect(() => {
@@ -71,18 +71,18 @@ export function VariableAutocomplete({ inputRef, value, csvHeaders = [], onChang
     const handler = (e) => {
       if (e.key === 'Escape') {
         setIsOpen(false);
-        inputRef?.current?.focus();
+        document.getElementById(inputId)?.focus();
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [isOpen, inputRef]);
+  }, [isOpen, inputId]);
 
   const insertVariable = (header) => {
     const triggerStart = triggerStartRef.current;
     if (triggerStart === null) return;
 
-    const el = inputRef?.current;
+    const el = document.getElementById(inputId);
     // Read the CURRENT live value (user may have typed more chars since trigger)
     const liveValue = el ? el.value : value;
     const currentCursor = el ? el.selectionStart : liveValue.length;
@@ -138,7 +138,7 @@ export function VariableAutocomplete({ inputRef, value, csvHeaders = [], onChang
               }
               if (e.key === 'Escape') {
                 setIsOpen(false);
-                inputRef?.current?.focus();
+                document.getElementById(inputId)?.focus();
               }
             }}
             placeholder="Search fields..."

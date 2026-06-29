@@ -227,7 +227,8 @@ export const useStore = create((set, get) => ({
           category: t.category || 'Newsletter',
           description: t.description || t.preview_text || t.subject || 'No description provided.',
           avgOpenRate: t.avg_open_rate || t.avgOpenRate || '-',
-          color: t.color || colors[index % colors.length]
+          color: t.color || colors[index % colors.length],
+          html_content: t.html_content || t.htmlContent || ''
         };
       });
 

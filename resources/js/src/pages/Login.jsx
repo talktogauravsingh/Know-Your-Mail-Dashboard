@@ -6,8 +6,8 @@ import { Input, Label } from '../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../components/ui/Card';
 
 export default function Login() {
-  const [email, setEmail] = useState('demo@tracker.io');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('agent@example.com');
+  const [password, setPassword] = useState('password');
   const [isLoading, setIsLoading] = useState(false);
   const login = useStore((state) => state.login);
   const addToast = useStore((state) => state.addToast);
@@ -37,13 +37,13 @@ export default function Login() {
         <CardContent className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input 
-              id="email" 
-              type="email" 
-              placeholder="m@example.com" 
+            <Input
+              id="email"
+              type="email"
+              placeholder="m@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required 
+              required
             />
           </div>
           <div className="space-y-2">
@@ -51,12 +51,12 @@ export default function Login() {
               <Label htmlFor="password">Password</Label>
               <Link to="#" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">Forgot password?</Link>
             </div>
-            <Input 
-              id="password" 
-              type="password" 
+            <Input
+              id="password"
+              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required 
+              required
             />
           </div>
         </CardContent>

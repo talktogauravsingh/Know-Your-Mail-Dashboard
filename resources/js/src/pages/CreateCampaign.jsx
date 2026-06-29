@@ -4,7 +4,7 @@ import { Button } from '../components/ui/Button';
 import { Input, Label } from '../components/ui/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import { Select } from '../components/ui/Select';
-import { ArrowLeft, Save, Send, Layers, CheckCircle2, AlertCircle, Upload, Calendar, Clock, Sparkles, Wand2, Activity, Filter, Users, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Send, Layers, CheckCircle2, AlertCircle, Upload, Calendar, Clock, Sparkles, Wand2, Activity, Filter, Users, Loader2, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { CsvPreviewPanel } from '../components/CsvPreview';
 import { SegmentationEngine } from '../components/SegmentationEngine';
@@ -68,6 +68,7 @@ export default function CreateCampaign() {
   const [currentStep, setCurrentStep] = useState(1);
   const [variableMappings, setVariableMappings] = useState({});
   const [detectedVariables, setDetectedVariables] = useState([]);
+  const [activeStep3SegmentId, setActiveStep3SegmentId] = useState(null);
 
   // Extract variables from template + body content + subject
   const extractAllCampaignVariables = async (templateOverride = undefined) => {
@@ -139,6 +140,95 @@ export default function CreateCampaign() {
     return () => setCampaignId(null); // also reset on unmount
   }, [id]);
 
+  const updateStateFromCampaignData = React.useCallback((campaign) => {
+    if (!campaign) return;
+    setCampaignName(campaign.name || '');
+    setSenderConfigId(campaign.sender_config_id ? String(campaign.sender_config_id) : '1');
+    setSegmentationMode(campaign.segmentation_mode || 'single');
+    setRecipientSource(campaign.recipient_source || 'campaign');
+    setVariableMappings(campaign.variable_mappings || {});
+    setScheduleType(campaign.schedule_type || 'immediate');
+    setScheduledAt(campaign.scheduled_at ? campaign.scheduled_at.substring(0, 16) : '');
+    setScheduleFrequency(campaign.schedule_frequency || 'daily');
+    setScheduleDays(campaign.schedule_days || []);
+    setScheduleTime(campaign.schedule_time || '');
+
+    // Reconstruct template
+    if (campaign.template) {
+      setSelectedTemplateData(campaign.template);
+    } else if (campaign.template_id && templates.length > 0) {
+      const tmpl = templates.find(t => String(t.id) === String(campaign.template_id));
+      if (tmpl) setSelectedTemplateData(tmpl);
+    }
+
+    // Reconstruct segments and variants
+    const loadedSegments = [];
+    const loadedVariants = {};
+
+    if (campaign.variants && campaign.variants.length > 0) {
+      const sortedVariants = [...campaign.variants].sort((a, b) => (a.priority || 0) - (b.priority || 0));
+      sortedVariants.forEach(v => {
+        const isDefault = v.is_default || v.name === 'Default';
+        const segmentId = isDefault ? 'default' : String(v.id);
+        
+        // Reconstruct filters
+        const filters = [];
+        if (v.filter_groups && v.filter_groups.length > 0) {
+          v.filter_groups[0].filters.forEach(f => {
+            filters.push({
+              field: f.field_name,
+              operator: f.operator,
+              value: f.field_value
+            });
+          });
+        }
+        
+        loadedSegments.push({
+          id: segmentId,
+          name: v.name,
+          isDefault: isDefault,
+          filters: filters,
+          priority: v.priority
+        });
+        
+        loadedVariants[segmentId] = {
+          subject: v.subject || '',
+          body: v.body || '',
+          cta_url: v.cta_url || '',
+          template_id: v.template_id || null
+        };
+      });
+    }
+
+    if (loadedSegments.length === 0) {
+      loadedSegments.push({ id: 'default', name: 'Default Segment', isDefault: true, filters: [] });
+      loadedVariants['default'] = {
+        subject: campaign.subject || '',
+        body: campaign.body || '',
+        cta_url: campaign.cta_url || '',
+        template_id: null
+      };
+    }
+
+    setSegments(loadedSegments);
+    setVariants(loadedVariants);
+
+    // Pre-fill recipient/CSV preview data if present
+    if (campaign.recipient_preview) {
+      const preview = campaign.recipient_preview;
+      setCsvResult({
+        fileName: campaign.recipient_source === 'campaign' ? 'Uploaded Recipients' : 'Organization Directory',
+        totalRows: preview.total_rows,
+        validRows: preview.valid_rows,
+        invalidRows: preview.invalid_rows,
+        headers: preview.headers,
+        rows: preview.preview_rows,
+        errors: [],
+      });
+      setUploadStatus('success');
+    }
+  }, [templates]);
+
   // Edit mode loader
   useEffect(() => {
     if (!id) return;
@@ -155,90 +245,8 @@ export default function CreateCampaign() {
           return;
         }
 
-        setCampaignName(campaign.name || '');
-        setSenderConfigId(campaign.sender_config_id ? String(campaign.sender_config_id) : '1');
-        setSegmentationMode(campaign.segmentation_mode || 'single');
-        setRecipientSource(campaign.recipient_source || 'campaign');
-        setVariableMappings(campaign.variable_mappings || {});
-        setScheduleType(campaign.schedule_type || 'immediate');
-        setScheduledAt(campaign.scheduled_at ? campaign.scheduled_at.substring(0, 16) : '');
-        setScheduleFrequency(campaign.schedule_frequency || 'daily');
-        setScheduleDays(campaign.schedule_days || []);
-        setScheduleTime(campaign.schedule_time || '');
+        updateStateFromCampaignData(campaign);
         setCurrentStep(campaign.wizard_step || 1);
-
-        // Reconstruct template
-        if (campaign.template) {
-          setSelectedTemplateData(campaign.template);
-        } else if (campaign.template_id && templates.length > 0) {
-          const tmpl = templates.find(t => String(t.id) === String(campaign.template_id));
-          if (tmpl) setSelectedTemplateData(tmpl);
-        }
-
-        // Reconstruct segments and variants
-        const loadedSegments = [];
-        const loadedVariants = {};
-
-        if (campaign.variants && campaign.variants.length > 0) {
-          const sortedVariants = [...campaign.variants].sort((a, b) => (a.priority || 0) - (b.priority || 0));
-          sortedVariants.forEach(v => {
-            const isDefault = v.is_default || v.name === 'Default';
-            const segmentId = isDefault ? 'default' : String(v.id);
-            
-            // Reconstruct filters
-            const filters = [];
-            if (v.filter_groups && v.filter_groups.length > 0) {
-              v.filter_groups[0].filters.forEach(f => {
-                filters.push({
-                  field: f.field_name,
-                  operator: f.operator,
-                  value: f.field_value
-                });
-              });
-            }
-            
-            loadedSegments.push({
-              id: segmentId,
-              name: v.name,
-              isDefault: isDefault,
-              filters: filters,
-              priority: v.priority
-            });
-            
-            loadedVariants[segmentId] = {
-              subject: v.subject || '',
-              body: v.body || '',
-              cta_url: v.cta_url || ''
-            };
-          });
-        }
-
-        if (loadedSegments.length === 0) {
-          loadedSegments.push({ id: 'default', name: 'Default', isDefault: true, filters: [] });
-          loadedVariants['default'] = {
-            subject: campaign.subject || '',
-            body: campaign.body || '',
-            cta_url: campaign.cta_url || ''
-          };
-        }
-
-        setSegments(loadedSegments);
-        setVariants(loadedVariants);
-
-        // Pre-fill recipient/CSV preview data if present
-        if (campaign.recipient_preview) {
-          const preview = campaign.recipient_preview;
-          setCsvResult({
-            fileName: campaign.recipient_source === 'campaign' ? 'Uploaded Recipients' : 'Organization Directory',
-            totalRows: preview.total_rows,
-            validRows: preview.valid_rows,
-            invalidRows: preview.invalid_rows,
-            headers: preview.headers,
-            rows: preview.preview_rows,
-            errors: [],
-          });
-          setUploadStatus('success');
-        }
 
         // Fetch insights (loads segmentation metadata)
         try {
@@ -255,7 +263,7 @@ export default function CreateCampaign() {
     };
 
     loadCampaign();
-  }, [id, navigate, templates]);
+  }, [id, navigate, updateStateFromCampaignData]);
 
   // Helper function to check if template has {{content}} block
   const checkTemplateHasContentBlock = (template) => {
@@ -336,6 +344,7 @@ export default function CreateCampaign() {
         });
         currentCampaignId = campaignResponse.data.id;
         setCampaignId(currentCampaignId);
+        updateStateFromCampaignData(campaignResponse.data);
         if (!campaignName.trim()) {
           setCampaignName(draftName);
         }
@@ -427,7 +436,8 @@ export default function CreateCampaign() {
       }
 
       // Always use the 'default' variant's content as the main campaign content fallback
-      const defaultVar = variants['default'] || {};
+      const defaultSegment = segments.find(s => s.isDefault) || segments[0];
+      const defaultVar = (defaultSegment ? variants[defaultSegment.id] : null) || variants['default'] || {};
       data.subject = defaultVar.subject || '';
       data.body = defaultVar.body || '';
       data.cta_link = '';
@@ -510,10 +520,13 @@ export default function CreateCampaign() {
     setIsSubmitting(true);
     try {
       if (campaignId) {
-        await updateCampaign(campaignId, {
+        const updated = await updateCampaign(campaignId, {
           template_id: template ? template.id : null,
           wizard_step: 4,
         });
+        if (updated) {
+          updateStateFromCampaignData(updated);
+        }
       }
       await extractAllCampaignVariables(template);
       setCurrentStep(4);
@@ -528,10 +541,13 @@ export default function CreateCampaign() {
     setIsSubmitting(true);
     try {
       if (campaignId) {
-        await updateCampaign(campaignId, {
+        const updated = await updateCampaign(campaignId, {
           template_id: selectedTemplateData ? selectedTemplateData.id : null,
           wizard_step: 4,
         });
+        if (updated) {
+          updateStateFromCampaignData(updated);
+        }
       }
       await extractAllCampaignVariables();
       setCurrentStep(4);
@@ -562,7 +578,8 @@ export default function CreateCampaign() {
         status: 'draft',
         wizard_step: 5,
       };
-      const defaultVar = variants['default'] || {};
+      const defaultSegment = segments.find(s => s.isDefault) || segments[0];
+      const defaultVar = (defaultSegment ? variants[defaultSegment.id] : null) || variants['default'] || {};
       data.subject = defaultVar.subject || '';
       data.body = defaultVar.body || '';
       data.cta_link = '';
@@ -571,7 +588,10 @@ export default function CreateCampaign() {
         data.template_id = selectedTemplateData.id;
       }
       
-      await updateCampaign(campaignId, data);
+      const updated = await updateCampaign(campaignId, data);
+      if (updated) {
+        updateStateFromCampaignData(updated);
+      }
       setCurrentStep(5);
     } catch (err) {
       console.error('Failed to transition from step 4 to step 5:', err);
@@ -592,10 +612,11 @@ export default function CreateCampaign() {
         variants,
         variable_mappings: variableMappings,
         recipient_source: recipientSource,
-        status: statusOverride || (scheduleType === 'immediate' ? 'sent' : 'scheduled'),
+        status: statusOverride || 'scheduled',
         schedule_type: scheduleType,
       };
-      const defaultVar = variants['default'] || {};
+      const defaultSegment = segments.find(s => s.isDefault) || segments[0];
+      const defaultVar = (defaultSegment ? variants[defaultSegment.id] : null) || variants['default'] || {};
       data.subject = defaultVar.subject || '';
       data.body = defaultVar.body || '';
       data.cta_link = '';
@@ -816,7 +837,15 @@ export default function CreateCampaign() {
   if (currentStep === 4) {
     const csvHeaders = csvResult?.headers || [];
     const csvFirstRow = csvResult?.rows?.[0] || {};
-    const defaultVariant = variants['default'] || {};
+    const defaultSegment = segments.find(s => s.isDefault) || segments[0];
+    const defaultVariant = (defaultSegment ? variants[defaultSegment.id] : null) || variants['default'] || {};
+
+    const getSegmentTemplateData = (segmentId) => {
+      if (segmentationMode === 'single') return selectedTemplateData;
+      const segmentTemplateId = variants[segmentId]?.template_id;
+      if (!segmentTemplateId) return null;
+      return templates.find(t => String(t.id) === String(segmentTemplateId)) || null;
+    };
 
     return (
       <div className="space-y-6 max-w-7xl mx-auto pb-10 animate-in fade-in duration-300">
@@ -855,135 +884,233 @@ export default function CreateCampaign() {
               )}
               
               <div className="space-y-8">
-                {segments.map((segment) => (
-                  <div key={segment.id} className={cn(
-                    "p-5 rounded-none border border-slate-200 dark:border-slate-800 space-y-5",
-                    segment.isDefault ? "bg-white dark:bg-slate-950" : "bg-slate-50/30 dark:bg-slate-900/20"
-                  )}>
-                    {segmentationMode === 'segmented' && (
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className={cn("px-2 py-0.5 rounded-none text-[10px] font-bold uppercase tracking-wider", segment.isDefault ? "bg-slate-200 text-slate-700" : "bg-indigo-600 text-white")}>
-                            {segment.isDefault ? 'Default' : `Segment ${segment.priority}`}
-                          </div>
-                          <span className="text-sm font-bold text-slate-900 dark:text-slate-50">{segment.name}</span>
-                        </div>
-                        {segment.isDefault && <p className="text-[10px] text-slate-400 italic">Fallback for everyone else</p>}
-                      </div>
-                    )}
+                {segments.map((segment) => {
+                  const activeTemplate = getSegmentTemplateData(segment.id);
+                  const activeHasContentBlock = !activeTemplate || checkTemplateHasContentBlock(activeTemplate);
+                  const isPreviewOpen = variants[segment.id]?.[`show_preview_${segment.id}`];
 
-                    <div className="space-y-4">
-                      {/* Subject Line with Autocomplete */}
-                      <div className="space-y-2">
+                  return (
+                    <div key={segment.id} className={cn(
+                      "p-5 rounded-none border border-slate-200 dark:border-slate-800 space-y-5",
+                      segment.isDefault ? "bg-white dark:bg-slate-950" : "bg-slate-50/30 dark:bg-slate-900/20"
+                    )}>
+                      {segmentationMode === 'segmented' && (
                         <div className="flex items-center justify-between">
-                          <Label className="text-sm font-semibold">Subject Line</Label>
-                          <div className="flex items-center gap-3">
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500">Type {'{{' } to insert variables</span>
-                            <button 
-                              type="button" 
-                              onClick={() => { setActiveAiSegment(segment.id); setAiGenOpen(true); }}
-                              className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium"
-                            >
-                              <Sparkles className="w-3 h-3" /> AI Generate
-                            </button>
+                          <div className="flex items-center gap-2">
+                            <div className={cn("px-2 py-0.5 rounded-none text-[10px] font-bold uppercase tracking-wider", segment.isDefault ? "bg-slate-200 text-slate-700" : "bg-indigo-600 text-white")}>
+                              {segment.isDefault ? 'Default' : `Segment ${segment.priority}`}
+                            </div>
+                            <span className="text-sm font-bold text-slate-900 dark:text-slate-50">{segment.name}</span>
                           </div>
+                          {segment.isDefault && <p className="text-[10px] text-slate-400 italic">Fallback for everyone else</p>}
                         </div>
-                        <div className="relative">
-                          <Input 
-                            ref={subjectInputRef}
-                            placeholder="What will they see in their inbox? Type {{ for variables"
-                            value={variants[segment.id]?.subject || ''}
-                            onChange={(e) => setVariants({
-                              ...variants,
-                              [segment.id]: { ...variants[segment.id], subject: e.target.value }
-                            })}
-                            onBlur={handleFieldBlur}
-                            required
-                            className="bg-white dark:bg-slate-950"
-                          />
-                          <VariableAutocomplete
-                            inputRef={subjectInputRef}
-                            value={variants[segment.id]?.subject || ''}
-                            csvHeaders={csvHeaders}
-                            onChange={(newVal) => setVariants({
-                              ...variants,
-                              [segment.id]: { ...variants[segment.id], subject: newVal }
-                            })}
-                            fieldType="input"
-                          />
-                        </div>
-                      </div>
+                      )}
 
-                      {/* Email Content with Autocomplete */}
-                      {(!selectedTemplateData || templateHasContentBlock) && (
+                      <div className="space-y-4">
+                        {/* Segment Specific Template Selection (for Multi-Segment Mode) */}
+                        {segmentationMode === 'segmented' && (
+                          <div className="space-y-2">
+                            <Label className="text-sm font-semibold">Email Template</Label>
+                            <div className="flex items-center gap-3">
+                              <Select 
+                                value={variants[segment.id]?.template_id || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setVariants(prev => ({
+                                    ...prev,
+                                    [segment.id]: {
+                                      ...prev[segment.id],
+                                      template_id: val ? Number(val) : null
+                                    }
+                                  }));
+                                }}
+                                className="bg-white dark:bg-slate-950 flex-1 h-10 border-slate-200 dark:border-slate-800"
+                              >
+                                <option value="">Plain Text / Start from Scratch (No Template)</option>
+                                {templates.map(tmpl => (
+                                  <option key={tmpl.id} value={tmpl.id}>
+                                    {tmpl.name} ({tmpl.category})
+                                  </option>
+                                ))}
+                              </Select>
+                              {variants[segment.id]?.template_id && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setVariants(prev => ({
+                                      ...prev,
+                                      [segment.id]: {
+                                        ...prev[segment.id],
+                                        template_id: null
+                                      }
+                                    }));
+                                  }}
+                                  className="text-xs text-red-500 hover:text-red-650 hover:bg-red-50 dark:hover:bg-red-950/20 px-2.5 h-10 shrink-0 gap-1 border border-slate-200 dark:border-slate-850"
+                                >
+                                  <X className="w-3.5 h-3.5" /> Unselect
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Subject Line with Autocomplete */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <Label className="text-sm font-semibold">Email Content</Label>
+                            <Label className="text-sm font-semibold">Subject Line</Label>
                             <div className="flex items-center gap-3">
+                              <span className="text-[10px] text-slate-400 dark:text-slate-500">Type {'{{' } to insert variables</span>
+                              
+                              {segmentationMode === 'segmented' && !segment.isDefault && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const mainSubject = variants['default']?.subject || '';
+                                    setVariants(prev => ({
+                                      ...prev,
+                                      [segment.id]: {
+                                        ...prev[segment.id],
+                                        subject: mainSubject
+                                      }
+                                    }));
+                                  }}
+                                  className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-semibold"
+                                >
+                                  Copy from Main Subject
+                                </button>
+                              )}
+
                               <button 
                                 type="button" 
-                                onClick={() => { setActiveAiSegment(segment.id); setAiRewriteOpen(true); }}
-                                className="text-xs flex items-center gap-1 text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
+                                onClick={() => { setActiveAiSegment(segment.id); setAiGenOpen(true); }}
+                                className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium"
                               >
-                                <Wand2 className="w-3 h-3" /> Rewrite
-                              </button>
-                              <button 
-                                type="button" 
-                                onClick={() => { setActiveAiSegment(segment.id); setAiAnalysisOpen(true); }}
-                                className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
-                              >
-                                <Activity className="w-3 h-3" /> Analyze
+                                <Sparkles className="w-3 h-3" /> AI Generate
                               </button>
                             </div>
                           </div>
                           <div className="relative">
-                            <textarea 
-                              ref={bodyTextareaRef}
-                              className="flex min-h-[200px] w-full rounded-none border border-slate-200 bg-white dark:bg-slate-950 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 dark:border-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                              placeholder={selectedTemplateData && templateHasContentBlock ? "Your message will be injected into the template's content zone... Type {{ for variables" : selectedTemplateData ? "Content field disabled. Edit the template first to add a Content Zone block." : "Your message goes here... Type {{ to insert dynamic variables"}
-                              value={variants[segment.id]?.body || ''}
+                            <Input 
+                              id={`subject-${segment.id}`}
+                              placeholder="What will they see in their inbox? Type {{ for variables"
+                              value={variants[segment.id]?.subject || ''}
                               onChange={(e) => setVariants({
                                 ...variants,
-                                [segment.id]: { ...variants[segment.id], body: e.target.value }
+                                [segment.id]: { ...variants[segment.id], subject: e.target.value }
                               })}
                               onBlur={handleFieldBlur}
-                              disabled={selectedTemplateData && !templateHasContentBlock}
-                              required={!selectedTemplateData || templateHasContentBlock}
-                            ></textarea>
+                              required
+                              className="bg-white dark:bg-slate-950"
+                            />
                             <VariableAutocomplete
-                              inputRef={bodyTextareaRef}
-                              value={variants[segment.id]?.body || ''}
+                              inputId={`subject-${segment.id}`}
+                              value={variants[segment.id]?.subject || ''}
                               csvHeaders={csvHeaders}
                               onChange={(newVal) => setVariants({
                                 ...variants,
-                                [segment.id]: { ...variants[segment.id], body: newVal }
+                                [segment.id]: { ...variants[segment.id], subject: newVal }
                               })}
-                              fieldType="textarea"
+                              fieldType="input"
                             />
                           </div>
-                          {selectedTemplateData && !templateHasContentBlock && (
-                            <div className="mt-2 flex items-center gap-2">
-                              <Link to={`/templates/designer?id=${selectedTemplateData.id}`}>
-                                <Button type="button" variant="outline" size="sm">
-                                  Edit Template in Designer
-                                </Button>
-                              </Link>
-                            </div>
-                          )}
-                          {selectedTemplateData && templateHasContentBlock && variants[segment.id]?.body && (
-                            <button 
-                              type="button"
-                              onClick={() => setShowPreview(true)}
-                              className="text-xs flex items-center gap-1 text-indigo-650 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium"
-                            >
-                              👁️ Preview & Style
-                            </button>
-                          )}
                         </div>
-                      )}
+
+                        {/* Email Content with Autocomplete */}
+                        {(!activeTemplate || activeHasContentBlock) && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-sm font-semibold">Email Content</Label>
+                              <div className="flex items-center gap-3">
+                                <button 
+                                  type="button" 
+                                  onClick={() => { setActiveAiSegment(segment.id); setAiRewriteOpen(true); }}
+                                  className="text-xs flex items-center gap-1 text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
+                                >
+                                  <Wand2 className="w-3 h-3" /> Rewrite
+                                </button>
+                                <button 
+                                  type="button" 
+                                  onClick={() => { setActiveAiSegment(segment.id); setAiAnalysisOpen(true); }}
+                                  className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                                >
+                                  <Activity className="w-3 h-3" /> Analyze
+                                </button>
+                              </div>
+                            </div>
+                            <div className="relative">
+                              <textarea 
+                                id={`body-${segment.id}`}
+                                className="flex min-h-[200px] w-full rounded-none border border-slate-200 bg-white dark:bg-slate-950 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 dark:border-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                                placeholder={activeTemplate && activeHasContentBlock ? "Your message will be injected into the template's content zone... Type {{ for variables" : activeTemplate ? "Content field disabled. Edit the template first to add a Content Zone block." : "Your message goes here... Type {{ to insert dynamic variables"}
+                                value={variants[segment.id]?.body || ''}
+                                onChange={(e) => setVariants({
+                                  ...variants,
+                                  [segment.id]: { ...variants[segment.id], body: e.target.value }
+                                })}
+                                onBlur={handleFieldBlur}
+                                disabled={activeTemplate && !activeHasContentBlock}
+                                required={!activeTemplate || activeHasContentBlock}
+                              ></textarea>
+                              <VariableAutocomplete
+                                inputId={`body-${segment.id}`}
+                                value={variants[segment.id]?.body || ''}
+                                csvHeaders={csvHeaders}
+                                onChange={(newVal) => setVariants({
+                                  ...variants,
+                                  [segment.id]: { ...variants[segment.id], body: newVal }
+                                })}
+                                fieldType="textarea"
+                              />
+                            </div>
+                            {activeTemplate && !activeHasContentBlock && (
+                              <div className="mt-2 flex items-center gap-2">
+                                <Link to={`/templates/designer?id=${activeTemplate.id}`}>
+                                  <Button type="button" variant="outline" size="sm">
+                                    Edit Template in Designer
+                                  </Button>
+                                </Link>
+                              </div>
+                            )}
+                            
+                            {activeTemplate && activeHasContentBlock && variants[segment.id]?.body && (
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  const toggleKey = `show_preview_${segment.id}`;
+                                  setVariants(prev => ({
+                                    ...prev,
+                                    [segment.id]: {
+                                      ...prev[segment.id],
+                                      [toggleKey]: !prev[segment.id]?.[toggleKey]
+                                    }
+                                  }));
+                                }}
+                                className="text-xs flex items-center gap-1 text-indigo-650 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-semibold mt-1"
+                              >
+                                👁️ {isPreviewOpen ? 'Hide Preview & Style' : 'Preview & Style'}
+                              </button>
+                            )}
+
+                            {activeTemplate && isPreviewOpen && (
+                              <div className="mt-4 border-t border-slate-100 dark:border-slate-800 pt-4 h-[450px]">
+                                <CampaignPreview 
+                                  template={activeTemplate}
+                                  body={variants[segment.id]?.body || ''}
+                                  subject={variants[segment.id]?.subject || ''}
+                                  inline={true}
+                                  variableMappings={variableMappings}
+                                  csvFirstRow={csvFirstRow}
+                                  detectedVariables={detectedVariables}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -1003,8 +1130,8 @@ export default function CreateCampaign() {
             recipientSource={recipientSource}
           />
 
-          {/* Live Preview */}
-          {selectedTemplateData && (
+          {/* Live Preview (Only in Single Mode or if a campaign-level template is selected) */}
+          {segmentationMode === 'single' && selectedTemplateData && (
             <CampaignPreview 
               template={selectedTemplateData}
               body={defaultVariant.body || ''}
@@ -1114,19 +1241,62 @@ export default function CreateCampaign() {
               className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
               isLoading={isSubmitting}
             >
-              {selectedTemplateData ? 'Continue to Compose →' : 'Skip — Compose Without Template →'}
+              {(segmentationMode === 'single' ? selectedTemplateData : true) ? 'Continue to Compose →' : 'Skip — Compose Without Template →'}
             </Button>
           </div>
         </div>
+
+        {segmentationMode === 'segmented' && (
+          <div className="space-y-3 pb-2">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">Assign templates to your segments</h3>
+            <div className="flex flex-wrap gap-2">
+              {segments.map((segment, idx) => {
+                const isActive = activeStep3SegmentId === segment.id || (!activeStep3SegmentId && idx === 0);
+                const hasTemplate = variants[segment.id]?.template_id;
+                return (
+                  <button
+                    key={segment.id}
+                    type="button"
+                    onClick={() => setActiveStep3SegmentId(segment.id)}
+                    className={cn(
+                      "px-4 py-2 rounded-none text-sm font-semibold transition-all flex items-center gap-2",
+                      isActive 
+                        ? "bg-indigo-600 text-white shadow-md border border-indigo-600" 
+                        : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-indigo-300"
+                    )}
+                  >
+                    {segment.name}
+                    {hasTemplate && (
+                      <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-slate-500">Select a segment above, then click a template below to assign it.</p>
+          </div>
+        )}
 
         {/* ─── Template Grid ─── */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {/* Blank Template option */}
           <div 
-            onClick={() => selectTemplateAndContinue(null)}
+            onClick={() => {
+              if (segmentationMode === 'segmented') {
+                const targetId = activeStep3SegmentId || segments[0]?.id;
+                if (targetId) {
+                  setVariants(prev => ({
+                    ...prev,
+                    [targetId]: { ...prev[targetId], template_id: null }
+                  }));
+                }
+              } else {
+                selectTemplateAndContinue(null);
+              }
+            }}
             className={cn(
               "border hover:border-indigo-600 bg-white dark:bg-slate-950 p-6 flex flex-col justify-between h-48 cursor-pointer transition-all duration-200 group hover:shadow-sm",
-              selectedTemplateData === null ? "border-2 border-indigo-600" : "border-slate-200 dark:border-slate-800"
+              (segmentationMode === 'segmented' ? (variants[activeStep3SegmentId || segments[0]?.id]?.template_id == null) : selectedTemplateData === null) ? "border-2 border-indigo-600" : "border-slate-200 dark:border-slate-800"
             )}
           >
             <div className="space-y-2">
@@ -1151,12 +1321,31 @@ export default function CreateCampaign() {
           {/* Loaded templates */}
           {templates.map((tmpl) => {
             const hasContentBlock = tmpl.html_content?.includes('{{content}}') || tmpl.htmlContent?.includes('{{content}}');
-            const isSelected = selectedTemplateData && String(selectedTemplateData.id) === String(tmpl.id);
+            
+            let isSelected = false;
+            if (segmentationMode === 'segmented') {
+              const targetId = activeStep3SegmentId || segments[0]?.id;
+              isSelected = String(variants[targetId]?.template_id) === String(tmpl.id);
+            } else {
+              isSelected = selectedTemplateData && String(selectedTemplateData.id) === String(tmpl.id);
+            }
             
             return (
               <div 
                 key={tmpl.id}
-                onClick={() => selectTemplateAndContinue(tmpl)}
+                onClick={() => {
+                  if (segmentationMode === 'segmented') {
+                    const targetId = activeStep3SegmentId || segments[0]?.id;
+                    if (targetId) {
+                      setVariants(prev => ({
+                        ...prev,
+                        [targetId]: { ...prev[targetId], template_id: tmpl.id }
+                      }));
+                    }
+                  } else {
+                    selectTemplateAndContinue(tmpl);
+                  }
+                }}
                 className={cn(
                   "border hover:border-indigo-600 bg-white dark:bg-slate-950 p-6 flex flex-col justify-between h-48 cursor-pointer transition-all duration-200 group hover:shadow-sm",
                   isSelected ? "border-2 border-indigo-600" : "border-slate-200 dark:border-slate-800"
@@ -1183,7 +1372,9 @@ export default function CreateCampaign() {
                   <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{tmpl.description}</p>
                 </div>
                 <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
-                  {isSelected ? "Selected (Click to change) →" : "Use Layout →"}
+                  {isSelected 
+                    ? "Selected (Click to change) →" 
+                    : (segmentationMode === 'segmented' ? "Assign to Segment →" : "Use Layout →")}
                 </span>
               </div>
             );
@@ -1526,18 +1717,24 @@ export default function CreateCampaign() {
                       wizard_step: 3,
                       recipient_source: recipientSource,
                     };
-                    const defaultVar = variants['default'] || {};
+                    const defaultSegment = segments.find(s => s.isDefault) || segments[0];
+                    const defaultVar = (defaultSegment ? variants[defaultSegment.id] : null) || variants['default'] || {};
                     data.subject = defaultVar.subject || 'Campaign Subject';
                     data.body = defaultVar.body || 'Email content goes here...';
                     data.cta_link = '';
 
+                    let updatedCampaign;
                     if (campaignId) {
-                      await updateCampaign(campaignId, data);
+                      updatedCampaign = await updateCampaign(campaignId, data);
                     } else {
                       const response = await api.post('/campaigns', data);
-                      if (response?.data?.id) {
-                        setCampaignId(response.data.id);
+                      updatedCampaign = response?.data;
+                      if (updatedCampaign?.id) {
+                        setCampaignId(updatedCampaign.id);
                       }
+                    }
+                    if (updatedCampaign) {
+                      updateStateFromCampaignData(updatedCampaign);
                     }
                     setCurrentStep(3);
                   } catch (err) {
@@ -1627,13 +1824,18 @@ export default function CreateCampaign() {
                   wizard_step: 2,
                   status: 'draft',
                 };
+                let updatedCampaign;
                 if (campaignId) {
-                  await updateCampaign(campaignId, data);
+                  updatedCampaign = await updateCampaign(campaignId, data);
                 } else {
                   const response = await api.post('/campaigns', data);
-                  if (response?.data?.id) {
-                    setCampaignId(response.data.id);
+                  updatedCampaign = response?.data;
+                  if (updatedCampaign?.id) {
+                    setCampaignId(updatedCampaign.id);
                   }
+                }
+                if (updatedCampaign) {
+                  updateStateFromCampaignData(updatedCampaign);
                 }
                 setCurrentStep(2);
               } catch (err) {

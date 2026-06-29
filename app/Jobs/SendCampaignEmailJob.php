@@ -165,9 +165,12 @@ class SendCampaignEmailJob implements ShouldQueue
             // Prepare HTML body
             $htmlBody = '';
 
-            // If campaign has a template with content block, use template merging
-            if ($campaign->template_id && $campaign->template) {
-                $template = $campaign->template;
+            // Resolve the template for this variant: use variant's template_id first, falling back to campaign's template_id
+            $templateId = $variant->template_id ?: $campaign->template_id;
+            $template = $templateId ? \App\Models\EmailTemplate::find($templateId) : null;
+
+            // If template exists, use template merging
+            if ($template) {
                 $templateService = new EmailTemplateService();
                 
                 // Prepare the variant body (with variable substitution)

@@ -98,9 +98,6 @@ class AssignSegmentsJob implements ShouldQueue
     protected function applyFilter($query, $filter)
     {
         $field = strtolower(trim($filter->field_name));
-        if (!preg_match('/^[A-Za-z0-9_]+$/', $field)) {
-            return;
-        }
         $value = $filter->field_value;
         $op = $filter->operator;
 
@@ -109,31 +106,56 @@ class AssignSegmentsJob implements ShouldQueue
             $value = strtolower(trim($value));
         }
 
-        // Attributes is a JSON column. Use Postgres ->> operator to extract text
-        $column = "attributes->>'{$field}'";
-
         switch ($op) {
             case '=':
-                $query->whereRaw("{$column} = ?", [$value]);
+                $query->whereRaw("attributes->>? = ?", [$field, $value]);
                 break;
             case '!=':
-                $query->whereRaw("{$column} != ?", [$value]);
+                $query->whereRaw("attributes->>? != ?", [$field, $value]);
+                break;
+            case '>':
+                if (is_numeric($value)) {
+                    $query->whereRaw("CAST(attributes->>? AS numeric) > ?", [$field, floatval($value)]);
+                } else {
+                    $query->whereRaw("attributes->>? > ?", [$field, $value]);
+                }
+                break;
+            case '<':
+                if (is_numeric($value)) {
+                    $query->whereRaw("CAST(attributes->>? AS numeric) < ?", [$field, floatval($value)]);
+                } else {
+                    $query->whereRaw("attributes->>? < ?", [$field, $value]);
+                }
+                break;
+            case '>=':
+                if (is_numeric($value)) {
+                    $query->whereRaw("CAST(attributes->>? AS numeric) >= ?", [$field, floatval($value)]);
+                } else {
+                    $query->whereRaw("attributes->>? >= ?", [$field, $value]);
+                }
+                break;
+            case '<=':
+                if (is_numeric($value)) {
+                    $query->whereRaw("CAST(attributes->>? AS numeric) <= ?", [$field, floatval($value)]);
+                } else {
+                    $query->whereRaw("attributes->>? <= ?", [$field, $value]);
+                }
                 break;
             case 'in':
                 $values = array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
                 $placeholders = implode(',', array_fill(0, count($values), '?'));
-                $query->whereRaw("{$column} IN ({$placeholders})", $values);
+                $query->whereRaw("attributes->>? IN ({$placeholders})", array_merge([$field], $values));
                 break;
             case 'not_in':
                 $values = array_map(fn($v) => strtolower(trim($v)), explode(',', $value));
                 $placeholders = implode(',', array_fill(0, count($values), '?'));
-                $query->whereRaw("{$column} NOT IN ({$placeholders})", $values);
+                $query->whereRaw("attributes->>? NOT IN ({$placeholders})", array_merge([$field], $values));
                 break;
             case 'contains':
-                $query->whereRaw("{$column} LIKE ?", ["%{$value}%"]);
+                $query->whereRaw("attributes->>? LIKE ?", [$field, "%{$value}%"]);
                 break;
             case 'starts_with':
-                $query->whereRaw("{$column} LIKE ?", ["{$value}%"]);
+                $query->whereRaw("attributes->>? LIKE ?", [$field, "{$value}%"]);
                 break;
         }
     }
