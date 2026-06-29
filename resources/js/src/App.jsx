@@ -22,6 +22,8 @@ import BulkImport from './pages/BulkImport';
 import Settings from './pages/Settings';
 import Billing from './pages/Billing';
 import TemplateDesigner from './pages/TemplateDesigner';
+import Automations from './pages/Automations';
+import AutomationBuilder from './pages/AutomationBuilder';
 
 // Protected Route Wrapper
 function ProtectedRoute({ children }) {
@@ -78,6 +80,9 @@ export default function App() {
           <Route path="/bulk-import" element={<BulkImport />} />
           <Route path="/billing" element={<Billing />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/automations" element={<Automations />} />
+          <Route path="/automations/new" element={<AutomationBuilder />} />
+          <Route path="/automations/:id" element={<AutomationBuilder />} />
           <Route
             path="/templates/designer"
             element={<TemplateDesigner />}

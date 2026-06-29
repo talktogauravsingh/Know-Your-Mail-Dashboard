@@ -613,4 +613,84 @@ export const useStore = create((set, get) => ({
       set({ rolesLoading: false });
     }
   },
+
+  // Automations
+  automations: [],
+  automationsLoading: false,
+  fetchAutomations: async () => {
+    set({ automationsLoading: true });
+    try {
+      const { data } = await api.get('/automations');
+      set({ automations: data, automationsLoading: false });
+    } catch (error) {
+      console.error('Failed to fetch automations:', error);
+      set({ automationsLoading: false });
+    }
+  },
+  fetchAutomationDetail: async (id) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.get(`/automations/${id}`);
+      return data;
+    } catch (error) {
+      console.error('Failed to fetch automation detail:', error);
+      get().addToast('Failed to load automation detail', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  createAutomation: async (automationData) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.post('/automations', automationData);
+      get().fetchAutomations();
+      get().addToast('Automation created successfully', 'success');
+      return data.data || data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to create automation', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  updateAutomation: async (id, automationData) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.patch(`/automations/${id}`, automationData);
+      get().fetchAutomations();
+      get().addToast('Automation updated successfully', 'success');
+      return data.data || data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to update automation', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  deleteAutomation: async (id) => {
+    try {
+      await api.delete(`/automations/${id}`);
+      get().fetchAutomations();
+      get().addToast('Automation deleted successfully', 'success');
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to delete automation', 'error');
+      throw error;
+    }
+  },
+  toggleAutomation: async (id) => {
+    try {
+      const { data } = await api.post(`/automations/${id}/toggle`);
+      set((state) => ({
+        automations: state.automations.map((a) =>
+          a.id === id || a.uuid === id ? { ...a, status: data.status } : a
+        ),
+      }));
+      get().addToast(`Automation ${data.status === 'active' ? 'activated' : 'paused'}`, 'success');
+      return data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to toggle status', 'error');
+      throw error;
+    }
+  },
 }));

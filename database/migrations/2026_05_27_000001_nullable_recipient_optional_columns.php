@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         foreach (['lead_type', 'city', 'gender'] as $column) {
             if (Schema::hasColumn('recipients', $column)) {
                 if (DB::getDriverName() === 'mysql') {
@@ -23,6 +27,10 @@ return new class extends Migration {
 
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         foreach (['lead_type', 'city', 'gender'] as $column) {
             if (Schema::hasColumn('recipients', $column)) {
                 DB::table('recipients')->whereNull($column)->update([$column => '']);

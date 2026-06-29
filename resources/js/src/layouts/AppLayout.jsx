@@ -30,7 +30,7 @@ const navigation = [
   { name: 'Billing & Plan', href: '/billing', icon: CreditCard },
   { name: 'Campaigns', href: '/campaigns', icon: Mail },
   { name: 'Templates', href: '/templates', icon: LayoutTemplate },
-  { name: 'Automation', href: '#', icon: Sparkles, disabled: true },
+  { name: 'Automation', href: '/automations', icon: Sparkles },
   { name: 'Audience', href: '/audience', icon: Users },
   { name: 'Global Import', href: '/bulk-import', icon: Database },
   { name: 'AI Chatbot', href: '#', icon: Bot, disabled: true },

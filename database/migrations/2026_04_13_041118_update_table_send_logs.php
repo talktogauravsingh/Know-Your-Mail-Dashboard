@@ -14,6 +14,10 @@ return new class extends Migration {
             if (!Schema::hasColumn('send_logs', 'variant_id')) {
                 $table->unsignedBigInteger('variant_id')->nullable();
             }
+            if (!Schema::hasColumn('send_logs', 'status')) {
+                $table->enum('status', ['pending','sent','failed','opened','clicked'])
+                      ->default('pending');
+            }
             if (!Schema::hasColumn('send_logs', 'provider_message_id')) {
                 $table->string('provider_message_id')->nullable();
             }

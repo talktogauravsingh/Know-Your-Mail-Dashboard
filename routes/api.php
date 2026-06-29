@@ -162,3 +162,12 @@ Route::middleware('auth:sanctum')->prefix('admin/kym')->group(function () {
     Route::get('/organizations', [\App\Http\Controllers\Api\Admin\KymConsoleController::class, 'index']);
     Route::post('/organizations/{id}/update', [\App\Http\Controllers\Api\Admin\KymConsoleController::class, 'update']);
 });
+
+Route::middleware('auth:sanctum')->prefix('automations')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'store']);
+    Route::get('/{automation}', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'show']);
+    Route::patch('/{automation}', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'update']);
+    Route::delete('/{automation}', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'destroy']);
+    Route::post('/{automation}/toggle', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'toggle']);
+});

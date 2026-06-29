@@ -40,6 +40,7 @@ class TrackingController extends Controller
                     $request->header('User-Agent', ''),
                     $request->header('Referer', '')
                 ));
+                \App\Jobs\EvaluateTriggerAutomationJob::dispatch($sendLog, 'open');
             }
         } catch (\Exception $e) {
             Log::warning('Tracking open failed: ' . $e->getMessage());
@@ -59,6 +60,7 @@ class TrackingController extends Controller
 
     public function ClickMailTrack(Request $request)
     {
+        $url = $request->query('url');
         try {
             $sendLog = SendLog::find($request->route('sendLog'));
 
@@ -91,12 +93,12 @@ class TrackingController extends Controller
                     $request->header('User-Agent', ''),
                     $request->header('Referer', '')
                 ));
+                \App\Jobs\EvaluateTriggerAutomationJob::dispatch($sendLog, 'click', $url);
             }
         } catch (\Exception $e) {
             Log::warning('Tracking click failed: ' . $e->getMessage());
         }
         
-        $url = $request->query('url');
         if ($url) {
             return redirect($url);
         }
