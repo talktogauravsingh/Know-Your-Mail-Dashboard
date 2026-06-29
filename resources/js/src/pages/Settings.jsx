@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
 import {
     Card,
     CardHeader,
@@ -25,6 +26,7 @@ import {
     Ban,
 } from "lucide-react";
 import { useStore } from "../store/useStore";
+import TeamManagement from "./settings/TeamManagement";
 import SenderDomains from "./settings/SenderDomains";
 import SmtpCredentials from "./settings/SmtpCredentials";
 import Suppressions from "./settings/Suppressions";
@@ -82,7 +84,25 @@ function loadRazorpayScript() {
 }
 
 export default function Settings() {
-    const [activeTab, setActiveTab] = useState("team");
+    const user = useStore((state) => state.user);
+    const userRoleSlug = user?.role?.slug;
+    const isSettingsAllowed = userRoleSlug === "super-admin" || userRoleSlug === "admin" || userRoleSlug === "root";
+    const isTeamAllowed = isSettingsAllowed; // Team management is accessible to all settings users since settings as a whole is now restricted
+
+    const [activeTab, setActiveTab] = useState("profile");
+    const [hasDefaulted, setHasDefaulted] = useState(false);
+
+    useEffect(() => {
+        if (userRoleSlug && !hasDefaulted) {
+            setActiveTab(isTeamAllowed ? "team" : "profile");
+            setHasDefaulted(true);
+        }
+    }, [userRoleSlug, isTeamAllowed, hasDefaulted]);
+
+    if (user && !isSettingsAllowed) {
+        return <Navigate to="/dashboard" replace />;
+    }
+
     const [isAddingSmtp, setIsAddingSmtp] = useState(false);
     const [newSmtp, setNewSmtp] = useState({
         provider: "Custom SMTP",
@@ -114,7 +134,6 @@ export default function Settings() {
     const fetchSmtpConfigurations = useStore(
         (state) => state.fetchSmtpConfigurations,
     );
-    const user = useStore((state) => state.user);
     const smtpConfigurationsLoading = useStore(
         (state) => state.smtpConfigurationsLoading,
     );
@@ -179,7 +198,7 @@ export default function Settings() {
 
     const tabs = [
         { id: "profile", label: "My Profile", icon: User },
-        { id: "team", label: "Team Management", icon: Users },
+        ...(isTeamAllowed ? [{ id: "team", label: "Team Management", icon: Users }] : []),
         { id: "integrations", label: "Third-Party SMTP", icon: Mail },
         { id: "domains", label: "Sender Domains", icon: Globe },
         { id: "smtp-credentials", label: "SMTP Relay Keys", icon: KeyRound },
@@ -225,68 +244,7 @@ export default function Settings() {
                 {/* Content Area */}
                 <div className="flex-1 space-y-6">
                     {activeTab === "team" && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between">
-                                    <div>
-                                        <CardTitle>Team Members</CardTitle>
-                                        <CardDescription>
-                                            Manage who has access to this
-                                            workspace.
-                                        </CardDescription>
-                                    </div>
-                                    <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                                        Invite User
-                                    </Button>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="divide-y divide-slate-200 dark:divide-slate-800 border-t border-slate-200 dark:border-slate-800">
-                                        <div className="flex items-center justify-between py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold dark:bg-indigo-900/50 dark:text-indigo-300">
-                                                    GS
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-sm text-slate-900 dark:text-slate-50">
-                                                        Gaurav Singh{" "}
-                                                        <Badge
-                                                            variant="secondary"
-                                                            className="ml-1 text-[10px] py-0"
-                                                        >
-                                                            You
-                                                        </Badge>
-                                                    </p>
-                                                    <p className="text-xs text-slate-500">
-                                                        gaurav@emailtracker.io
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-none dark:bg-slate-800 dark:text-slate-300">
-                                                Admin
-                                            </Badge>
-                                        </div>
-                                        <div className="flex items-center justify-between py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold dark:bg-slate-800 dark:text-slate-400">
-                                                    SM
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-sm text-slate-900 dark:text-slate-50">
-                                                        Sarah Marketing
-                                                    </p>
-                                                    <p className="text-xs text-slate-500">
-                                                        sarah@emailtracker.io
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-none dark:bg-slate-800 dark:text-slate-300">
-                                                Editor
-                                            </Badge>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                        <TeamManagement />
                     )}
 
                     {activeTab === "billing" && (

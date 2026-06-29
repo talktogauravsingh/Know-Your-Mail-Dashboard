@@ -19,20 +19,40 @@ class AuthRepository
      */
     public function createUser(array $data)
     {
-        $roleId = Role::where('slug', 'user')->value('id');
+        $roleId = Role::where('slug', 'super-admin')->value('id');
 
         if (!$roleId) {
-            throw new \Exception('Default role (user) not found');
+            throw new \Exception('Default role (super-admin) not found');
         }
 
         return DB::transaction(function () use ($data, $roleId) {
+            $nameParts = explode(' ', trim($data['name']));
+            $firstName = $nameParts[0] ?? 'User';
+            
+            $isSkipped = filter_var($data['is_skipped'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            $orgTypeSlug = $isSkipped ? 'individual' : ($data['organization_type'] ?? 'individual');
+            
+            $orgTypeId = \App\Models\OrganizationType::where('slug', $orgTypeSlug)->value('id') 
+                ?? \App\Models\OrganizationType::where('slug', 'individual')->value('id');
+
+            if ($isSkipped) {
+                $orgName = $firstName . '-' . Str::random(5) . "'s Organization";
+            } else {
+                $orgName = $data['organization_name'] ?? null;
+                if (empty($orgName)) {
+                    $orgName = $firstName . "'s Organization";
+                }
+            }
+
             $organization = Organization::create([
-                'name' => $data['organization_name'] ?? $data['name'] . ' Organization',
+                'name'     => $orgName,
+                'org_type' => $orgTypeId,
             ]);
 
             return User::create([
                 'name'            => $data['name'],
                 'email'           => $data['email'],
+                'phone_number'    => $data['phone_number'] ?? null,
                 'password'        => Hash::make($data['password']),
                 'role_id'         => $roleId,
                 'organization_id' => $organization->id,
