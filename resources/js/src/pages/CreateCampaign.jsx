@@ -1833,22 +1833,6 @@ export default function CreateCampaign() {
                   if (updatedCampaign?.id) {
                     setCampaignId(updatedCampaign.id);
                   }
-                } else {
-                  const formData = new FormData(form);
-                  const data = Object.fromEntries(formData);
-                  data.segments = segments;
-                  data.is_ab_test = isABTest;
-                  data.ab_test_type = abTestType;
-                  data.segmentation_mode = segmentationMode;
-                  data.variants = variants;
-                  
-                  const defaultVar = variants['default'] || {};
-                  data.subject = defaultVar.subject || '';
-                  data.body = defaultVar.body || '';
-                  data.cta_link = defaultVar.cta_link || data.cta_link || '';
-                  data.status = 'draft';
-                  
-                  await updateCampaign(campaignId, data);
                 }
                 if (updatedCampaign) {
                   updateStateFromCampaignData(updatedCampaign);
