@@ -26,21 +26,34 @@ class TrackingController extends Controller
             $sendLog = SendLog::find($request->route('sendLog'));
 
             if ($sendLog) {
-                $updateData = ['last_activity_at' => Carbon::now()];
-                if (!$sendLog->opened_at) {
-                    $updateData['opened_at'] = Carbon::now();
-                }
-                $sendLog->increment('opens_count');
-                $sendLog->update($updateData);
-
-                $this->trackingService->logTracking($sendLog, $request, 'open');
-                dispatch(new EnrichTrackingDataJob(
-                    $sendLog->id,
-                    $request->ip(),
+                $classification = $this->trackingService->classifyRequest(
                     $request->header('User-Agent', ''),
-                    $request->header('Referer', '')
-                ));
-                \App\Jobs\EvaluateTriggerAutomationJob::dispatch($sendLog, 'open');
+                    $request->ip()
+                );
+
+                $sentAt = $sendLog->sent_at;
+                $isWithinPrefetchWindow = $sentAt && Carbon::parse($sentAt)->diffInSeconds(Carbon::now()) < 15;
+
+                // Treat proxy prefetch requests as real human opens only if they occur after the initial 15-second prefetch window.
+                if ($classification === 'human_open' || ($classification === 'proxy_prefetch' && !$isWithinPrefetchWindow)) {
+                    $updateData = ['last_activity_at' => Carbon::now()];
+                    if (!$sendLog->opened_at) {
+                        $updateData['opened_at'] = Carbon::now();
+                    }
+                    $sendLog->increment('opens_count');
+                    $sendLog->update($updateData);
+
+                    $this->trackingService->logTracking($sendLog, $request, 'open');
+                    dispatch(new EnrichTrackingDataJob(
+                        $sendLog->id,
+                        $request->ip(),
+                        $request->header('User-Agent', ''),
+                        $request->header('Referer', '')
+                    ));
+                    \App\Jobs\EvaluateTriggerAutomationJob::dispatch($sendLog, 'open');
+                } else {
+                    Log::info("Campaign open ignored for sendLog {$sendLog->id} because it was classified as: {$classification} (prefetch window: yes)");
+                }
             }
         } catch (\Exception $e) {
             Log::warning('Tracking open failed: ' . $e->getMessage());
@@ -128,7 +141,10 @@ class TrackingController extends Controller
                 $request->header('User-Agent', ''),
                 $request->ip()
             );
-            $isRealOpen = $classification === 'human_open' ? 1 : 0;
+            
+            $sentAt = $recipient->sent_at;
+            $isWithinPrefetchWindow = $sentAt && Carbon::parse($sentAt)->diffInSeconds(Carbon::now()) < 15;
+            $isRealOpen = ($classification === 'human_open' || ($classification === 'proxy_prefetch' && !$isWithinPrefetchWindow)) ? 1 : 0;
 
             // Log event
             \App\Models\Event::create([

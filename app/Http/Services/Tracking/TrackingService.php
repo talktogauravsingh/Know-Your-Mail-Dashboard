@@ -6,8 +6,28 @@ class TrackingService
 {
     public function __construct() {}
 
+    private function detectProxy($userAgent)
+    {
+        $ua = strtolower($userAgent);
+        if (str_contains($ua, 'googleimageproxy') || str_contains($ua, 'via ggpht.com') || str_contains($ua, 'edge/12.246')) {
+            return 'Gmail Proxy';
+        }
+        if (str_contains($ua, 'yahoomailproxy')) {
+            return 'Yahoo Proxy';
+        }
+        if (str_contains($ua, 'cloudflare-ua')) {
+            return 'Cloudflare Proxy';
+        }
+        return null;
+    }
+
     public function getBrowserName($userAgent)
     {
+        $proxy = $this->detectProxy($userAgent);
+        if ($proxy) {
+            return $proxy;
+        }
+
         $browsers = [
             'Edge' => 'Edge',
             'OPR' => 'Opera',
@@ -30,6 +50,11 @@ class TrackingService
 
     public function getOSName($userAgent)
     {
+        $proxy = $this->detectProxy($userAgent);
+        if ($proxy) {
+            return $proxy === 'Gmail Proxy' ? 'Gmail Client' : ($proxy === 'Yahoo Proxy' ? 'Yahoo Client' : 'Proxy Server');
+        }
+
         $oses = [
             'Windows NT 10.0' => 'Windows 10',
             'Windows NT 6.3' => 'Windows 8.1',
@@ -55,6 +80,11 @@ class TrackingService
 
     public function getDeviceType($userAgent)
     {
+        $proxy = $this->detectProxy($userAgent);
+        if ($proxy) {
+            return 'Email Client (Proxy)';
+        }
+
         if (preg_match('/mobile/i', $userAgent)) {
             return 'Mobile';
         } elseif (preg_match('/tablet/i', $userAgent)) {
@@ -120,7 +150,7 @@ class TrackingService
         }
 
         // 2. Google / Yahoo prefetch proxies
-        if (str_contains($ua, 'googleimageproxy') || str_contains($ua, 'yahoomailproxy') || str_contains($ua, 'cloudflare-ua')) {
+        if (str_contains($ua, 'googleimageproxy') || str_contains($ua, 'yahoomailproxy') || str_contains($ua, 'cloudflare-ua') || str_contains($ua, 'edge/12.246')) {
             return 'proxy_prefetch';
         }
 
