@@ -308,6 +308,40 @@ export default function CreateCampaign() {
     }
   };
 
+  const fetchOrgData = async () => {
+    setUploadStatus('loading');
+    try {
+      const previewRes = await api.get('/campaigns/org-recipients');
+      if (previewRes.data.success) {
+        setCsvResult({
+          fileName: 'Organization Directory',
+          totalRows: previewRes.data.total_rows,
+          validRows: previewRes.data.valid_rows,
+          invalidRows: previewRes.data.invalid_rows,
+          headers: previewRes.data.headers,
+          rows: previewRes.data.preview_rows,
+          errors: [],
+        });
+        setUploadStatus('success');
+      }
+
+      const insightsRes = await api.get('/insights/org');
+      if (insightsRes.data.success) {
+        setInsights(insightsRes.data.insights || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch organization recipient data:', err);
+      setUploadStatus('error');
+      setUploadMessage(err.response?.data?.message || 'Failed to load organization directory');
+    }
+  };
+
+  useEffect(() => {
+    if (recipientSource === 'org') {
+      fetchOrgData();
+    }
+  }, [recipientSource]);
+
 
   useEffect(() => {
     fetchTemplates().catch(() => {});
@@ -1471,8 +1505,12 @@ export default function CreateCampaign() {
                 <button
                   type="button"
                   onClick={() => {
-                    setRecipientSource('org');
-                    setInsights([]);
+                    if (recipientSource !== 'org') {
+                      setRecipientSource('org');
+                      setInsights([]);
+                      setCsvResult(null);
+                      setUploadStatus('idle');
+                    }
                   }}
                   className={cn(
                     "p-5 border-2 text-left transition-all duration-200 flex flex-col gap-3",
@@ -1503,8 +1541,12 @@ export default function CreateCampaign() {
                 <button
                   type="button"
                   onClick={() => {
-                    setRecipientSource('campaign');
-                    setInsights([]);
+                    if (recipientSource !== 'campaign') {
+                      setRecipientSource('campaign');
+                      setInsights([]);
+                      setCsvResult(null);
+                      setUploadStatus('idle');
+                    }
                   }}
                   className={cn(
                     "p-5 border-2 text-left transition-all duration-200 flex flex-col gap-3",
@@ -1615,6 +1657,31 @@ export default function CreateCampaign() {
 
           {/* PATH B: Organization-wide → Segmentation Filters */}
           {recipientSource === 'org' && (
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                  Organization Directory Sample
+                </CardTitle>
+                <CardDescription>
+                  Below is a sample of unique recipients loaded from your organization's directory.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {csvResult && (
+                  <CsvPreviewPanel
+                    status={uploadStatus}
+                    fileName="Organization Directory"
+                    result={csvResult}
+                    error={uploadMessage}
+                    onRetry={null}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {recipientSource === 'org' && csvResult && (
             <Card>
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2">

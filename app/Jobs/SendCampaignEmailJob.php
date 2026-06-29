@@ -206,8 +206,9 @@ class SendCampaignEmailJob implements ShouldQueue
             Mail::to($recipient->email)->send(new BulkMail($subject, $htmlBody));
 
             $sendLog->update([
-                'status' => 'sent',
+                'status' => 'delivered',
                 'sent_at' => now(),
+                'delivered_at' => now(),
             ]);
 
             Log::info("Sent email to {$recipient->email} for campaign {$campaign->id} using Variant: {$variant->name}");

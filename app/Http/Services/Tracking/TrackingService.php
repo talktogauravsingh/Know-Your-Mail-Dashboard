@@ -6,8 +6,28 @@ class TrackingService
 {
     public function __construct() {}
 
+    private function detectProxy($userAgent)
+    {
+        $ua = strtolower($userAgent);
+        if (str_contains($ua, 'googleimageproxy') || str_contains($ua, 'via ggpht.com') || str_contains($ua, 'edge/12.246')) {
+            return 'Gmail Proxy';
+        }
+        if (str_contains($ua, 'yahoomailproxy')) {
+            return 'Yahoo Proxy';
+        }
+        if (str_contains($ua, 'cloudflare-ua')) {
+            return 'Cloudflare Proxy';
+        }
+        return null;
+    }
+
     public function getBrowserName($userAgent)
     {
+        $proxy = $this->detectProxy($userAgent);
+        if ($proxy) {
+            return $proxy;
+        }
+
         $browsers = [
             'Edge' => 'Edge',
             'OPR' => 'Opera',
@@ -30,6 +50,11 @@ class TrackingService
 
     public function getOSName($userAgent)
     {
+        $proxy = $this->detectProxy($userAgent);
+        if ($proxy) {
+            return $proxy === 'Gmail Proxy' ? 'Gmail Client' : ($proxy === 'Yahoo Proxy' ? 'Yahoo Client' : 'Proxy Server');
+        }
+
         $oses = [
             'Windows NT 10.0' => 'Windows 10',
             'Windows NT 6.3' => 'Windows 8.1',
@@ -55,6 +80,11 @@ class TrackingService
 
     public function getDeviceType($userAgent)
     {
+        $proxy = $this->detectProxy($userAgent);
+        if ($proxy) {
+            return 'Email Client (Proxy)';
+        }
+
         if (preg_match('/mobile/i', $userAgent)) {
             return 'Mobile';
         } elseif (preg_match('/tablet/i', $userAgent)) {
@@ -108,6 +138,57 @@ class TrackingService
             'last_activity_at' => now(),
         ]);
         return $data;
+    }
+
+    public function classifyRequest(string $userAgent, string $ip): string
+    {
+        $ua = strtolower($userAgent);
+
+        // 1. Bot detection
+        if (str_contains($ua, 'bot') || str_contains($ua, 'spider') || str_contains($ua, 'crawler') || str_contains($ua, 'headless')) {
+            return 'bot_open';
+        }
+
+        // 2. Google / Yahoo prefetch proxies
+        if (str_contains($ua, 'googleimageproxy') || str_contains($ua, 'yahoomailproxy') || str_contains($ua, 'cloudflare-ua') || str_contains($ua, 'edge/12.246')) {
+            return 'proxy_prefetch';
+        }
+
+        // 3. Apple Mail Privacy Protection (MPP) Heuristics
+        $isAppleIP = str_starts_with($ip, '17.');
+        $isAppleUA = str_contains($ua, 'macintosh; intel mac os x 10_15_7') && str_contains($ua, 'applewebkit/605.1.15') && !str_contains($ua, 'chrome');
+
+        if ($isAppleIP || $isAppleUA) {
+            return 'proxy_prefetch';
+        }
+
+        return 'human_open';
+    }
+
+    public function triggerRelayWebhook(string $recipientId, string $eventType, array $payload): void
+    {
+        try {
+            $recipient = \App\Models\MessageRecipient::with('message')->find($recipientId);
+            if (!$recipient || !$recipient->message) {
+                return;
+            }
+            $orgId = $recipient->message->organization_id;
+
+            $webhooks = \App\Models\Webhook::where('organization_id', $orgId)
+                ->where('is_active', true)
+                ->whereJsonContains('events', $eventType)
+                ->get();
+
+            foreach ($webhooks as $webhook) {
+                \App\Jobs\SendRelayWebhookJob::dispatch(
+                    $webhook->id,
+                    \Illuminate\Support\Str::uuid()->toString(),
+                    $payload
+                );
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to queue webhook inside tracking service: ' . $e->getMessage());
+        }
     }
 }
 

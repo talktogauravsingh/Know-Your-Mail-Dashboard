@@ -82,6 +82,7 @@ Route::middleware('auth:sanctum')->prefix('campaigns')->group(function () {
     Route::get('/', [CampaignController::class, 'index']);
     Route::post('/', [CampaignController::class, 'store']);
     Route::post('/preview', [CampaignController::class, 'preview']);
+    Route::get('/org-recipients', [CampaignController::class, 'getOrgRecipients']);
     Route::post('/extract-variables', [CampaignController::class, 'extractVariables']);
     Route::get('/{campaign}', [CampaignController::class, 'show']);
     Route::patch('/{campaign}', [CampaignController::class, 'update']);
@@ -93,6 +94,10 @@ Route::get('/track/open/{sendLog}', [TrackingController::class, 'OpenMailTrack']
 Route::get('/track/click/{sendLog}', [TrackingController::class, 'ClickMailTrack']);
 Route::get('/o/{sendLog}', [TrackingController::class, 'OpenMailTrack']);
 Route::get('/c/{sendLog}', [TrackingController::class, 'ClickMailTrack']);
+
+Route::get('/track/open/{recipientId}', [TrackingController::class, 'OpenRelayTrack'])->whereUuid('recipientId');
+Route::get('/track/click/{linkId}/{recipientId}', [TrackingController::class, 'ClickRelayTrack'])->whereUuid('linkId')->whereUuid('recipientId');
+Route::post('/internal/relay-event', [TrackingController::class, 'handleRelayEvent']);
 Route::middleware('auth:sanctum')->prefix('email-templates')->group(function () {
     Route::get('/', [\App\Http\Controllers\EmailTemplateController::class, 'index']);
     Route::post('/', [\App\Http\Controllers\EmailTemplateController::class, 'store']);

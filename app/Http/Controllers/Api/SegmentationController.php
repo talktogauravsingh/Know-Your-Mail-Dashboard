@@ -127,7 +127,7 @@ class SegmentationController extends Controller
             }
         });
 
-        $count = $query->count();
+        $count = $query->distinct('email')->count('email');
 
         return response()->json([
             'success' => true,
