@@ -105,4 +105,161 @@ class TrackingController extends Controller
         
         return response('', 204);
     }
+
+    public function OpenRelayTrack(Request $request)
+    {
+        $recipientId = $request->route('recipientId');
+        
+        $base64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=';
+        $image = base64_decode($base64);
+
+        $uuidRegex = '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i';
+        if (!preg_match($uuidRegex, $recipientId)) {
+            return response($image, 200)->header('Content-Type', 'image/png');
+        }
+
+        try {
+            $recipient = \App\Models\MessageRecipient::with('message')->find($recipientId);
+            if (!$recipient || !$recipient->message) {
+                return response($image, 200)->header('Content-Type', 'image/png');
+            }
+
+            $classification = $this->trackingService->classifyRequest(
+                $request->header('User-Agent', ''),
+                $request->ip()
+            );
+            $isRealOpen = $classification === 'human_open' ? 1 : 0;
+
+            // Log event
+            \App\Models\Event::create([
+                'recipient_id' => $recipientId,
+                'event_type' => 'opened',
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->header('User-Agent', ''),
+                'details' => [
+                    'classification' => $classification,
+                    'is_real_open' => $isRealOpen,
+                ],
+            ]);
+
+            // Update aggregates in daily_analytics
+            \Illuminate\Support\Facades\DB::insert(
+                "INSERT INTO daily_analytics (organization_id, domain_id, date, open_count, real_open_count, created_at, updated_at)
+                 VALUES (?, ?, CURRENT_DATE(), 1, ?, NOW(), NOW())
+                 ON DUPLICATE KEY UPDATE 
+                   open_count = open_count + 1,
+                   real_open_count = real_open_count + ?,
+                   updated_at = NOW()",
+                [
+                    $recipient->message->organization_id,
+                    $recipient->message->domain_id,
+                    $isRealOpen,
+                    $isRealOpen
+                ]
+            );
+
+            // Fire webhook event
+            $this->trackingService->triggerRelayWebhook($recipientId, 'opened', [
+                'recipient_id' => $recipientId,
+                'message_id' => $recipient->message->id,
+                'email' => $recipient->recipient_email,
+                'event' => 'opened',
+                'ip' => $request->ip(),
+                'user_agent' => $request->header('User-Agent', ''),
+                'classification' => $classification,
+                'timestamp' => now()->toIso8601String(),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::warning('Relay open tracking failed: ' . $e->getMessage());
+        }
+
+        return response($image, 200)
+            ->header('Content-Type', 'image/png')
+            ->header('Content-Length', strlen($image))
+            ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', '0');
+    }
+
+    public function ClickRelayTrack(Request $request)
+    {
+        $linkId = $request->route('linkId');
+        $recipientId = $request->route('recipientId');
+        $defaultRedirectUrl = 'https://knowyourmail.com';
+
+        $uuidRegex = '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i';
+        if (!preg_match($uuidRegex, $linkId) || !preg_match($uuidRegex, $recipientId)) {
+            return redirect($defaultRedirectUrl);
+        }
+
+        try {
+            $link = \App\Models\TrackedLink::find($linkId);
+            $recipient = \App\Models\MessageRecipient::with('message')->find($recipientId);
+            
+            if (!$link || !$recipient || !$recipient->message) {
+                return redirect($defaultRedirectUrl);
+            }
+
+            $originalUrl = $link->original_url;
+
+            // Log event
+            \App\Models\Event::create([
+                'recipient_id' => $recipientId,
+                'event_type' => 'clicked',
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->header('User-Agent', ''),
+                'details' => [
+                    'link_id' => $linkId,
+                    'url' => $originalUrl,
+                ],
+            ]);
+
+            // Update aggregates in daily_analytics
+            \Illuminate\Support\Facades\DB::insert(
+                "INSERT INTO daily_analytics (organization_id, domain_id, date, click_count, created_at, updated_at)
+                 VALUES (?, ?, CURRENT_DATE(), 1, NOW(), NOW())
+                 ON DUPLICATE KEY UPDATE 
+                   click_count = click_count + 1,
+                   updated_at = NOW()",
+                [
+                    $recipient->message->organization_id,
+                    $recipient->message->domain_id
+                ]
+            );
+
+            // Fire webhook event
+            $this->trackingService->triggerRelayWebhook($recipientId, 'clicked', [
+                'recipient_id' => $recipientId,
+                'message_id' => $recipient->message->id,
+                'email' => $recipient->recipient_email,
+                'event' => 'clicked',
+                'url' => $originalUrl,
+                'ip' => $request->ip(),
+                'user_agent' => $request->header('User-Agent', ''),
+                'timestamp' => now()->toIso8601String(),
+            ]);
+
+            return redirect($originalUrl);
+
+        } catch (\Exception $e) {
+            Log::warning('Relay click tracking failed: ' . $e->getMessage());
+            return redirect($defaultRedirectUrl);
+        }
+    }
+
+    public function handleRelayEvent(Request $request)
+    {
+        $recipientId = $request->input('recipientId');
+        $eventType = $request->input('eventType');
+        $payload = $request->input('payload');
+
+        if (!$recipientId || !$eventType || !$payload) {
+            return response()->json(['error' => 'Missing required fields'], 400);
+        }
+
+        $this->trackingService->triggerRelayWebhook($recipientId, $eventType, $payload);
+
+        return response()->json(['success' => true]);
+    }
 }

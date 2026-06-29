@@ -109,5 +109,56 @@ class TrackingService
         ]);
         return $data;
     }
+
+    public function classifyRequest(string $userAgent, string $ip): string
+    {
+        $ua = strtolower($userAgent);
+
+        // 1. Bot detection
+        if (str_contains($ua, 'bot') || str_contains($ua, 'spider') || str_contains($ua, 'crawler') || str_contains($ua, 'headless')) {
+            return 'bot_open';
+        }
+
+        // 2. Google / Yahoo prefetch proxies
+        if (str_contains($ua, 'googleimageproxy') || str_contains($ua, 'yahoomailproxy') || str_contains($ua, 'cloudflare-ua')) {
+            return 'proxy_prefetch';
+        }
+
+        // 3. Apple Mail Privacy Protection (MPP) Heuristics
+        $isAppleIP = str_starts_with($ip, '17.');
+        $isAppleUA = str_contains($ua, 'macintosh; intel mac os x 10_15_7') && str_contains($ua, 'applewebkit/605.1.15') && !str_contains($ua, 'chrome');
+
+        if ($isAppleIP || $isAppleUA) {
+            return 'proxy_prefetch';
+        }
+
+        return 'human_open';
+    }
+
+    public function triggerRelayWebhook(string $recipientId, string $eventType, array $payload): void
+    {
+        try {
+            $recipient = \App\Models\MessageRecipient::with('message')->find($recipientId);
+            if (!$recipient || !$recipient->message) {
+                return;
+            }
+            $orgId = $recipient->message->organization_id;
+
+            $webhooks = \App\Models\Webhook::where('organization_id', $orgId)
+                ->where('is_active', true)
+                ->whereJsonContains('events', $eventType)
+                ->get();
+
+            foreach ($webhooks as $webhook) {
+                \App\Jobs\SendRelayWebhookJob::dispatch(
+                    $webhook->id,
+                    \Illuminate\Support\Str::uuid()->toString(),
+                    $payload
+                );
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to queue webhook inside tracking service: ' . $e->getMessage());
+        }
+    }
 }
 
