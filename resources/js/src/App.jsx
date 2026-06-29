@@ -10,7 +10,6 @@ import AppLayout from './layouts/AppLayout';
 // Pages
 import Login from './pages/Login';
 import Signup from './pages/Signup';
-import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Campaigns from './pages/Campaigns';
 import CreateCampaign from './pages/CreateCampaign';
@@ -54,9 +53,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<Landing />} />
-        
         <Route element={<AuthLayout />}>
+          <Route path="/" element={<Login />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
         </Route>
