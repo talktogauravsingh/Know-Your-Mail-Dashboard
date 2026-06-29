@@ -92,11 +92,21 @@ class AssignSegmentsJob implements ShouldQueue
         $variantId = $variant->id;
         $now = now();
 
-        $sql = "
-            INSERT INTO recipient_segment_assignments (campaign_id, recipient_id, variant_id, created_at, updated_at)
-            " . $query->selectRaw('?, id, ?, ?, ?', [$campaignId, $variantId, $now, $now])->toSql() . "
-            ON CONFLICT (campaign_id, recipient_id) DO UPDATE SET variant_id = EXCLUDED.variant_id, updated_at = EXCLUDED.updated_at
-        ";
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'mysql') {
+            $sql = "
+                INSERT INTO recipient_segment_assignments (campaign_id, recipient_id, variant_id, created_at, updated_at)
+                " . $query->selectRaw('?, id, ?, ?, ?', [$campaignId, $variantId, $now, $now])->toSql() . "
+                ON DUPLICATE KEY UPDATE variant_id = VALUES(variant_id), updated_at = VALUES(updated_at)
+            ";
+        } else {
+            $sql = "
+                INSERT INTO recipient_segment_assignments (campaign_id, recipient_id, variant_id, created_at, updated_at)
+                " . $query->selectRaw('?, id, ?, ?, ?', [$campaignId, $variantId, $now, $now])->toSql() . "
+                ON CONFLICT (campaign_id, recipient_id) DO UPDATE SET variant_id = EXCLUDED.variant_id, updated_at = EXCLUDED.updated_at
+            ";
+        }
 
         DB::statement($sql, $query->getBindings());
     }
