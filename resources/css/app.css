@@ -8,22 +8,31 @@
 @source '../**/*.js';
 
 @theme {
-    --font-sans: 'Instrument Sans', 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-sans: 'Instrument Sans', 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Segoe UI Symbol', 'Noto Color Emoji';
 
-    /* KnowYourEmail Brand Identity */
-    --color-primary-500: #3b82f6; /* Cyber Blue */
-    --color-primary-600: #2563eb;
-    --color-primary-700: #1d4ed8;
-    
-    --color-accent-500: #8b5cf6; /* Electric Violet */
-    --color-accent-600: #7c3aed;
-    
-    --color-slate-850: #162032; /* Deep Graphite custom shade for backgrounds */
+  /* KnowYourEmail Brand Identity */
+  --color-primary-500: #3b82f6;
+  /* Cyber Blue */
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-accent-500: #8b5cf6;
+  /* Electric Violet */
+  --color-accent-600: #7c3aed;
 
-    /* Soft UI Radii */
-    --radius-soft: 16px;
-    --radius-softer: 24px;
+  --color-slate-850: #162032;
+  /* Deep Graphite custom shade for backgrounds */
+
+  /* Soft UI Radii */
+  --radius-soft: 0px;
+  --radius-softer: 0px;
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
 }
 
 /* ─── Skeleton shimmer animation ────────────────────────────────────────────
@@ -33,9 +42,17 @@
    shimmer for a more organic, wave-like feel.
    ─────────────────────────────────────────────────────────────────────────── */
 @keyframes skeleton-sweep {
-  0%   { transform: translateX(-100%); }
-  60%  { transform: translateX(100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+
+  60% {
+    transform: translateX(100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 .skeleton-shimmer {
@@ -47,21 +64,207 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.55) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.55) 50%,
+      transparent 100%);
   animation: skeleton-sweep 1.8s ease-in-out infinite;
 }
 
 /* Dark-mode shimmer — subtler highlight so it doesn't look washed out */
 .dark .skeleton-shimmer::after {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.07) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.07) 50%,
+      transparent 100%);
+}
+
+/* Stepper Active Shimmer Effect */
+@keyframes active-shimmer-sweep {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.active-step-shimmer {
+  background: linear-gradient(90deg,
+      rgba(79, 70, 229, 0.04) 0%,
+      rgba(79, 70, 229, 0.12) 50%,
+      rgba(79, 70, 229, 0.04) 100%);
+  background-size: 200% 100%;
+  animation: active-shimmer-sweep 2.5s infinite linear;
+}
+
+.dark .active-step-shimmer {
+  background: linear-gradient(90deg,
+      rgba(99, 102, 241, 0.02) 0%,
+      rgba(99, 102, 241, 0.08) 50%,
+      rgba(99, 102, 241, 0.02) 100%);
+  background-size: 200% 100%;
+}
+
+.active-step-shimmer-dark {
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.02) 0%,
+      rgba(255, 255, 255, 0.08) 50%,
+      rgba(255, 255, 255, 0.02) 100%);
+  background-size: 200% 100%;
+  animation: active-shimmer-sweep 2.5s infinite linear;
+}
+
+@keyframes step-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: step-fade-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.theme-transition-icon {
+  transition: transform 0.65s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.65s ease-out, filter 0.65s ease-out;
+}
+
+/* ─── Envelope Transition Animations ───────────────────────────────────────── */
+@keyframes envelope-bounce-drop {
+  0% {
+    transform: translate(-50%, -100vh);
+    animation-timing-function: cubic-bezier(0.55, 0.055, 0.675, 0.19);
+  }
+  60% {
+    transform: translate(-50%, -40%);
+    animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
+  }
+  75% {
+    transform: translate(-50%, -55%);
+    animation-timing-function: cubic-bezier(0.55, 0.055, 0.675, 0.19);
+  }
+  90% {
+    transform: translate(-50%, -48%);
+    animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
+  }
+  100% {
+    transform: translate(-50%, -50%);
+  }
+}
+
+.animate-envelope-drop {
+  animation: envelope-bounce-drop 0.65s forwards;
+}
+
+.animate-envelope-leave {
+  transform: translate(-50%, 100vh) !important;
+  transition: transform 0.6s cubic-bezier(0.55, 0.085, 0.68, 0.53) !important;
+}
+
+.animate-envelope-active {
+  transform: translate(-50%, -50%);
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.transform-origin-top {
+  transform-origin: top;
+}
+
+@keyframes leg-sway {
+  0%, 100% {
+    transform: rotate(-8deg);
+  }
+  50% {
+    transform: rotate(8deg);
+  }
+}
+
+@keyframes bird-flap {
+  0%, 100% {
+    transform: translateY(0) scaleY(1);
+  }
+  50% {
+    transform: translateY(-2px) scaleY(0.4);
+  }
+}
+
+@keyframes bird-fly {
+  0% {
+    left: -50px;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    left: 80px;
+    opacity: 0;
+  }
+}
+
+@keyframes snow-fall {
+  0% {
+    transform: translateY(-30px) translateX(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.8;
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(50px) translateX(10px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* ─── Global Autofill Style Overrides ─────────────────────────────────────────
+   Overrides user-agent defaults that force a light blue/yellow background on 
+   autofilled inputs. Uses inset box-shadow to match the input's themed bg.
+   ─────────────────────────────────────────────────────────────────────────── */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+textarea:-webkit-autofill:active,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus,
+select:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important; /* slate-900 */
+  caret-color: #0f172a;
+}
+
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover, 
+.dark input:-webkit-autofill:focus, 
+.dark input:-webkit-autofill:active,
+.dark textarea:-webkit-autofill,
+.dark textarea:-webkit-autofill:hover,
+.dark textarea:-webkit-autofill:focus,
+.dark textarea:-webkit-autofill:active,
+.dark select:-webkit-autofill,
+.dark select:-webkit-autofill:hover,
+.dark select:-webkit-autofill:focus,
+.dark select:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #162032 inset !important; /* matches --color-slate-850 bg-slate-850 */
+  -webkit-text-fill-color: #f8fafc !important; /* slate-50 */
+  caret-color: #f8fafc;
 }

@@ -12,6 +12,7 @@ class OrganizationSubscription extends Model
     public const STATUS_PAST_DUE = 3;
     public const STATUS_CANCELLED = 4;
     public const STATUS_EXPIRED = 5;
+    public const STATUS_PAUSED = 6;
 
     protected $fillable = [
         'organization_id',
@@ -64,6 +65,7 @@ class OrganizationSubscription extends Model
             self::STATUS_PAST_DUE => 'past_due',
             self::STATUS_CANCELLED => 'cancelled',
             self::STATUS_EXPIRED => 'expired',
+            self::STATUS_PAUSED => 'paused',
         ];
     }
 

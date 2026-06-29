@@ -67,19 +67,44 @@ class AnalysisController extends Controller
         $user = $request->user();
         $campaign = Campaign::forUser($user)->findOrFail($id);
 
+        // Self-healing check: if campaign is marked as running but has no pending logs, mark it completed.
+        if (strtolower($campaign->status) === 'running') {
+            $hasPending = SendLog::where('campaign_id', $id)->where('status', 'pending')->exists();
+            if (!$hasPending) {
+                $campaign->update(['status' => 'completed']);
+                $campaign->status = 'completed';
+            }
+        }
+
         $sendLogs = SendLog::where('campaign_id', $id);
 
         $sentCount = (clone $sendLogs)->count();
-        $openedCount = (clone $sendLogs)->whereNotNull('opened_at')->count();
-        $openRate = $sentCount > 0 ? round(($openedCount / $sentCount) * 100, 2) : 0;
-
         $deliveredCount = (clone $sendLogs)->whereNotNull('delivered_at')->count();
-        $clicksTotal = (clone $sendLogs)->sum('clicks_count');
         $bounceCount = (clone $sendLogs)->where('bounce_type', '!=', 'none')->count();
-        $bounceRate = $sentCount > 0 ? round(($bounceCount / $sentCount) * 100, 2) : 0;
-        $deliveryRate = $sentCount > 0 ? round(($deliveredCount / $sentCount) * 100, 2) : 0;
-        $clickRate = $sentCount > 0 ? round(($clicksTotal / $sentCount) * 100, 2) : 0;
+        $unsubscribedCount = (clone $sendLogs)->where('status', 'unsubscribed')->count();
 
+        // Unique & Total Opens
+        $uniqueOpens = (clone $sendLogs)->whereNotNull('opened_at')->count();
+        $totalOpens = (clone $sendLogs)->sum('opens_count');
+        if ($totalOpens < $uniqueOpens) {
+            $totalOpens = $uniqueOpens;
+        }
+
+        // Unique & Total Clicks
+        $uniqueClicks = (clone $sendLogs)->whereNotNull('clicked_at')->count();
+        $totalClicks = (clone $sendLogs)->sum('clicks_count');
+        if ($totalClicks < $uniqueClicks) {
+            $totalClicks = $uniqueClicks;
+        }
+
+        // Rates
+        $deliveryRate = $sentCount > 0 ? round(($deliveredCount / $sentCount) * 100, 2) : 0;
+        $openRate = $sentCount > 0 ? round(($uniqueOpens / $sentCount) * 100, 2) : 0;
+        $clickRate = $sentCount > 0 ? round(($uniqueClicks / $sentCount) * 100, 2) : 0;
+        $bounceRate = $sentCount > 0 ? round(($bounceCount / $sentCount) * 100, 2) : 0;
+        $unsubscribeRate = $sentCount > 0 ? round(($unsubscribedCount / $sentCount) * 100, 2) : 0;
+
+        // Region Breakdown
         $regionBreakdown = (clone $sendLogs)
             ->whereNotNull('region')
             ->groupBy('region')
@@ -87,44 +112,143 @@ class AnalysisController extends Controller
             ->get()
             ->map(fn($item) => ['name' => $item->region, 'value' => $item->value]);
 
-        // Hourly Opens
-        $hourlyOpens = [];
-        $startTime = $campaign->created_at;
-        $endTime = $startTime->copy()->addHours(10);
-        
-        $openedAtList = (clone $sendLogs)
-            ->whereBetween('opened_at', [$startTime, $endTime])
-            ->pluck('opened_at')
-            ->map(function($date) {
-                return \Carbon\Carbon::parse($date);
-            });
+        // Device and Browser Breakdowns from tracking_data JSON
+        $deviceBreakdown = ['Desktop' => 0, 'Mobile' => 0, 'Tablet' => 0, 'Unknown' => 0];
+        $browserBreakdown = [];
 
-        for ($i = 0; $i < 10; $i++) {
-            $time = $startTime->copy()->addHours($i);
-            $nextTime = $time->copy()->addHour();
-            
-            $count = $openedAtList->filter(function($openedAt) use ($time, $nextTime) {
-                return $openedAt->between($time, $nextTime);
-            })->count();
-            
-            $hourlyOpens[] = ['time' => $time->format('H:i'), 'opens' => $count];
+        $logsWithTracking = (clone $sendLogs)->whereNotNull('tracking_data')->get(['tracking_data']);
+        foreach ($logsWithTracking as $log) {
+            $data = $log->tracking_data;
+            if (is_array($data)) {
+                $device = $data['device_type'] ?? 'Unknown';
+                $browser = $data['browser'] ?? 'Unknown';
+
+                $deviceBreakdown[$device] = ($deviceBreakdown[$device] ?? 0) + 1;
+                $browserBreakdown[$browser] = ($browserBreakdown[$browser] ?? 0) + 1;
+            }
         }
 
-        // Recipients sample
+        $deviceBreakdownData = [];
+        foreach ($deviceBreakdown as $name => $val) {
+            if ($val > 0 || $name !== 'Unknown') {
+                $deviceBreakdownData[] = ['name' => $name, 'value' => $val];
+            }
+        }
+
+        $browserBreakdownData = [];
+        foreach ($browserBreakdown as $name => $val) {
+            $browserBreakdownData[] = ['name' => $name, 'value' => $val];
+        }
+        usort($browserBreakdownData, fn($a, $b) => $b['value'] <=> $a['value']);
+        if (count($browserBreakdownData) > 5) {
+            $topBrowsers = array_slice($browserBreakdownData, 0, 4);
+            $otherVal = array_sum(array_column(array_slice($browserBreakdownData, 4), 'value'));
+            $topBrowsers[] = ['name' => 'Other', 'value' => $otherVal];
+            $browserBreakdownData = $topBrowsers;
+        }
+
+        // Dynamic chronological opens timeline (no future entries)
+        $startTime = $campaign->created_at;
+        $now = now();
+        $hoursSinceStart = $startTime->diffInHours($now);
+
+        $hourlyOpens = [];
+        if ($hoursSinceStart < 24) {
+            $totalHoursToShow = max(1, min(24, intval($hoursSinceStart) + 1));
+            
+            $openedAtList = (clone $sendLogs)
+                ->whereBetween('opened_at', [$startTime, $now])
+                ->pluck('opened_at')
+                ->map(fn($date) => \Carbon\Carbon::parse($date));
+
+            for ($i = 0; $i < $totalHoursToShow; $i++) {
+                $time = $startTime->copy()->addHours($i);
+                $nextTime = $time->copy()->addHour();
+                
+                $count = $openedAtList->filter(function($openedAt) use ($time, $nextTime) {
+                    return $openedAt->between($time, $nextTime);
+                })->count();
+                
+                $hourlyOpens[] = ['time' => $time->format('H:i'), 'opens' => $count];
+            }
+        } else {
+            $daysSinceStart = $startTime->diffInDays($now);
+            $totalDaysToShow = max(1, min(7, intval($daysSinceStart) + 1));
+            
+            $openedAtList = (clone $sendLogs)
+                ->whereBetween('opened_at', [$startTime, $now])
+                ->pluck('opened_at')
+                ->map(fn($date) => \Carbon\Carbon::parse($date));
+
+            for ($i = 0; $i < $totalDaysToShow; $i++) {
+                $date = $startTime->copy()->addDays($i);
+                $startOfDay = $date->copy()->startOfDay();
+                $endOfDay = $date->copy()->endOfDay();
+                
+                $count = $openedAtList->filter(function($openedAt) use ($startOfDay, $endOfDay) {
+                    return $openedAt->between($startOfDay, $endOfDay);
+                })->count();
+                
+                $hourlyOpens[] = ['time' => $date->format('M d'), 'opens' => $count];
+            }
+        }
+
+        // Dynamic link clicks performance from tracking_data
+        $linkClicks = [];
+        if ($campaign->cta_url) {
+            $linkClicks[$campaign->cta_url] = 0;
+        }
+
+        $campaign->variants()->get()->each(function($v) use (&$linkClicks) {
+            if ($v->cta_url) {
+                $linkClicks[$v->cta_url] = 0;
+            }
+        });
+
+        foreach ($logsWithTracking as $log) {
+            $data = $log->tracking_data;
+            if (is_array($data) && isset($data['clicked_urls'])) {
+                foreach ($data['clicked_urls'] as $clickInfo) {
+                    $url = $clickInfo['url'] ?? null;
+                    if ($url) {
+                        $linkClicks[$url] = ($linkClicks[$url] ?? 0) + 1;
+                    }
+                }
+            }
+        }
+
+        // Reconcile legacy clicks with the link breakdown
+        $sumOfParsedClicks = array_sum($linkClicks);
+        if ($totalClicks > $sumOfParsedClicks) {
+            $mainUrl = $campaign->cta_url ?: 'https://example.com/main';
+            $linkClicks[$mainUrl] = ($linkClicks[$mainUrl] ?? 0) + ($totalClicks - $sumOfParsedClicks);
+        }
+
+        $linkPerformance = [];
+        foreach ($linkClicks as $url => $clicks) {
+            $linkPerformance[] = ['url' => $url, 'clicks' => $clicks];
+        }
+
+        if (empty($linkPerformance)) {
+            $linkPerformance[] = ['url' => $campaign->cta_url ?? 'https://example.com/main', 'clicks' => 0];
+        }
+
+        // Recipients details
         $recipientList = (clone $sendLogs)
             ->with('recipient')
             ->latest()
-            ->take(20)
             ->get()
             ->map(fn($log) => [
                 'id' => $log->id,
-                'email' => $log->recipient ? $log->recipient->email : 'Unknown',
+                'email' => $log->email,
                 'status' => ucfirst($log->status),
-                'openCount' => $log->opened_at ? 1 : 0,
+                'openCount' => (int)$log->opens_count,
                 'clickCount' => (int)$log->clicks_count,
                 'location' => $log->region ?? 'Unknown',
-                'device' => 'Desktop/Chrome',
-                'lastActivity' => $log->updated_at->diffForHumans()
+                'device' => is_array($log->tracking_data) ? ($log->tracking_data['device_type'] ?? 'Unknown') : 'Unknown',
+                'browser' => is_array($log->tracking_data) ? ($log->tracking_data['browser'] ?? 'Unknown') : 'Unknown',
+                'unsubscribed' => $log->status === 'unsubscribed',
+                'lastActivity' => $log->last_activity_at ? $log->last_activity_at->diffForHumans() : 'No activity'
             ]);
 
         return response()->json([
@@ -138,22 +262,26 @@ class AnalysisController extends Controller
             'summary' => [
                 'sent' => $sentCount,
                 'delivered' => $deliveredCount,
-                'opened' => $openedCount,
-                'clicked' => (int)$clicksTotal,
+                'opened' => $uniqueOpens,
+                'opened_total' => $totalOpens,
+                'clicked' => $uniqueClicks,
+                'clicked_total' => $totalClicks,
                 'bounced' => $bounceCount,
+                'unsubscribed' => $unsubscribedCount,
             ],
             'rates' => [
                 'delivery' => $deliveryRate,
                 'open' => $openRate,
                 'click' => $clickRate,
                 'bounce' => $bounceRate,
+                'unsubscribe' => $unsubscribeRate,
             ],
             'hourlyOpens' => $hourlyOpens,
             'regionBreakdown' => $regionBreakdown,
+            'deviceBreakdown' => $deviceBreakdownData,
+            'browserBreakdown' => $browserBreakdownData,
             'recipients' => $recipientList,
-            'linkPerformance' => [
-                ['url' => $campaign->cta_url ?? 'https://example.com/main', 'clicks' => (int)$clicksTotal]
-            ]
+            'linkPerformance' => $linkPerformance
         ]);
     }
 

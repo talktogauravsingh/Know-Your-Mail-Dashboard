@@ -17,9 +17,11 @@ class SendLog extends Model
         'status',
         'response',
         'opened_at',
+        'clicked_at',
         'sent_at',
         'delivered_at',
         'clicks_count',
+        'opens_count',
         'bounce_type',
         'bounce_count',
         'region',
@@ -29,6 +31,7 @@ class SendLog extends Model
 
     protected $casts = [
         'opened_at' => 'datetime',
+        'clicked_at' => 'datetime',
         'sent_at' => 'datetime',
         'delivered_at' => 'datetime',
         'last_activity_at' => 'datetime',

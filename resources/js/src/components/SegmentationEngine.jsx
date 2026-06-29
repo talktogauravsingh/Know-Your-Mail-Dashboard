@@ -13,6 +13,12 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
   ]);
   const [counts, setCounts] = useState({});
   const [loading, setLoading] = useState({});
+  const prevFiltersRef = React.useRef({});
+
+  useEffect(() => {
+    // Clear cache if module/campaign context changes
+    prevFiltersRef.current = {};
+  }, [campaignId, moduleType, moduleId]);
 
   useEffect(() => {
     if (isSingleMode) {
@@ -74,44 +80,125 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
     }));
   };
 
-  const fetchLiveCount = async (segment) => {
-    // Only fetch if there are actual filters to apply
-    if (segment.filters.length === 0) {
-      setCounts(prev => ({ ...prev, [segment.id]: 0 }));
-      return;
-    }
-    
-    // Only fetch if all filters have a field and value
-    if (segment.filters.some(f => !f.field || !f.value)) {
-      setCounts(prev => ({ ...prev, [segment.id]: 0 }));
-      return;
-    }
+  const updateAllCounts = async () => {
+    // Only query if we have a valid moduleId or campaignId
+    if (!moduleId && !campaignId) return;
 
-    console.log(`Fetching live count for segment ${segment.id}`, segment.filters);
-    setLoading(prev => ({ ...prev, [segment.id]: true }));
-    
     try {
-      // Use the new flexible route: /api/campaigns/segments/validate-count/{campaign?}
-      const url = campaignId 
+      // 1. Fetch total count of the selected recipient source
+      const totalUrl = campaignId 
         ? `/campaigns/segments/validate-count/${campaignId}` 
         : `/campaigns/segments/validate-count`;
 
-      const response = await api.post(url, {
+      const totalRes = await api.post(totalUrl, {
         module_type: moduleType,
         module_id: moduleId,
-        groups: [{ filters: segment.filters.map(f => ({
-          field_name: f.field,
-          operator: f.operator,
-          field_value: f.value
-        })) }]
+        groups: [{ filters: [] }]
       });
-      
-      console.log(`Received count for segment ${segment.id}: ${response.data.count}`);
-      setCounts(prev => ({ ...prev, [segment.id]: response.data.count }));
-    } catch (error) {
-      console.error('Failed to fetch count', error);
-    } finally {
-      setLoading(prev => ({ ...prev, [segment.id]: false }));
+      const total = totalRes.data.count;
+
+      // 2. Separate default and non-default segments
+      const nonDefaultSegments = segments.filter(s => !s.isDefault);
+      const validNonDefaultSegments = nonDefaultSegments.filter(segment => {
+        return segment.filters.length > 0 && !segment.filters.some(f => !f.field || !f.value);
+      });
+
+      let nonDefaultChanged = false;
+
+      // 3. Fetch counts for each valid non-default segment
+      for (const segment of validNonDefaultSegments) {
+        const filtersStr = JSON.stringify(segment.filters);
+        const hasCount = counts[segment.id] !== undefined;
+
+        if (prevFiltersRef.current[segment.id] === filtersStr && hasCount) {
+          continue;
+        }
+
+        nonDefaultChanged = true;
+        setLoading(prev => ({ ...prev, [segment.id]: true }));
+        try {
+          const url = campaignId 
+            ? `/campaigns/segments/validate-count/${campaignId}` 
+            : `/campaigns/segments/validate-count`;
+
+          const response = await api.post(url, {
+            module_type: moduleType,
+            module_id: moduleId,
+            groups: [{ filters: segment.filters.map(f => ({
+              field_name: f.field,
+              operator: f.operator,
+              field_value: f.value
+            })) }]
+          });
+          setCounts(prev => ({ ...prev, [segment.id]: response.data.count }));
+          prevFiltersRef.current[segment.id] = filtersStr;
+        } catch (error) {
+          console.error(`Failed to fetch count for segment ${segment.id}`, error);
+        } finally {
+          setLoading(prev => ({ ...prev, [segment.id]: false }));
+        }
+      }
+
+      // Set invalid non-default segment counts to 0
+      nonDefaultSegments.forEach(segment => {
+        if (!validNonDefaultSegments.includes(segment)) {
+          const hasCount = counts[segment.id] !== undefined;
+          if (counts[segment.id] !== 0 || !hasCount) {
+            setCounts(prev => ({ ...prev, [segment.id]: 0 }));
+            nonDefaultChanged = true;
+          }
+          prevFiltersRef.current[segment.id] = '';
+        }
+      });
+
+      // 4. Update the fallback/default segment or single segment count
+      if (isSingleMode) {
+        const singleId = segments[0]?.id || 'default';
+        if (counts[singleId] !== total) {
+          setCounts(prev => ({ ...prev, [singleId]: total }));
+        }
+      } else {
+        const defaultSegment = segments.find(s => s.isDefault);
+        if (!defaultSegment) return;
+
+        if (validNonDefaultSegments.length === 0) {
+          // If no non-default segment has valid filters, default segment gets the entire audience
+          if (counts[defaultSegment.id] !== total) {
+            setCounts(prev => ({ ...prev, [defaultSegment.id]: total }));
+          }
+        } else {
+          // Only recalculate fallback if nonDefaultChanged or default count isn't set yet
+          const hasDefaultCount = counts[defaultSegment.id] !== undefined;
+          if (nonDefaultChanged || !hasDefaultCount) {
+            setLoading(prev => ({ ...prev, [defaultSegment.id]: true }));
+            try {
+              const url = campaignId 
+                ? `/campaigns/segments/validate-count/${campaignId}` 
+                : `/campaigns/segments/validate-count`;
+
+              const response = await api.post(url, {
+                module_type: moduleType,
+                module_id: moduleId,
+                groups: validNonDefaultSegments.map(segment => ({
+                  filters: segment.filters.map(f => ({
+                    field_name: f.field,
+                    operator: f.operator,
+                    field_value: f.value
+                  }))
+                }))
+              });
+              const unionCount = response.data.count;
+              setCounts(prev => ({ ...prev, [defaultSegment.id]: Math.max(0, total - unionCount) }));
+            } catch (error) {
+              console.error('Failed to fetch union count', error);
+            } finally {
+              setLoading(prev => ({ ...prev, [defaultSegment.id]: false }));
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to run updateAllCounts', err);
     }
   };
 
@@ -119,17 +206,12 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
 
   // Debounced effect for live counting whenever filters change
   useEffect(() => {
-    const activeSegments = segments.filter(s => !s.isDefault || s.filters.length > 0);
-    if (activeSegments.length === 0) return;
-
     const timer = setTimeout(() => {
-      activeSegments.forEach(segment => {
-        fetchLiveCount(segment);
-      });
+      updateAllCounts();
     }, 600); // 600ms debounce to avoid spamming the API
 
     return () => clearTimeout(timer);
-  }, [JSON.stringify(segments), campaignId, moduleType, moduleId]);
+  }, [JSON.stringify(segments), campaignId, moduleType, moduleId, isSingleMode]);
 
   useEffect(() => {
     onSegmentsChange?.(segments);
@@ -269,6 +351,10 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
                         >
                           <option value="=">equals</option>
                           <option value="!=">not equals</option>
+                          <option value=">">greater than</option>
+                          <option value="<">less than</option>
+                          <option value=">=">greater than or equal</option>
+                          <option value="<=">less than or equal</option>
                           <option value="in">is one of</option>
                           <option value="contains">contains</option>
                           <option value="starts_with">starts with</option>

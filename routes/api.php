@@ -14,21 +14,29 @@ use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Tracking\TrackingController;
 
 Route::get('/user', function (Request $request) {
-    return $request->user();
+    return $request->user()->load('role.permissions');
 })->middleware('auth:sanctum');
 
 Route::get('/insights/org', [\App\Http\Controllers\Api\SegmentationController::class, 'getOrgInsights'])->middleware('auth:sanctum');
 
 Route::prefix('auth')->group(function () {
+    Route::post('send-otp', [AuthController::class, 'sendOtp'])->middleware('throttle:5,1');
     Route::post('register', [AuthController::class, 'register'])->middleware('throttle:5,1');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
     Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
     Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
+    Route::post('reset-temporary-password', [AuthController::class, 'resetTemporaryPassword'])->middleware('throttle:5,1');
 });
 
 Route::middleware('auth:sanctum')->prefix('managers')->group(function () {
     Route::post('/', [AuthController::class, 'createManager'])->middleware('permissions:create_manager');
+});
+
+Route::middleware('auth:sanctum')->prefix('organization/users')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\OrganizationUserController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\Api\OrganizationUserController::class, 'store']);
+    Route::delete('/{user}', [\App\Http\Controllers\Api\OrganizationUserController::class, 'destroy']);
 });
 
 Route::middleware(['auth:sanctum', 'permissions:view_roles'])->prefix('roles')->group(function () {
@@ -60,11 +68,11 @@ Route::middleware('auth:sanctum')->prefix('recipients')->group(function () {
 // Analysis APIs
 Route::middleware(['auth:sanctum'])->prefix('analysis')->group(function () {
     Route::get('dashboard', [AnalysisController::class, 'dashboard']);
-    Route::get('hierarchical', [AnalysisController::class, 'hierarchical']);
-    Route::get('campaign/{id}', [AnalysisController::class, 'campaignAnalysis']);
+    Route::get('hierarchical', [AnalysisController::class, 'hierarchical'])->middleware('feature:advanced_analytics');
+    Route::get('campaign/{id}', [AnalysisController::class, 'campaignAnalysis'])->middleware('feature:advanced_analytics');
     Route::get('template/{id}', [AnalysisController::class, 'templateAnalysis']);
 
-    Route::middleware('permissions:track_conversions')->group(function () {
+    Route::middleware(['permissions:track_conversions', 'feature:track_conversions'])->group(function () {
         Route::post('conversion', [AnalysisController::class, 'recordConversion']);
     });
 });
@@ -98,13 +106,13 @@ Route::middleware('auth:sanctum')->prefix('email-templates')->group(function () 
 
 Route::get('/o/{requestUserId}', [TrackingController::class, 'OpenMailTrack']);
 Route::get('/c/{requestUserId}', [TrackingController::class, 'ClickMailTrack']);
-Route::prefix('v1')->group(function () {
-    Route::post('spam/check', [\App\Http\Controllers\Api\EmailAIController::class, 'spamCheck']);
-    Route::post('email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate']);
-    Route::post('email/rewrite', [\App\Http\Controllers\Api\EmailAIController::class, 'rewrite']);
-    Route::post('email/score', [\App\Http\Controllers\Api\EmailAIController::class, 'score']);
-    Route::get('health', [\App\Http\Controllers\Api\EmailAIController::class, 'health']);
+Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+    Route::post('spam/check', [\App\Http\Controllers\Api\EmailAIController::class, 'spamCheck'])->middleware('feature:ai_generation');
+    Route::post('email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate'])->middleware('feature:ai_generation');
+    Route::post('email/rewrite', [\App\Http\Controllers\Api\EmailAIController::class, 'rewrite'])->middleware('feature:ai_generation');
+    Route::post('email/score', [\App\Http\Controllers\Api\EmailAIController::class, 'score'])->middleware('feature:ai_generation');
 });
+Route::get('v1/health', [\App\Http\Controllers\Api\EmailAIController::class, 'health']);
 
 Route::post('/payments/webhooks/razorpay', [PaymentController::class, 'razorpayWebhook']);
 
@@ -148,4 +156,18 @@ Route::middleware('auth:sanctum')->prefix('suppressions')->group(function () {
     Route::get('/', [\App\Http\Controllers\Api\SuppressionController::class, 'index']);
     Route::post('/', [\App\Http\Controllers\Api\SuppressionController::class, 'store']);
     Route::delete('/{id}', [\App\Http\Controllers\Api\SuppressionController::class, 'destroy']);
+});
+
+Route::middleware('auth:sanctum')->prefix('admin/kym')->group(function () {
+    Route::get('/organizations', [\App\Http\Controllers\Api\Admin\KymConsoleController::class, 'index']);
+    Route::post('/organizations/{id}/update', [\App\Http\Controllers\Api\Admin\KymConsoleController::class, 'update']);
+});
+
+Route::middleware('auth:sanctum')->prefix('automations')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'store']);
+    Route::get('/{automation}', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'show']);
+    Route::patch('/{automation}', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'update']);
+    Route::delete('/{automation}', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'destroy']);
+    Route::post('/{automation}/toggle', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'toggle']);
 });

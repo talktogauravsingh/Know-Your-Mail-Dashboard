@@ -68,7 +68,7 @@ export default function Templates() {
 
   const filteredTemplates = templates.filter(t => 
     (activeFilter === 'All' || t.category === activeFilter) &&
-    t.name.toLowerCase().includes(searchTerm.toLowerCase())
+    (t.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
