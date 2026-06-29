@@ -1660,6 +1660,31 @@ export default function CreateCampaign() {
             <Card>
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                  Organization Directory Sample
+                </CardTitle>
+                <CardDescription>
+                  Below is a sample of unique recipients loaded from your organization's directory.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {csvResult && (
+                  <CsvPreviewPanel
+                    status={uploadStatus}
+                    fileName="Organization Directory"
+                    result={csvResult}
+                    error={uploadMessage}
+                    onRetry={null}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {recipientSource === 'org' && csvResult && (
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2">
                   <Filter className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                   {segmentationMode === 'segmented' ? 'Multi-Segment Targeting Rules' : 'Audience Targeting Filters'}
                 </CardTitle>
@@ -1680,22 +1705,6 @@ export default function CreateCampaign() {
                   isSingleMode={segmentationMode === 'single'}
                   canAddSegments={true}
                 />
-
-                {csvResult && (
-                  <div className="mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-50 mb-4 flex items-center gap-2">
-                      <Users className="w-4 h-4 text-indigo-605" />
-                      Organization Directory Sample (5 Users Only)
-                    </h3>
-                    <CsvPreviewPanel
-                      status={uploadStatus}
-                      fileName="Organization Directory"
-                      result={csvResult}
-                      error={uploadMessage}
-                      onRetry={null}
-                    />
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}
