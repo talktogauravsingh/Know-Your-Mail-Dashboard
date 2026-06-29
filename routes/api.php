@@ -68,11 +68,11 @@ Route::middleware('auth:sanctum')->prefix('recipients')->group(function () {
 // Analysis APIs
 Route::middleware(['auth:sanctum'])->prefix('analysis')->group(function () {
     Route::get('dashboard', [AnalysisController::class, 'dashboard']);
-    Route::get('hierarchical', [AnalysisController::class, 'hierarchical']);
-    Route::get('campaign/{id}', [AnalysisController::class, 'campaignAnalysis']);
+    Route::get('hierarchical', [AnalysisController::class, 'hierarchical'])->middleware('feature:advanced_analytics');
+    Route::get('campaign/{id}', [AnalysisController::class, 'campaignAnalysis'])->middleware('feature:advanced_analytics');
     Route::get('template/{id}', [AnalysisController::class, 'templateAnalysis']);
 
-    Route::middleware('permissions:track_conversions')->group(function () {
+    Route::middleware(['permissions:track_conversions', 'feature:track_conversions'])->group(function () {
         Route::post('conversion', [AnalysisController::class, 'recordConversion']);
     });
 });
@@ -106,13 +106,13 @@ Route::middleware('auth:sanctum')->prefix('email-templates')->group(function () 
 
 Route::get('/o/{requestUserId}', [TrackingController::class, 'OpenMailTrack']);
 Route::get('/c/{requestUserId}', [TrackingController::class, 'ClickMailTrack']);
-Route::prefix('v1')->group(function () {
-    Route::post('spam/check', [\App\Http\Controllers\Api\EmailAIController::class, 'spamCheck']);
-    Route::post('email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate']);
-    Route::post('email/rewrite', [\App\Http\Controllers\Api\EmailAIController::class, 'rewrite']);
-    Route::post('email/score', [\App\Http\Controllers\Api\EmailAIController::class, 'score']);
-    Route::get('health', [\App\Http\Controllers\Api\EmailAIController::class, 'health']);
+Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+    Route::post('spam/check', [\App\Http\Controllers\Api\EmailAIController::class, 'spamCheck'])->middleware('feature:ai_generation');
+    Route::post('email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate'])->middleware('feature:ai_generation');
+    Route::post('email/rewrite', [\App\Http\Controllers\Api\EmailAIController::class, 'rewrite'])->middleware('feature:ai_generation');
+    Route::post('email/score', [\App\Http\Controllers\Api\EmailAIController::class, 'score'])->middleware('feature:ai_generation');
 });
+Route::get('v1/health', [\App\Http\Controllers\Api\EmailAIController::class, 'health']);
 
 Route::post('/payments/webhooks/razorpay', [PaymentController::class, 'razorpayWebhook']);
 
@@ -156,4 +156,9 @@ Route::middleware('auth:sanctum')->prefix('suppressions')->group(function () {
     Route::get('/', [\App\Http\Controllers\Api\SuppressionController::class, 'index']);
     Route::post('/', [\App\Http\Controllers\Api\SuppressionController::class, 'store']);
     Route::delete('/{id}', [\App\Http\Controllers\Api\SuppressionController::class, 'destroy']);
+});
+
+Route::middleware('auth:sanctum')->prefix('admin/kym')->group(function () {
+    Route::get('/organizations', [\App\Http\Controllers\Api\Admin\KymConsoleController::class, 'index']);
+    Route::post('/organizations/{id}/update', [\App\Http\Controllers\Api\Admin\KymConsoleController::class, 'update']);
 });

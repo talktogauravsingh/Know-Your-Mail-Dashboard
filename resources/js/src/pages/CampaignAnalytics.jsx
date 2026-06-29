@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../components/ui/Card';
+import FeatureGateLock from '../components/ui/FeatureGateLock';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
@@ -165,20 +166,22 @@ export default function CampaignAnalytics() {
         </Button>
       </div>
 
-      {/* Tabs Menu */}
-      <div className="flex space-x-1 rounded-xl bg-slate-100 dark:bg-slate-900/60 p-1 w-fit border border-slate-200/50 dark:border-slate-800/20">
-        {[
-          { id: 'overview', label: 'Overview' },
-          { id: 'insights', label: 'Client Insights' },
-          { id: 'recipients', label: 'Recipients' }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${activeTab === tab.id
-                ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-slate-50 border border-slate-200/20 dark:border-slate-700/20'
-                : 'text-slate-600 hover:text-slate-950 dark:text-slate-400 dark:hover:text-slate-200'
-              }`}
+      {/* Tabs and Content Wrapper */}
+      <FeatureGateLock feature="advanced_analytics">
+        {/* Tabs Menu */}
+        <div className="flex space-x-1 rounded-xl bg-slate-100 dark:bg-slate-900/60 p-1 w-fit border border-slate-200/50 dark:border-slate-800/20">
+          {[
+            { id: 'overview', label: 'Overview' },
+            { id: 'insights', label: 'Client Insights' },
+            { id: 'recipients', label: 'Recipients' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${activeTab === tab.id
+                  ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-slate-50 border border-slate-200/20 dark:border-slate-700/20'
+                  : 'text-slate-600 hover:text-slate-950 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
           >
             {tab.label}
           </button>
@@ -621,6 +624,7 @@ export default function CampaignAnalytics() {
           </div>
         </div>
       )}
+      </FeatureGateLock>
     </div>
   );
 }

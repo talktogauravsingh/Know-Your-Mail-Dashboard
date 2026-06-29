@@ -22,6 +22,14 @@ class EmailAIController extends Controller
 
     public function generate(GenerateEmailAIRequest $request)
     {
+        $orgId = (int) auth()->user()->organization_id;
+        if (!app(\App\Services\FeatureGateService::class)->consumeCredit('ai_generation', $orgId)) {
+            return response()->json([
+                'error' => 'feature_locked',
+                'message' => 'You have run out of AI generation credits for your billing cycle. Please upgrade your plan.'
+            ], 403);
+        }
+
         $data = $request->validated();
         $result = $this->service->generate($data);
 
@@ -64,6 +72,14 @@ class EmailAIController extends Controller
 
     public function rewrite(RewriteEmailAIRequest $request)
     {
+        $orgId = (int) auth()->user()->organization_id;
+        if (!app(\App\Services\FeatureGateService::class)->consumeCredit('ai_generation', $orgId)) {
+            return response()->json([
+                'error' => 'feature_locked',
+                'message' => 'You have run out of AI generation credits for your billing cycle. Please upgrade your plan.'
+            ], 403);
+        }
+
         $data = $request->validated();
         $result = $this->service->rewrite($data);
 

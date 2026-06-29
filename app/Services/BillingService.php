@@ -41,6 +41,27 @@ class BillingService
             }
         }
 
+        // Fetch active/unlocked features list and remaining credits
+        $activePlanKey = $subscription?->plan_key ?? 'free';
+        $dbPlan = \App\Models\Plan::where('key', $activePlanKey)->with('features')->first();
+        $activeFeatures = [];
+
+        if ($dbPlan) {
+            $gateService = app(\App\Services\FeatureGateService::class);
+            foreach ($dbPlan->features as $feature) {
+                if ($feature->pivot->is_enabled === 1) {
+                    $quotaInfo = $gateService->checkQuota($feature->key, $organizationId);
+                    $activeFeatures[] = [
+                        'key' => $feature->key,
+                        'name' => $feature->name,
+                        'description' => $feature->description,
+                        'limit_value' => $feature->pivot->limit_value,
+                        'remaining' => $quotaInfo['remaining'],
+                    ];
+                }
+            }
+        }
+
         return [
             'organization_id' => $organizationId,
             'subscription' => $subscription ? [
@@ -57,6 +78,7 @@ class BillingService
                 'cancelled_at' => optional($subscription->cancelled_at)->toIso8601String(),
             ] : null,
             'current_plan' => $transformedPlan,
+            'active_features' => $activeFeatures,
             'cta_label' => $subscription ? 'Update Plan' : 'Add New Plan',
         ];
     }
@@ -142,6 +164,9 @@ class BillingService
 
         $subscription->save();
 
+        // Reset the organization feature credits for the new/updated plan
+        app(\App\Services\FeatureGateService::class)->resetCreditsForOrg($organizationId, $planKey);
+
         return $subscription->refresh();
     }
 
@@ -215,6 +240,10 @@ class BillingService
 
     private function freePlan(): array
     {
+        $freeConfig = config('payments.plans.free');
+        if (is_array($freeConfig)) {
+            return $this->transformPlan('free', $freeConfig);
+        }
         return [
             'key' => 'free',
             'name' => 'Free',

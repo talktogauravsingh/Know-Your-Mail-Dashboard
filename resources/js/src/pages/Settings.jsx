@@ -24,12 +24,14 @@ import {
     Server,
     KeyRound,
     Ban,
+    Shield,
 } from "lucide-react";
 import { useStore } from "../store/useStore";
 import TeamManagement from "./settings/TeamManagement";
 import SenderDomains from "./settings/SenderDomains";
 import SmtpCredentials from "./settings/SmtpCredentials";
 import Suppressions from "./settings/Suppressions";
+import KymConsole from "./settings/KymConsole";
 
 function formatMoney(amountMinor = 0, currency = "INR") {
     const safeAmountMinor = Number(amountMinor) || 0;
@@ -204,6 +206,10 @@ export default function Settings() {
         { id: "smtp-credentials", label: "SMTP Relay Keys", icon: KeyRound },
         { id: "suppressions", label: "Suppression List", icon: Ban },
     ];
+
+    if (user?.role?.slug === "root") {
+        tabs.push({ id: "kym-console", label: "KYM Root Console", icon: Shield });
+    }
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 max-w-5xl mx-auto pb-10">
@@ -802,6 +808,12 @@ export default function Settings() {
                                     </Button>
                                 </CardContent>
                             </Card>
+                        </div>
+                    )}
+
+                    {activeTab === "kym-console" && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <KymConsole />
                         </div>
                     )}
                 </div>

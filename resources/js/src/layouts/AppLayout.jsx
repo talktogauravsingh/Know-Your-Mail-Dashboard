@@ -63,6 +63,11 @@ export default function AppLayout() {
     localStorage.setItem('sidebar-collapsed', JSON.stringify(isCollapsed));
   }, [isCollapsed]);
 
+  // Fetch billing details globally on mount
+  useEffect(() => {
+    fetchBillingSummary().catch(() => {});
+  }, [fetchBillingSummary]);
+
   // Sync theme to document root
   useEffect(() => {
     if (theme === 'dark') {
