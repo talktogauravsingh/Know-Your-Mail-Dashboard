@@ -61,7 +61,13 @@ class AssignSegmentsJob implements ShouldQueue
         if ($hasCampaignRecipients) {
             $query = Recipient::where('module_type', 2)->where('module_id', $this->campaign->id);
         } else {
-            $query = Recipient::where('module_type', 1)->where('module_id', $this->campaign->organization_id);
+            $subQuery = DB::table('recipients')
+                ->select(DB::raw('MIN(id) as id'))
+                ->where('module_type', 1)
+                ->where('module_id', $this->campaign->organization_id)
+                ->groupBy('email');
+            
+            $query = Recipient::whereIn('id', $subQuery);
         }
 
         $filterGroups = $variant->filterGroups;

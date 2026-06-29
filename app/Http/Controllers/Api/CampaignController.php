@@ -474,4 +474,89 @@ class CampaignController extends Controller
             'variables' => array_values($result),
         ]);
     }
+
+    public function getOrgRecipients(Request $request)
+    {
+        $user = Auth::user();
+        $orgId = $user->organization_id ?? 1;
+
+        // Fetch insights to get the headers
+        $insights = DB::table('campaign_csv_insights')
+            ->where('module_type', 1)
+            ->where('module_id', $orgId)
+            ->get();
+        
+        $headers = $insights->pluck('field_name')->toArray();
+        if (!in_array('email', $headers)) {
+            array_unshift($headers, 'email');
+        }
+        if (!in_array('name', $headers)) {
+            $headers[] = 'name';
+        }
+        if (!in_array('phone', $headers)) {
+            $headers[] = 'phone';
+        }
+
+        // Get 5 unique sample recipients based on email in a driver-agnostic way
+        $subQuery = DB::table('recipients')
+            ->select(DB::raw('MIN(id) as id'))
+            ->where('module_type', 1)
+            ->where('module_id', $orgId)
+            ->groupBy('email');
+
+        $sampleRecipients = DB::table('recipients')
+            ->whereIn('id', $subQuery)
+            ->limit(5)
+            ->get();
+
+        // Convert sample recipients to associative array of header => value
+        $previewRows = [];
+        foreach ($sampleRecipients as $r) {
+            $attrs = json_decode($r->attributes, true) ?: [];
+            $row = [
+                'email' => $r->email,
+                'name' => $r->name,
+                'phone' => $r->phone,
+                'lead_type' => $r->lead_type,
+                'city' => $r->city,
+                'gender' => $r->gender,
+            ];
+            // Merge in custom attributes (lowercased keys)
+            foreach ($attrs as $key => $val) {
+                $row[strtolower($key)] = $val;
+            }
+            
+            // Build the row in the order of headers
+            $orderedRow = [];
+            foreach ($headers as $h) {
+                $orderedRow[$h] = $row[strtolower($h)] ?? null;
+            }
+            $previewRows[] = $orderedRow;
+        }
+
+        // Count unique totals
+        $totalRows = DB::table('recipients')
+            ->where('module_type', 1)
+            ->where('module_id', $orgId)
+            ->distinct('email')
+            ->count('email');
+            
+        $validRows = DB::table('recipients')
+            ->where('module_type', 1)
+            ->where('module_id', $orgId)
+            ->where('is_valid', true)
+            ->distinct('email')
+            ->count('email');
+
+        $invalidRows = $totalRows - $validRows;
+
+        return response()->json([
+            'success' => true,
+            'headers' => $headers,
+            'preview_rows' => $previewRows,
+            'total_rows' => $totalRows,
+            'valid_rows' => $validRows,
+            'invalid_rows' => $invalidRows,
+        ]);
+    }
 }

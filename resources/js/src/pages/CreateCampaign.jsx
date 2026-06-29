@@ -308,6 +308,40 @@ export default function CreateCampaign() {
     }
   };
 
+  const fetchOrgData = async () => {
+    setUploadStatus('loading');
+    try {
+      const previewRes = await api.get('/campaigns/org-recipients');
+      if (previewRes.data.success) {
+        setCsvResult({
+          fileName: 'Organization Directory',
+          totalRows: previewRes.data.total_rows,
+          validRows: previewRes.data.valid_rows,
+          invalidRows: previewRes.data.invalid_rows,
+          headers: previewRes.data.headers,
+          rows: previewRes.data.preview_rows,
+          errors: [],
+        });
+        setUploadStatus('success');
+      }
+
+      const insightsRes = await api.get('/insights/org');
+      if (insightsRes.data.success) {
+        setInsights(insightsRes.data.insights || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch organization recipient data:', err);
+      setUploadStatus('error');
+      setUploadMessage(err.response?.data?.message || 'Failed to load organization directory');
+    }
+  };
+
+  useEffect(() => {
+    if (recipientSource === 'org') {
+      fetchOrgData();
+    }
+  }, [recipientSource]);
+
 
   useEffect(() => {
     fetchTemplates().catch(() => {});
@@ -1473,6 +1507,8 @@ export default function CreateCampaign() {
                   onClick={() => {
                     setRecipientSource('org');
                     setInsights([]);
+                    setCsvResult(null);
+                    setUploadStatus('idle');
                   }}
                   className={cn(
                     "p-5 border-2 text-left transition-all duration-200 flex flex-col gap-3",
@@ -1505,6 +1541,8 @@ export default function CreateCampaign() {
                   onClick={() => {
                     setRecipientSource('campaign');
                     setInsights([]);
+                    setCsvResult(null);
+                    setUploadStatus('idle');
                   }}
                   className={cn(
                     "p-5 border-2 text-left transition-all duration-200 flex flex-col gap-3",
@@ -1638,6 +1676,22 @@ export default function CreateCampaign() {
                   isSingleMode={segmentationMode === 'single'}
                   canAddSegments={true}
                 />
+
+                {csvResult && (
+                  <div className="mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-50 mb-4 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-indigo-605" />
+                      Organization Directory Sample (5 Users Only)
+                    </h3>
+                    <CsvPreviewPanel
+                      status={uploadStatus}
+                      fileName="Organization Directory"
+                      result={csvResult}
+                      error={uploadMessage}
+                      onRetry={null}
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
