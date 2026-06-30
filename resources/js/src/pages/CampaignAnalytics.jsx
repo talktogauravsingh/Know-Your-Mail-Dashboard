@@ -36,18 +36,45 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell
+  Cell,
+  LineChart,
+  Line
 } from 'recharts';
 
 const COLORS = ['#6366f1', '#a855f7', '#ec4899', '#14b8a6', '#f59e0b', '#3b82f6'];
 
 // Custom Tooltip Renderers to avoid dark-theme text contrast / black patch issues in Recharts
-const OpensTooltip = ({ active, payload, label }) => {
+const OpensTimelineTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
       <div style={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', padding: '10px', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)' }}>
         <p style={{ color: '#94a3b8', margin: '0 0 4px 0', fontSize: '11px', fontWeight: '500' }}>{`Time: ${label}`}</p>
         <p style={{ color: '#ec4899', margin: 0, fontSize: '12px', fontWeight: '700' }}>{`Opens: ${payload[0].value}`}</p>
+      </div>
+    );
+  }
+  return null;
+};
+
+const ClicksTimelineTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div style={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', padding: '10px', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)' }}>
+        <p style={{ color: '#94a3b8', margin: '0 0 4px 0', fontSize: '11px', fontWeight: '500' }}>{`Time: ${label}`}</p>
+        <p style={{ color: '#6366f1', margin: 0, fontSize: '12px', fontWeight: '700' }}>{`Clicks: ${payload[0].value}`}</p>
+      </div>
+    );
+  }
+  return null;
+};
+
+const TimeSpentTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div style={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', padding: '10px', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)' }}>
+        <p style={{ color: '#ffffff', margin: 0, fontSize: '12px', fontWeight: '700' }}>
+          {`${payload[0].payload.name}: ${payload[0].value} user(s)`}
+        </p>
       </div>
     );
   }
@@ -123,7 +150,8 @@ export default function CampaignAnalytics() {
     deviceBreakdown = [],
     browserBreakdown = [],
     recipients = [],
-    linkPerformance = []
+    linkPerformance = [],
+    timeSpentDistribution = []
   } = currentCampaign;
 
   const filteredRecipients = recipients.filter(r =>
@@ -312,7 +340,7 @@ export default function CampaignAnalytics() {
           {/* Charts Grid */}
           <div className="grid gap-6 md:grid-cols-2">
 
-            {/* Open Timeline (Past to Present Area Chart) */}
+            {/* Opens Timeline (Curved Line Chart) */}
             <Card className="border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-bold text-slate-900 dark:text-slate-50">Opens Timeline</CardTitle>
@@ -322,13 +350,7 @@ export default function CampaignAnalytics() {
                 <div className="h-[280px] w-full">
                   {hourlyOpens.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={hourlyOpens} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="colorOpens" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#ec4899" stopOpacity={0.25} />
-                            <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
+                      <LineChart data={hourlyOpens} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" className="dark:stroke-slate-900" />
                         <XAxis
                           dataKey="time"
@@ -344,18 +366,17 @@ export default function CampaignAnalytics() {
                           axisLine={false}
                           allowDecimals={false}
                         />
-                        <Tooltip content={<OpensTooltip />} />
-                        <Area
+                        <Tooltip content={<OpensTimelineTooltip />} />
+                        <Line
                           type="monotone"
                           dataKey="opens"
+                          name="Opens"
                           stroke="#ec4899"
                           strokeWidth={3}
-                          fillOpacity={1}
-                          fill="url(#colorOpens)"
-                          dot={{ r: 4, fill: '#ec4899', strokeWidth: 2, stroke: '#fff' }}
-                          activeDot={{ r: 6 }}
+                          dot={{ r: 3, fill: '#ec4899', strokeWidth: 1, stroke: '#fff' }}
+                          activeDot={{ r: 5 }}
                         />
-                      </AreaChart>
+                      </LineChart>
                     </ResponsiveContainer>
                   ) : (
                     <div className="flex h-full items-center justify-center text-slate-400 text-sm">
@@ -366,7 +387,57 @@ export default function CampaignAnalytics() {
               </CardContent>
             </Card>
 
-            {/* Link Performance (Horizontal Bar Chart) */}
+            {/* Clicks Timeline (Curved Line Chart) */}
+            <Card className="border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-bold text-slate-900 dark:text-slate-50">Clicks Timeline</CardTitle>
+                <CardDescription className="text-xs">Chronological link click distribution (past to present).</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[280px] w-full">
+                  {hourlyOpens.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={hourlyOpens} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" className="dark:stroke-slate-900" />
+                        <XAxis
+                          dataKey="time"
+                          stroke="#94a3b8"
+                          fontSize={11}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <YAxis
+                          stroke="#94a3b8"
+                          fontSize={11}
+                          tickLine={false}
+                          axisLine={false}
+                          allowDecimals={false}
+                        />
+                        <Tooltip content={<ClicksTimelineTooltip />} />
+                        <Line
+                          type="monotone"
+                          dataKey="clicks"
+                          name="Clicks"
+                          stroke="#6366f1"
+                          strokeWidth={3}
+                          dot={{ r: 3, fill: '#6366f1', strokeWidth: 1, stroke: '#fff' }}
+                          activeDot={{ r: 5 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-slate-400 text-sm">
+                      No clicks recorded yet.
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+          </div>
+
+          {/* Link Performance (Horizontal Bar Chart) */}
+          <div className="mt-6">
             <Card className="border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-bold text-slate-900 dark:text-slate-50">Link Click Performance</CardTitle>
@@ -437,7 +508,7 @@ export default function CampaignAnalytics() {
       {/* Client Insights Tab */}
       {activeTab === 'insights' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 
             {/* Geographic Opens */}
             <Card className="border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950">
@@ -553,6 +624,41 @@ export default function CampaignAnalytics() {
                     No client tracking profiles available.
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Attention Span / Time Spent */}
+            <Card className="border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950 md:col-span-2 lg:col-span-1">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-bold">
+                  <CheckCircle className="h-5 w-5 text-purple-500" /> Attention Span
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Time elapsed between recipient's first open and link click.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[280px] w-full">
+                  {timeSpentDistribution.length > 0 && timeSpentDistribution.some(d => d.value > 0) ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={timeSpentDistribution} layout="vertical" margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" className="dark:stroke-slate-900" />
+                        <XAxis type="number" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
+                        <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} width={110} tickLine={false} axisLine={false} />
+                        <Tooltip content={<TimeSpentTooltip />} />
+                        <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={20}>
+                          {timeSpentDistribution.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-slate-400 text-sm">
+                      No open-to-click timeline data available.
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>

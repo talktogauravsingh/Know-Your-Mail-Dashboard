@@ -149,7 +149,46 @@ class AnalysisController extends Controller
             $browserBreakdownData = $topBrowsers;
         }
 
-        // Dynamic chronological opens timeline (no future entries)
+        // Time Spent Distribution (opened_at to clicked_at delta)
+        $timeSpentBrackets = [
+            'Immediate (< 10s)' => 0,
+            'Quick scan (10s-1m)' => 0,
+            'Engaged (1m-5m)' => 0,
+            'Deep dive (5m-30m)' => 0,
+            'Delayed (30m+)' => 0,
+        ];
+
+        $engagedLogs = (clone $sendLogs)
+            ->whereNotNull('opened_at')
+            ->whereNotNull('clicked_at')
+            ->get(['opened_at', 'clicked_at']);
+
+        foreach ($engagedLogs as $log) {
+            $open = \Carbon\Carbon::parse($log->opened_at);
+            $click = \Carbon\Carbon::parse($log->clicked_at);
+            $diff = $click->diffInSeconds($open);
+
+            if ($diff < 0) {
+                $timeSpentBrackets['Immediate (< 10s)']++;
+            } elseif ($diff < 10) {
+                $timeSpentBrackets['Immediate (< 10s)']++;
+            } elseif ($diff < 60) {
+                $timeSpentBrackets['Quick scan (10s-1m)']++;
+            } elseif ($diff < 300) {
+                $timeSpentBrackets['Engaged (1m-5m)']++;
+            } elseif ($diff < 1800) {
+                $timeSpentBrackets['Deep dive (5m-30m)']++;
+            } else {
+                $timeSpentBrackets['Delayed (30m+)']++;
+            }
+        }
+
+        $timeSpentDistribution = [];
+        foreach ($timeSpentBrackets as $bracketName => $count) {
+            $timeSpentDistribution[] = ['name' => $bracketName, 'value' => $count];
+        }
+
+        // Dynamic chronological opens & clicks timeline (no future entries)
         $startTime = $campaign->created_at;
         $now = now();
         $hoursSinceStart = $startTime->diffInHours($now);
@@ -163,15 +202,28 @@ class AnalysisController extends Controller
                 ->pluck('opened_at')
                 ->map(fn($date) => \Carbon\Carbon::parse($date));
 
+            $clickedAtList = (clone $sendLogs)
+                ->whereBetween('clicked_at', [$startTime, $now])
+                ->pluck('clicked_at')
+                ->map(fn($date) => \Carbon\Carbon::parse($date));
+
             for ($i = 0; $i < $totalHoursToShow; $i++) {
                 $time = $startTime->copy()->addHours($i);
                 $nextTime = $time->copy()->addHour();
                 
-                $count = $openedAtList->filter(function($openedAt) use ($time, $nextTime) {
+                $openCount = $openedAtList->filter(function($openedAt) use ($time, $nextTime) {
                     return $openedAt->between($time, $nextTime);
                 })->count();
+
+                $clickCount = $clickedAtList->filter(function($clickedAt) use ($time, $nextTime) {
+                    return $clickedAt->between($time, $nextTime);
+                })->count();
                 
-                $hourlyOpens[] = ['time' => $time->format('H:i'), 'opens' => $count];
+                $hourlyOpens[] = [
+                    'time' => $time->format('H:i'), 
+                    'opens' => $openCount,
+                    'clicks' => $clickCount
+                ];
             }
         } else {
             $daysSinceStart = $startTime->diffInDays($now);
@@ -182,16 +234,29 @@ class AnalysisController extends Controller
                 ->pluck('opened_at')
                 ->map(fn($date) => \Carbon\Carbon::parse($date));
 
+            $clickedAtList = (clone $sendLogs)
+                ->whereBetween('clicked_at', [$startTime, $now])
+                ->pluck('clicked_at')
+                ->map(fn($date) => \Carbon\Carbon::parse($date));
+
             for ($i = 0; $i < $totalDaysToShow; $i++) {
                 $date = $startTime->copy()->addDays($i);
                 $startOfDay = $date->copy()->startOfDay();
                 $endOfDay = $date->copy()->endOfDay();
                 
-                $count = $openedAtList->filter(function($openedAt) use ($startOfDay, $endOfDay) {
+                $openCount = $openedAtList->filter(function($openedAt) use ($startOfDay, $endOfDay) {
                     return $openedAt->between($startOfDay, $endOfDay);
                 })->count();
+
+                $clickCount = $clickedAtList->filter(function($clickedAt) use ($startOfDay, $endOfDay) {
+                    return $clickedAt->between($startOfDay, $endOfDay);
+                })->count();
                 
-                $hourlyOpens[] = ['time' => $date->format('M d'), 'opens' => $count];
+                $hourlyOpens[] = [
+                    'time' => $date->format('M d'), 
+                    'opens' => $openCount,
+                    'clicks' => $clickCount
+                ];
             }
         }
 
@@ -284,6 +349,7 @@ class AnalysisController extends Controller
             'regionBreakdown' => $regionBreakdown,
             'deviceBreakdown' => $deviceBreakdownData,
             'browserBreakdown' => $browserBreakdownData,
+            'timeSpentDistribution' => $timeSpentDistribution,
             'recipients' => $recipientList,
             'linkPerformance' => $linkPerformance
         ]);
