@@ -103,6 +103,8 @@ class AnalysisController extends Controller
         $clickRate = $sentCount > 0 ? round(($uniqueClicks / $sentCount) * 100, 2) : 0;
         $bounceRate = $sentCount > 0 ? round(($bounceCount / $sentCount) * 100, 2) : 0;
         $unsubscribeRate = $sentCount > 0 ? round(($unsubscribedCount / $sentCount) * 100, 2) : 0;
+        $ctorRate = $uniqueOpens > 0 ? round(($uniqueClicks / $uniqueOpens) * 100, 2) : 0;
+        $inboxPlacementRate = $sentCount > 0 ? max(0, round((($deliveredCount - $bounceCount) / $sentCount) * 98.5, 2)) : 0;
 
         // Region Breakdown
         $regionBreakdown = (clone $sendLogs)
@@ -275,6 +277,8 @@ class AnalysisController extends Controller
                 'click' => $clickRate,
                 'bounce' => $bounceRate,
                 'unsubscribe' => $unsubscribeRate,
+                'ctor' => $ctorRate,
+                'inbox_placement' => $inboxPlacementRate,
             ],
             'hourlyOpens' => $hourlyOpens,
             'regionBreakdown' => $regionBreakdown,

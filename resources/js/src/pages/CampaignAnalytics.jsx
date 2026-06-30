@@ -21,7 +21,8 @@ import {
   Loader2,
   Laptop,
   Eye,
-  CheckCircle
+  CheckCircle,
+  Inbox
 } from 'lucide-react';
 import {
   AreaChart,
@@ -193,7 +194,7 @@ export default function CampaignAnalytics() {
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
 
           {/* Summary Cards */}
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-6">
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
 
             {/* Sent */}
             <Card className="bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/10">
@@ -256,6 +257,30 @@ export default function CampaignAnalytics() {
                     <span className="font-bold text-indigo-500">{rates.click}%</span>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Click-to-Open (CTOR) */}
+            <Card className="border-slate-200/80 dark:border-slate-800/80 shadow-sm bg-white dark:bg-slate-950">
+              <CardContent className="p-5 flex flex-col justify-between h-full min-h-[120px]">
+                <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
+                  <p className="font-semibold text-xs uppercase tracking-wider">CTOR</p>
+                  <MousePointer2 className="h-4 w-4 text-purple-500" />
+                </div>
+                <h3 className="text-3xl font-extrabold mt-4 text-slate-950 dark:text-slate-50">{rates.ctor ?? 0}%</h3>
+                <span className="text-xs font-semibold text-purple-500 mt-1">Click-to-open rate</span>
+              </CardContent>
+            </Card>
+
+            {/* Inbox Placement */}
+            <Card className="border-slate-200/80 dark:border-slate-800/80 shadow-sm bg-white dark:bg-slate-950">
+              <CardContent className="p-5 flex flex-col justify-between h-full min-h-[120px]">
+                <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
+                  <p className="font-semibold text-xs uppercase tracking-wider">Inbox Placement</p>
+                  <Inbox className="h-4 w-4 text-emerald-500" />
+                </div>
+                <h3 className="text-3xl font-extrabold mt-4 text-slate-950 dark:text-slate-50">{rates.inbox_placement ?? 0}%</h3>
+                <span className="text-xs font-semibold text-emerald-500 mt-1">Placement rate</span>
               </CardContent>
             </Card>
 
