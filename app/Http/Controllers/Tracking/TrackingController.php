@@ -23,7 +23,7 @@ class TrackingController extends Controller
     public function OpenMailTrack(Request $request)
     {
         try {
-            $sendLog = SendLog::find($request->route('sendLog'));
+            $sendLog = SendLog::where('uuid', $request->route('sendLog'))->first();
 
             if ($sendLog) {
                 $classification = $this->trackingService->classifyRequest(
@@ -75,7 +75,7 @@ class TrackingController extends Controller
     {
         $url = $request->query('url');
         try {
-            $sendLog = SendLog::find($request->route('sendLog'));
+            $sendLog = SendLog::where('uuid', $request->route('sendLog'))->first();
 
             if ($sendLog) {
                 $updateData = ['last_activity_at' => now()];

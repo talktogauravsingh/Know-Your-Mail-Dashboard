@@ -203,19 +203,19 @@ class SendCampaignEmailJob implements ShouldQueue
                     if (str_contains($url, '/api/track/')) {
                         return $matches[0]; // already tracked
                     }
-                    return 'href="' . $trackingBase . '/api/track/click/' . $sendLog->id . '?url=' . urlencode($url) . '"';
+                    return 'href="' . $trackingBase . '/api/track/click/' . $sendLog->uuid . '?url=' . urlencode($url) . '"';
                 },
                 $htmlBody
             );
 
             // Add tracking pixel to the HTML body
-            $trackingUrl = "{$trackingBase}/api/track/open/{$sendLog->id}";
+            $trackingUrl = "{$trackingBase}/api/track/open/{$sendLog->uuid}";
             $trackingPixel = "<img src='{$trackingUrl}' width='1' height='1' style='display:none;' />";
             
             // Add CTA tracking if there is one
             $ctaLink = $variant->cta_url;
             if ($ctaLink) {
-                $trackedCta = "{$trackingBase}/api/track/click/{$sendLog->id}?url=" . urlencode($ctaLink);
+                $trackedCta = "{$trackingBase}/api/track/click/{$sendLog->uuid}?url=" . urlencode($ctaLink);
                 // Append CTA link if not already in body
                 if (!str_contains($htmlBody, $ctaLink)) {
                     $htmlBody .= "<br><br><a href='{$trackedCta}'>Click Here</a>";

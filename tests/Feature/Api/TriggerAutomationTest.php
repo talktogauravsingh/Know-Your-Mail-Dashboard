@@ -51,7 +51,7 @@ class TriggerAutomationTest extends TestCase
             'name' => 'Campaign Alpha',
             'subject' => 'Hello Alpha',
             'body' => 'Campaign alpha content',
-            'status' => 'active',
+            'status' => 'running',
             'segmentation_mode' => 'single',
         ]);
 
@@ -186,7 +186,7 @@ class TriggerAutomationTest extends TestCase
         ]);
 
         // Simulate open track API endpoint hit
-        $response = $this->get("/api/track/open/{$sendLog->id}");
+        $response = $this->get("/api/track/open/{$sendLog->uuid}");
         $response->assertStatus(200);
 
         // Verify EvaluateTriggerAutomationJob was dispatched
@@ -227,7 +227,7 @@ class TriggerAutomationTest extends TestCase
         ]);
 
         // Simulating click track API with the correct url query parameter
-        $response = $this->get("/api/track/click/{$sendLog->id}?url=https://example.com/checkout");
+        $response = $this->get("/api/track/click/{$sendLog->uuid}?url=https://example.com/checkout");
         $response->assertRedirect('https://example.com/checkout');
 
         // Check EvaluateTriggerAutomationJob is queued
