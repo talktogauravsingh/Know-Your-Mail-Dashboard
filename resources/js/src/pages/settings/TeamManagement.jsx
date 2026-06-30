@@ -10,7 +10,7 @@ import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Badge } from "../../components/ui/Badge";
 import { useStore } from "../../store/useStore";
-import { Trash2, UserPlus, Shield, Mail, Key, UserCheck } from "lucide-react";
+import { Trash2, UserPlus, Shield, Mail, Key, UserCheck, Check, X, Lock } from "lucide-react";
 
 export default function TeamManagement() {
     const [isAdding, setIsAdding] = useState(false);
@@ -31,13 +31,20 @@ export default function TeamManagement() {
     const roles = useStore((state) => state.roles);
     const rolesLoading = useStore((state) => state.rolesLoading);
     const fetchRoles = useStore((state) => state.fetchRoles);
+
+    const passwordResetRequests = useStore((state) => state.passwordResetRequests);
+    const passwordResetRequestsLoading = useStore((state) => state.passwordResetRequestsLoading);
+    const fetchPasswordResetRequests = useStore((state) => state.fetchPasswordResetRequests);
+    const approvePasswordResetRequest = useStore((state) => state.approvePasswordResetRequest);
+    const rejectPasswordResetRequest = useStore((state) => state.rejectPasswordResetRequest);
     
     const isLoading = useStore((state) => state.isLoading);
 
     useEffect(() => {
         fetchTeamMembers();
         fetchRoles();
-    }, [fetchTeamMembers, fetchRoles]);
+        fetchPasswordResetRequests();
+    }, [fetchTeamMembers, fetchRoles, fetchPasswordResetRequests]);
 
     // Set default role in form when roles load
     useEffect(() => {
@@ -277,6 +284,77 @@ export default function TeamManagement() {
                                     </div>
                                 );
                             })}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Password Reset Requests */}
+            <Card className="mt-8 shadow-sm border-slate-200/60 dark:border-slate-800/60">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                    <div>
+                        <CardTitle className="text-lg font-bold flex items-center gap-2">
+                            <Lock className="w-5 h-5 text-indigo-605 text-indigo-600" /> Password Reset Requests
+                        </CardTitle>
+                        <CardDescription>
+                            Approve or reject password reset requests from team members in your organization.
+                        </CardDescription>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    {passwordResetRequestsLoading ? (
+                        <div className="space-y-3">
+                            <div className="h-16 w-full bg-slate-100 dark:bg-slate-900 rounded-xl animate-pulse" />
+                        </div>
+                    ) : passwordResetRequests.length === 0 ? (
+                        <div className="p-8 text-center text-sm text-slate-500 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/55 dark:bg-slate-900/5">
+                            No pending password reset requests.
+                        </div>
+                    ) : (
+                        <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-200 dark:divide-slate-800">
+                            {passwordResetRequests.map((req) => (
+                                <div key={req.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-950 flex-wrap gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-10 w-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-700 font-bold dark:bg-amber-950/20 dark:text-amber-300">
+                                            {req.user ? getInitials(req.user.name) : 'U'}
+                                        </div>
+                                        <div>
+                                            <div className="font-semibold text-sm text-slate-900 dark:text-slate-50">
+                                                {req.user ? req.user.name : 'Unknown User'}
+                                            </div>
+                                            <p className="text-xs text-slate-500">
+                                                {req.user ? req.user.email : ''}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                        {req.user?.role && (
+                                            <Badge className={getRoleBadgeClass(req.user.role.slug)}>
+                                                {req.user.role.name}
+                                            </Badge>
+                                        )}
+                                        <div className="flex items-center gap-1.5">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 flex items-center gap-1 font-semibold"
+                                                onClick={() => approvePasswordResetRequest(req.id)}
+                                            >
+                                                <Check className="w-4 h-4" /> Approve
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 flex items-center gap-1 font-semibold"
+                                                onClick={() => rejectPasswordResetRequest(req.id)}
+                                            >
+                                                <X className="w-4 h-4" /> Reject
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </CardContent>

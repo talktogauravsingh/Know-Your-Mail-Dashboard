@@ -261,23 +261,71 @@ public function createManager(Request $request)
      */
     public function forgotPassword(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email'
+        $validated = $request->validate([
+            'email' => 'required|email|exists:users,email'
         ]);
 
-        $status = Password::sendResetLink(
-            $request->only('email')
-        );
+        $user = \App\Models\User::where('email', $validated['email'])->first();
+        $user->load('role');
 
-        if ($status === Password::RESET_LINK_SENT) {
+        $isHighPrivileged = in_array($user->role->slug, ['root', 'super-admin', 'admin']);
+
+        if ($isHighPrivileged) {
+            // Directly generate OTP, cache it, and email it
+            $otp = (string) random_int(100000, 999999);
+            \Illuminate\Support\Facades\Cache::put('password_reset_otp_' . $user->email, $otp, 600); // 10 minutes
+
+            // Send OTP email
+            try {
+                $this->sendPasswordResetOtpEmail($user, $otp);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Password reset OTP email failed: ' . $e->getMessage());
+                return response()->json([
+                    'message' => 'Failed to send OTP email. Please try again later.'
+                ], 500);
+            }
+
             return response()->json([
-                'message' => 'Reset link sent to email'
+                'status' => 'otp_sent',
+                'message' => 'OTP has been sent to your email address.'
+            ]);
+        } else {
+            // Low-privileged user: Check database states first
+            $approvedRequest = \App\Models\PasswordResetRequest::where('user_id', $user->id)
+                ->where('status', 'approved')
+                ->where('otp_expires_at', '>', now())
+                ->first();
+
+            if ($approvedRequest) {
+                return response()->json([
+                    'status' => 'otp_sent',
+                    'message' => 'Your password reset request has been approved. Please enter the OTP sent to your email.'
+                ]);
+            }
+
+            $pendingRequest = \App\Models\PasswordResetRequest::where('user_id', $user->id)
+                ->where('status', 'pending')
+                ->first();
+
+            if ($pendingRequest) {
+                return response()->json([
+                    'status' => 'request_pending',
+                    'message' => 'A password reset request is already pending administrator approval.'
+                ]);
+            }
+
+            // Otherwise, create a new pending request
+            \App\Models\PasswordResetRequest::create([
+                'user_id' => $user->id,
+                'organization_id' => $user->organization_id,
+                'status' => 'pending',
+            ]);
+
+            return response()->json([
+                'status' => 'request_pending',
+                'message' => 'A password reset request has been sent to your organization administrator for approval.'
             ]);
         }
-
-        return response()->json([
-            'error' => 'Unable to send reset link'
-        ], 400);
     }
 
     /**
@@ -285,27 +333,108 @@ public function createManager(Request $request)
      */
     public function resetPassword(Request $request)
     {
-        $request->validate([
-            'token' => 'required',
-            'email' => 'required|email',
+        $validated = $request->validate([
+            'email' => 'required|email|exists:users,email',
+            'otp' => 'required|string|size:6',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
-        $status = Password::reset(
-            $request->only('email', 'token', 'password', 'password_confirmation'),
-            function ($user, $password) {
-                $this->authRepo->resetUserPassword($user, $password);
-            }
-        );
+        $user = \App\Models\User::where('email', $validated['email'])->first();
+        $user->load('role');
 
-        if ($status === Password::PASSWORD_RESET) {
+        $isHighPrivileged = in_array($user->role->slug, ['root', 'super-admin', 'admin']);
+
+        if ($isHighPrivileged) {
+            // Verify OTP from Cache
+            $cachedOtp = \Illuminate\Support\Facades\Cache::get('password_reset_otp_' . $user->email);
+            if (!$cachedOtp || (string) $cachedOtp !== (string) $validated['otp']) {
+                return response()->json([
+                    'message' => 'The provided OTP is invalid or has expired.',
+                    'errors' => [
+                        'otp' => ['The provided OTP is invalid or has expired.']
+                    ]
+                ], 422);
+            }
+
+            // Reset password
+            $user->password = Hash::make($validated['password']);
+            $user->must_change_password = false;
+            $user->save();
+
+            \Illuminate\Support\Facades\Cache::forget('password_reset_otp_' . $user->email);
+
             return response()->json([
-                'message' => 'Password reset successfully'
+                'message' => 'Password reset successfully. You can now log in.'
+            ]);
+        } else {
+            // Low-privileged user: Verify OTP from latest approved PasswordResetRequest
+            $requestRecord = \App\Models\PasswordResetRequest::where('user_id', $user->id)
+                ->where('status', 'approved')
+                ->orderBy('updated_at', 'desc')
+                ->first();
+
+            if (!$requestRecord || (string) $requestRecord->otp !== (string) $validated['otp'] || $requestRecord->otp_expires_at->isPast()) {
+                return response()->json([
+                    'message' => 'The provided OTP is invalid or has expired.',
+                    'errors' => [
+                        'otp' => ['The provided OTP is invalid or has expired.']
+                    ]
+                ], 422);
+            }
+
+            // Reset password
+            $user->password = Hash::make($validated['password']);
+            $user->must_change_password = false;
+            $user->save();
+
+            // Mark request as completed
+            $requestRecord->status = 'completed';
+            $requestRecord->save();
+
+            return response()->json([
+                'message' => 'Password reset successfully. You can now log in.'
             ]);
         }
+    }
 
-        return response()->json([
-            'error' => 'Unable to reset password'
-        ], 400);
+    /**
+     * Send Password Reset OTP Email
+     */
+    public function sendPasswordResetOtpEmail($user, $otp)
+    {
+        config([
+            'mail.default' => 'smtp',
+            'mail.mailers.smtp.transport' => 'smtp',
+            'mail.mailers.smtp.host' => env('MAIL_HOST', 'smtp.gmail.com'),
+            'mail.mailers.smtp.port' => env('MAIL_PORT', 587),
+            'mail.mailers.smtp.encryption' => env('MAIL_ENCRYPTION', 'tls'),
+            'mail.mailers.smtp.username' => env('MAIL_USERNAME'),
+            'mail.mailers.smtp.password' => env('MAIL_PASSWORD'),
+            'mail.from' => [
+                'address' => env('MAIL_FROM_ADDRESS'),
+                'name' => env('MAIL_FROM_NAME'),
+            ],
+        ]);
+
+        app()->forgetInstance('mail.manager');
+        app()->forgetInstance('mailer');
+
+        $subject = "Your Password Reset OTP: " . $otp;
+        $htmlBody = "
+            <div style='font-family: \"Plus Jakarta Sans\", \"Inter\", system-ui, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; color: #1e293b; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);'>
+                <div style='text-align: center; margin-bottom: 24px;'>
+                    <h2 style='font-size: 20px; font-weight: 700; color: #0f172a; margin-top: 16px; margin-bottom: 4px;'>Verify Your Password Reset</h2>
+                    <p style='font-size: 14px; color: #64748b; margin: 0;'>Please use the OTP code below to reset your password:</p>
+                </div>
+                <div style='border-top: 1px solid #f1f5f9; padding-top: 24px; margin-bottom: 24px; text-align: center;'>
+                    <div style='display: inline-block; padding: 16px 24px; background-color: #f8fafc; border: 1px dashed #4f46e5; border-radius: 12px; margin: 16px auto;'>
+                        <span style='font-size: 32px; font-weight: 850; color: #4f46e5; letter-spacing: 6px; font-family: monospace;'>" . $otp . "</span>
+                    </div>
+                    <p style='font-size: 13px; line-height: 1.5; color: #64748b; margin-top: 16px;'>This OTP is valid for 10 minutes. If you did not request a password reset, please ignore this email.</p>
+                </div>
+            </div>
+        ";
+
+        \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\BulkMail($subject, $htmlBody));
     }
 }

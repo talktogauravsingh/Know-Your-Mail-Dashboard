@@ -136,6 +136,12 @@ Route::middleware('auth:sanctum')->prefix('smtp-configurations')->group(function
     Route::post('/{smtpConfiguration}/activate', [\App\Http\Controllers\Api\SmtpConfigurationController::class, 'activate']);
 });
 
+Route::middleware('auth:sanctum')->prefix('organization/password-reset-requests')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\PasswordResetRequestController::class, 'index']);
+    Route::post('/{id}/approve', [\App\Http\Controllers\Api\PasswordResetRequestController::class, 'approve']);
+    Route::post('/{id}/reject', [\App\Http\Controllers\Api\PasswordResetRequestController::class, 'reject']);
+});
+
 Route::middleware('auth:sanctum')->prefix('domains')->group(function () {
     Route::get('/', [\App\Http\Controllers\Api\SenderDomainController::class, 'index']);
     Route::post('/', [\App\Http\Controllers\Api\SenderDomainController::class, 'store']);

@@ -26,6 +26,8 @@ export const useStore = create((set, get) => ({
   teamMembersLoading: false,
   roles: [],
   rolesLoading: false,
+  passwordResetRequests: [],
+  passwordResetRequestsLoading: false,
 
   // Persistence helpers
   persistAuth: (user, token) => {
@@ -572,6 +574,59 @@ export const useStore = create((set, get) => ({
     } catch (error) {
       console.error('Failed to fetch roles:', error);
       set({ rolesLoading: false });
+    }
+  },
+  fetchPasswordResetRequests: async () => {
+    set({ passwordResetRequestsLoading: true });
+    try {
+      const { data } = await api.get('/organization/password-reset-requests');
+      set({ passwordResetRequests: data, passwordResetRequestsLoading: false });
+    } catch (error) {
+      console.error('Failed to fetch password reset requests:', error);
+      set({ passwordResetRequestsLoading: false });
+    }
+  },
+  approvePasswordResetRequest: async (id) => {
+    try {
+      await api.post(`/organization/password-reset-requests/${id}/approve`);
+      get().fetchPasswordResetRequests();
+      get().addToast('Password reset request approved. OTP sent to user.', 'success');
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to approve request', 'error');
+    }
+  },
+  rejectPasswordResetRequest: async (id) => {
+    try {
+      await api.post(`/organization/password-reset-requests/${id}/reject`);
+      get().fetchPasswordResetRequests();
+      get().addToast('Password reset request rejected.', 'success');
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to reject request', 'error');
+    }
+  },
+  forgotPassword: async (email) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.post('/auth/forgot-password', { email });
+      return data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Forgot password request failed', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  resetPassword: async (payload) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.post('/auth/reset-password', payload);
+      get().addToast('Password reset successfully! You can now log in.', 'success');
+      return data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Password reset failed', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
     }
   },
 }));
