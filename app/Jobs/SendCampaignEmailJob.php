@@ -163,6 +163,7 @@ class SendCampaignEmailJob implements ShouldQueue
             $subject = $engine->render($subject, $variables);
 
             // Prepare HTML body
+            $trackingBase = rtrim(env('TRACKING_BASE_URL', config('app.url')), '/');
             $htmlBody = '';
 
             // Resolve the template for this variant: use variant's template_id first, falling back to campaign's template_id
@@ -184,8 +185,30 @@ class SendCampaignEmailJob implements ShouldQueue
                 $htmlBody = nl2br($body);
             }
 
+            // Convert plain text URLs to anchor tags (if not already wrapped in an href or src)
+            $htmlBody = preg_replace_callback(
+                '/(?<!href=["\'])(?<!src=["\'])\b(https?:\/\/[^\s<>\]]+)/i',
+                function($matches) {
+                    $url = rtrim($matches[1], '.,;:!?)"\'>');
+                    return '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($url) . '</a>';
+                },
+                $htmlBody
+            );
+
+            // Rewrite all <a href="..."> links to route through click tracking
+            $htmlBody = preg_replace_callback(
+                '/href="([^"]+)"/i',
+                function($matches) use ($trackingBase, $sendLog) {
+                    $url = htmlspecialchars_decode($matches[1]);
+                    if (str_contains($url, '/api/track/')) {
+                        return $matches[0]; // already tracked
+                    }
+                    return 'href="' . $trackingBase . '/api/track/click/' . $sendLog->id . '?url=' . urlencode($url) . '"';
+                },
+                $htmlBody
+            );
+
             // Add tracking pixel to the HTML body
-            $trackingBase = rtrim(env('TRACKING_BASE_URL', config('app.url')), '/');
             $trackingUrl = "{$trackingBase}/api/track/open/{$sendLog->id}";
             $trackingPixel = "<img src='{$trackingUrl}' width='1' height='1' style='display:none;' />";
             
