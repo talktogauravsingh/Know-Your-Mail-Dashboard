@@ -22,6 +22,10 @@ export const useStore = create((set, get) => ({
   suppressions: [],
   suppressionsTotal: 0,
   suppressionsLoading: false,
+  teamMembers: [],
+  teamMembersLoading: false,
+  roles: [],
+  rolesLoading: false,
 
   // Persistence helpers
   persistAuth: (user, token) => {
@@ -55,10 +59,28 @@ export const useStore = create((set, get) => ({
     set({ isLoading: true });
     try {
       const { data } = await api.post('/auth/login', credentials);
+      if (data.must_change_password) {
+        return data;
+      }
       get().persistAuth(data.user, data.token);
       return data;
     } catch (error) {
       get().addToast(error.response?.data?.message || 'Login failed', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  resetTemporaryPassword: async (payload) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.post('/auth/reset-temporary-password', payload);
+      get().persistAuth(data.user, data.token);
+      get().addToast('Password updated successfully. Welcome!', 'success');
+      return data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Password reset failed', 'error');
       throw error;
     } finally {
       set({ isLoading: false });
@@ -227,7 +249,8 @@ export const useStore = create((set, get) => ({
           category: t.category || 'Newsletter',
           description: t.description || t.preview_text || t.subject || 'No description provided.',
           avgOpenRate: t.avg_open_rate || t.avgOpenRate || '-',
-          color: t.color || colors[index % colors.length]
+          color: t.color || colors[index % colors.length],
+          html_content: t.html_content || t.htmlContent || ''
         };
       });
 
@@ -544,6 +567,130 @@ export const useStore = create((set, get) => ({
       get().addToast('Suppression removed successfully', 'success');
     } catch (error) {
       get().addToast('Failed to remove suppression', 'error');
+    }
+  },
+
+  // Team management
+  fetchTeamMembers: async () => {
+    set({ teamMembersLoading: true });
+    try {
+      const { data } = await api.get('/organization/users');
+      set({ teamMembers: data, teamMembersLoading: false });
+    } catch (error) {
+      get().addToast('Failed to fetch team members', 'error');
+      set({ teamMembersLoading: false });
+    }
+  },
+  addTeamMember: async (payload) => {
+    set({ isLoading: true });
+    try {
+      await api.post('/organization/users', payload);
+      get().fetchTeamMembers();
+      get().addToast('Team member added successfully', 'success');
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to add team member', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  deleteTeamMember: async (id) => {
+    try {
+      await api.delete(`/organization/users/${id}`);
+      get().fetchTeamMembers();
+      get().addToast('Team member removed successfully', 'success');
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to remove team member', 'error');
+    }
+  },
+  fetchRoles: async () => {
+    set({ rolesLoading: true });
+    try {
+      const { data } = await api.get('/roles');
+      set({ roles: data, rolesLoading: false });
+    } catch (error) {
+      console.error('Failed to fetch roles:', error);
+      set({ rolesLoading: false });
+    }
+  },
+
+  // Automations
+  automations: [],
+  automationsLoading: false,
+  fetchAutomations: async () => {
+    set({ automationsLoading: true });
+    try {
+      const { data } = await api.get('/automations');
+      set({ automations: data, automationsLoading: false });
+    } catch (error) {
+      console.error('Failed to fetch automations:', error);
+      set({ automationsLoading: false });
+    }
+  },
+  fetchAutomationDetail: async (id) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.get(`/automations/${id}`);
+      return data;
+    } catch (error) {
+      console.error('Failed to fetch automation detail:', error);
+      get().addToast('Failed to load automation detail', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  createAutomation: async (automationData) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.post('/automations', automationData);
+      get().fetchAutomations();
+      get().addToast('Automation created successfully', 'success');
+      return data.data || data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to create automation', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  updateAutomation: async (id, automationData) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.patch(`/automations/${id}`, automationData);
+      get().fetchAutomations();
+      get().addToast('Automation updated successfully', 'success');
+      return data.data || data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to update automation', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  deleteAutomation: async (id) => {
+    try {
+      await api.delete(`/automations/${id}`);
+      get().fetchAutomations();
+      get().addToast('Automation deleted successfully', 'success');
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to delete automation', 'error');
+      throw error;
+    }
+  },
+  toggleAutomation: async (id) => {
+    try {
+      const { data } = await api.post(`/automations/${id}/toggle`);
+      set((state) => ({
+        automations: state.automations.map((a) =>
+          a.id === id || a.uuid === id ? { ...a, status: data.status } : a
+        ),
+      }));
+      get().addToast(`Automation ${data.status === 'active' ? 'activated' : 'paused'}`, 'success');
+      return data;
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to toggle status', 'error');
+      throw error;
     }
   },
 }));

@@ -163,11 +163,15 @@ class SendCampaignEmailJob implements ShouldQueue
             $subject = $engine->render($subject, $variables);
 
             // Prepare HTML body
+            $trackingBase = rtrim(env('TRACKING_BASE_URL', config('app.url')), '/');
             $htmlBody = '';
 
-            // If campaign has a template with content block, use template merging
-            if ($campaign->template_id && $campaign->template) {
-                $template = $campaign->template;
+            // Resolve the template for this variant: use variant's template_id first, falling back to campaign's template_id
+            $templateId = $variant->template_id ?: $campaign->template_id;
+            $template = $templateId ? \App\Models\EmailTemplate::find($templateId) : null;
+
+            // If template exists, use template merging
+            if ($template) {
                 $templateService = new EmailTemplateService();
                 
                 // Prepare the variant body (with variable substitution)
@@ -181,15 +185,37 @@ class SendCampaignEmailJob implements ShouldQueue
                 $htmlBody = nl2br($body);
             }
 
+            // Convert plain text URLs to anchor tags (if not already wrapped in an href or src)
+            $htmlBody = preg_replace_callback(
+                '/(?<!href=["\'])(?<!src=["\'])\b(https?:\/\/[^\s<>\]]+)/i',
+                function($matches) {
+                    $url = rtrim($matches[1], '.,;:!?)"\'>');
+                    return '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($url) . '</a>';
+                },
+                $htmlBody
+            );
+
+            // Rewrite all <a href="..."> links to route through click tracking
+            $htmlBody = preg_replace_callback(
+                '/href="([^"]+)"/i',
+                function($matches) use ($trackingBase, $sendLog) {
+                    $url = htmlspecialchars_decode($matches[1]);
+                    if (str_contains($url, '/api/track/')) {
+                        return $matches[0]; // already tracked
+                    }
+                    return 'href="' . $trackingBase . '/api/track/click/' . $sendLog->uuid . '?url=' . urlencode($url) . '"';
+                },
+                $htmlBody
+            );
+
             // Add tracking pixel to the HTML body
-            $trackingBase = rtrim(env('TRACKING_BASE_URL', config('app.url')), '/');
-            $trackingUrl = "{$trackingBase}/api/track/open/{$sendLog->id}";
+            $trackingUrl = "{$trackingBase}/api/track/open/{$sendLog->uuid}";
             $trackingPixel = "<img src='{$trackingUrl}' width='1' height='1' style='display:none;' />";
             
             // Add CTA tracking if there is one
             $ctaLink = $variant->cta_url;
             if ($ctaLink) {
-                $trackedCta = "{$trackingBase}/api/track/click/{$sendLog->id}?url=" . urlencode($ctaLink);
+                $trackedCta = "{$trackingBase}/api/track/click/{$sendLog->uuid}?url=" . urlencode($ctaLink);
                 // Append CTA link if not already in body
                 if (!str_contains($htmlBody, $ctaLink)) {
                     $htmlBody .= "<br><br><a href='{$trackedCta}'>Click Here</a>";
@@ -203,8 +229,9 @@ class SendCampaignEmailJob implements ShouldQueue
             Mail::to($recipient->email)->send(new BulkMail($subject, $htmlBody));
 
             $sendLog->update([
-                'status' => 'sent',
+                'status' => 'delivered',
                 'sent_at' => now(),
+                'delivered_at' => now(),
             ]);
 
             Log::info("Sent email to {$recipient->email} for campaign {$campaign->id} using Variant: {$variant->name}");

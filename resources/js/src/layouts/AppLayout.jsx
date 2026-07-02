@@ -30,7 +30,7 @@ const navigation = [
   { name: 'Billing & Plan', href: '/billing', icon: CreditCard },
   { name: 'Campaigns', href: '/campaigns', icon: Mail },
   { name: 'Templates', href: '/templates', icon: LayoutTemplate },
-  { name: 'Automation', href: '#', icon: Sparkles, disabled: true },
+  { name: 'Automation', href: '/automations', icon: Sparkles },
   { name: 'Audience', href: '/audience', icon: Users },
   { name: 'Global Import', href: '/bulk-import', icon: Database },
   { name: 'AI Chatbot', href: '#', icon: Bot, disabled: true },
@@ -41,6 +41,14 @@ export default function AppLayout() {
   const { user, logout, theme, toggleTheme, billingSummary, fetchBillingSummary } = useStore();
   const location = useLocation();
   const currentPlanName = billingSummary?.current_plan?.name || 'Free';
+  const userRoleSlug = user?.role?.slug;
+  const isSettingsAllowed = userRoleSlug === 'super-admin' || userRoleSlug === 'admin' || userRoleSlug === 'root';
+  const filteredNavigation = navigation.filter(item => {
+    if (item.href === '/settings') {
+      return isSettingsAllowed;
+    }
+    return true;
+  });
 
   // Desktop sidebar collapse state (persisted)
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -54,6 +62,11 @@ export default function AppLayout() {
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', JSON.stringify(isCollapsed));
   }, [isCollapsed]);
+
+  // Fetch billing details globally on mount
+  useEffect(() => {
+    fetchBillingSummary().catch(() => {});
+  }, [fetchBillingSummary]);
 
   // Sync theme to document root
   useEffect(() => {
@@ -108,7 +121,7 @@ export default function AppLayout() {
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto py-2">
           <nav className="space-y-1 px-3">
-            {navigation.map((item) => {
+            {filteredNavigation.map((item) => {
               const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
               return (
                 <Link

@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../components/ui/Card';
+import FeatureGateLock from '../components/ui/FeatureGateLock';
+import { WorldMap } from 'react-svg-worldmap';
+import { getCountryCode } from '../lib/countryMapper';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
@@ -20,7 +23,8 @@ import {
   Loader2,
   Laptop,
   Eye,
-  CheckCircle
+  CheckCircle,
+  Inbox
 } from 'lucide-react';
 import {
   AreaChart,
@@ -34,18 +38,45 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell
+  Cell,
+  LineChart,
+  Line
 } from 'recharts';
 
 const COLORS = ['#6366f1', '#a855f7', '#ec4899', '#14b8a6', '#f59e0b', '#3b82f6'];
 
 // Custom Tooltip Renderers to avoid dark-theme text contrast / black patch issues in Recharts
-const OpensTooltip = ({ active, payload, label }) => {
+const OpensTimelineTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
       <div style={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', padding: '10px', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)' }}>
         <p style={{ color: '#94a3b8', margin: '0 0 4px 0', fontSize: '11px', fontWeight: '500' }}>{`Time: ${label}`}</p>
         <p style={{ color: '#ec4899', margin: 0, fontSize: '12px', fontWeight: '700' }}>{`Opens: ${payload[0].value}`}</p>
+      </div>
+    );
+  }
+  return null;
+};
+
+const ClicksTimelineTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div style={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', padding: '10px', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)' }}>
+        <p style={{ color: '#94a3b8', margin: '0 0 4px 0', fontSize: '11px', fontWeight: '500' }}>{`Time: ${label}`}</p>
+        <p style={{ color: '#6366f1', margin: 0, fontSize: '12px', fontWeight: '700' }}>{`Clicks: ${payload[0].value}`}</p>
+      </div>
+    );
+  }
+  return null;
+};
+
+const TimeSpentTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div style={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', padding: '10px', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)' }}>
+        <p style={{ color: '#ffffff', margin: 0, fontSize: '12px', fontWeight: '700' }}>
+          {`${payload[0].payload.name}: ${payload[0].value} user(s)`}
+        </p>
       </div>
     );
   }
@@ -96,6 +127,16 @@ export default function CampaignAnalytics() {
   const { currentCampaign, isLoading, fetchCampaignDetail } = useStore();
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
+  const [geoView, setGeoView] = useState('map');
+  const [isDarkMode, setIsDarkMode] = useState(document.documentElement.classList.contains('dark'));
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     fetchCampaignDetail(id);
@@ -117,12 +158,27 @@ export default function CampaignAnalytics() {
     summary,
     rates,
     hourlyOpens,
-    regionBreakdown,
+    regionBreakdown = [],
     deviceBreakdown = [],
     browserBreakdown = [],
     recipients = [],
-    linkPerformance = []
+    linkPerformance = [],
+    timeSpentDistribution = []
   } = currentCampaign;
+
+  // Format regionBreakdown into ISO-coded data for react-svg-worldmap
+  const mapData = Object.values(
+    regionBreakdown.reduce((acc, item) => {
+      const code = getCountryCode(item.name);
+      if (code) {
+        if (!acc[code]) {
+          acc[code] = { country: code, value: 0 };
+        }
+        acc[code].value += item.value;
+      }
+      return acc;
+    }, {})
+  );
 
   const filteredRecipients = recipients.filter(r =>
     r.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -165,20 +221,22 @@ export default function CampaignAnalytics() {
         </Button>
       </div>
 
-      {/* Tabs Menu */}
-      <div className="flex space-x-1 rounded-xl bg-slate-100 dark:bg-slate-900/60 p-1 w-fit border border-slate-200/50 dark:border-slate-800/20">
-        {[
-          { id: 'overview', label: 'Overview' },
-          { id: 'insights', label: 'Client Insights' },
-          { id: 'recipients', label: 'Recipients' }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${activeTab === tab.id
-                ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-slate-50 border border-slate-200/20 dark:border-slate-700/20'
-                : 'text-slate-600 hover:text-slate-950 dark:text-slate-400 dark:hover:text-slate-200'
-              }`}
+      {/* Tabs and Content Wrapper */}
+      <FeatureGateLock feature="advanced_analytics">
+        {/* Tabs Menu */}
+        <div className="flex space-x-1 rounded-xl bg-slate-100 dark:bg-slate-900/60 p-1 w-fit border border-slate-200/50 dark:border-slate-800/20">
+          {[
+            { id: 'overview', label: 'Overview' },
+            { id: 'insights', label: 'Client Insights' },
+            { id: 'recipients', label: 'Recipients' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${activeTab === tab.id
+                  ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-slate-50 border border-slate-200/20 dark:border-slate-700/20'
+                  : 'text-slate-600 hover:text-slate-950 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
           >
             {tab.label}
           </button>
@@ -190,7 +248,7 @@ export default function CampaignAnalytics() {
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
 
           {/* Summary Cards */}
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-6">
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
 
             {/* Sent */}
             <Card className="bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/10">
@@ -256,6 +314,30 @@ export default function CampaignAnalytics() {
               </CardContent>
             </Card>
 
+            {/* Click-to-Open (CTOR) */}
+            <Card className="border-slate-200/80 dark:border-slate-800/80 shadow-sm bg-white dark:bg-slate-950">
+              <CardContent className="p-5 flex flex-col justify-between h-full min-h-[120px]">
+                <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
+                  <p className="font-semibold text-xs uppercase tracking-wider">CTOR</p>
+                  <MousePointer2 className="h-4 w-4 text-purple-500" />
+                </div>
+                <h3 className="text-3xl font-extrabold mt-4 text-slate-950 dark:text-slate-50">{rates.ctor ?? 0}%</h3>
+                <span className="text-xs font-semibold text-purple-500 mt-1">Click-to-open rate</span>
+              </CardContent>
+            </Card>
+
+            {/* Inbox Placement */}
+            <Card className="border-slate-200/80 dark:border-slate-800/80 shadow-sm bg-white dark:bg-slate-950">
+              <CardContent className="p-5 flex flex-col justify-between h-full min-h-[120px]">
+                <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
+                  <p className="font-semibold text-xs uppercase tracking-wider">Inbox Placement</p>
+                  <Inbox className="h-4 w-4 text-emerald-500" />
+                </div>
+                <h3 className="text-3xl font-extrabold mt-4 text-slate-950 dark:text-slate-50">{rates.inbox_placement ?? 0}%</h3>
+                <span className="text-xs font-semibold text-emerald-500 mt-1">Placement rate</span>
+              </CardContent>
+            </Card>
+
             {/* Bounced */}
             <Card className="border-red-100 bg-red-50/20 dark:border-red-950/20 dark:bg-red-950/5">
               <CardContent className="p-5 flex flex-col justify-between h-full min-h-[120px]">
@@ -284,7 +366,7 @@ export default function CampaignAnalytics() {
           {/* Charts Grid */}
           <div className="grid gap-6 md:grid-cols-2">
 
-            {/* Open Timeline (Past to Present Area Chart) */}
+            {/* Opens Timeline (Curved Line Chart) */}
             <Card className="border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-bold text-slate-900 dark:text-slate-50">Opens Timeline</CardTitle>
@@ -294,13 +376,7 @@ export default function CampaignAnalytics() {
                 <div className="h-[280px] w-full">
                   {hourlyOpens.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={hourlyOpens} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="colorOpens" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#ec4899" stopOpacity={0.25} />
-                            <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
+                      <LineChart data={hourlyOpens} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" className="dark:stroke-slate-900" />
                         <XAxis
                           dataKey="time"
@@ -316,18 +392,17 @@ export default function CampaignAnalytics() {
                           axisLine={false}
                           allowDecimals={false}
                         />
-                        <Tooltip content={<OpensTooltip />} />
-                        <Area
+                        <Tooltip content={<OpensTimelineTooltip />} />
+                        <Line
                           type="monotone"
                           dataKey="opens"
+                          name="Opens"
                           stroke="#ec4899"
                           strokeWidth={3}
-                          fillOpacity={1}
-                          fill="url(#colorOpens)"
-                          dot={{ r: 4, fill: '#ec4899', strokeWidth: 2, stroke: '#fff' }}
-                          activeDot={{ r: 6 }}
+                          dot={{ r: 3, fill: '#ec4899', strokeWidth: 1, stroke: '#fff' }}
+                          activeDot={{ r: 5 }}
                         />
-                      </AreaChart>
+                      </LineChart>
                     </ResponsiveContainer>
                   ) : (
                     <div className="flex h-full items-center justify-center text-slate-400 text-sm">
@@ -338,7 +413,57 @@ export default function CampaignAnalytics() {
               </CardContent>
             </Card>
 
-            {/* Link Performance (Horizontal Bar Chart) */}
+            {/* Clicks Timeline (Curved Line Chart) */}
+            <Card className="border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-bold text-slate-900 dark:text-slate-50">Clicks Timeline</CardTitle>
+                <CardDescription className="text-xs">Chronological link click distribution (past to present).</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[280px] w-full">
+                  {hourlyOpens.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={hourlyOpens} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" className="dark:stroke-slate-900" />
+                        <XAxis
+                          dataKey="time"
+                          stroke="#94a3b8"
+                          fontSize={11}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <YAxis
+                          stroke="#94a3b8"
+                          fontSize={11}
+                          tickLine={false}
+                          axisLine={false}
+                          allowDecimals={false}
+                        />
+                        <Tooltip content={<ClicksTimelineTooltip />} />
+                        <Line
+                          type="monotone"
+                          dataKey="clicks"
+                          name="Clicks"
+                          stroke="#6366f1"
+                          strokeWidth={3}
+                          dot={{ r: 3, fill: '#6366f1', strokeWidth: 1, stroke: '#fff' }}
+                          activeDot={{ r: 5 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-slate-400 text-sm">
+                      No clicks recorded yet.
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+          </div>
+
+          {/* Link Performance (Horizontal Bar Chart) */}
+          <div className="mt-6">
             <Card className="border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-bold text-slate-900 dark:text-slate-50">Link Click Performance</CardTitle>
@@ -409,17 +534,74 @@ export default function CampaignAnalytics() {
       {/* Client Insights Tab */}
       {activeTab === 'insights' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 
             {/* Geographic Opens */}
-            <Card className="border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base font-bold"><Globe className="h-5 w-5 text-indigo-500" /> Geographic Breakdown</CardTitle>
-                <CardDescription className="text-xs">Top regions where recipients interact with campaign emails.</CardDescription>
+            <Card className="border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950 md:col-span-2 lg:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base font-bold">
+                    <Globe className="h-5 w-5 text-indigo-500" /> Geographic Breakdown
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-1">
+                    Top regions where recipients interact with campaign emails.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200/50 dark:border-slate-800/50">
+                  <button
+                    onClick={() => setGeoView('map')}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                      geoView === 'map'
+                        ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-50'
+                    }`}
+                  >
+                    Map View
+                  </button>
+                  <button
+                    onClick={() => setGeoView('chart')}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                      geoView === 'chart'
+                        ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-50'
+                    }`}
+                  >
+                    Chart View
+                  </button>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="h-[280px] w-full">
-                  {regionBreakdown.length > 0 ? (
+                <div className="h-[280px] w-full flex items-center justify-center">
+                  {geoView === 'map' ? (
+                    <div className="w-full h-full flex items-center justify-center relative overflow-hidden [&_svg]:max-h-full">
+                      <WorldMap
+                        color="#6366f1"
+                        valueSuffix="opens"
+                        size="responsive"
+                        data={mapData}
+                        backgroundColor="transparent"
+                        styleFunction={({ countryValue, minValue, maxValue }) => {
+                          const activeColor = '#6366f1';
+                          const inactiveColor = isDarkMode ? '#1e293b' : '#f1f5f9';
+                          const borderColor = isDarkMode ? '#334155' : '#cbd5e1';
+                          return {
+                            fill: countryValue ? activeColor : inactiveColor,
+                            fillOpacity: countryValue ? 0.35 + (countryValue / (maxValue || 1)) * 0.65 : 1,
+                            stroke: borderColor,
+                            strokeWidth: 0.5,
+                            strokeOpacity: 0.8,
+                            cursor: countryValue ? 'pointer' : 'default',
+                            transition: 'all 0.2s ease',
+                          };
+                        }}
+                      />
+                      {mapData.length === 0 && (
+                        <div className="absolute bottom-2 left-2 bg-slate-900/85 dark:bg-slate-950/85 text-white border border-slate-700/50 backdrop-blur-sm px-2.5 py-1 rounded text-[10px] font-medium tracking-wide">
+                          No engagement data recorded
+                        </div>
+                      )}
+                    </div>
+                  ) : regionBreakdown.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={regionBreakdown}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" className="dark:stroke-slate-900" />
@@ -527,6 +709,41 @@ export default function CampaignAnalytics() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Attention Span / Time Spent */}
+            <Card className="border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950 md:col-span-2 lg:col-span-3">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-bold">
+                  <CheckCircle className="h-5 w-5 text-purple-500" /> Attention Span
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Time elapsed between recipient's first open and link click.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[280px] w-full">
+                  {timeSpentDistribution.length > 0 && timeSpentDistribution.some(d => d.value > 0) ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={timeSpentDistribution} layout="vertical" margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" className="dark:stroke-slate-900" />
+                        <XAxis type="number" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
+                        <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} width={110} tickLine={false} axisLine={false} />
+                        <Tooltip content={<TimeSpentTooltip />} />
+                        <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={20}>
+                          {timeSpentDistribution.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-slate-400 text-sm">
+                      No open-to-click timeline data available.
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       )}
@@ -621,6 +838,7 @@ export default function CampaignAnalytics() {
           </div>
         </div>
       )}
+      </FeatureGateLock>
     </div>
   );
 }

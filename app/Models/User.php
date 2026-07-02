@@ -14,7 +14,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Support\Facades\DB;
 
-#[Fillable(['name', 'email', 'password', 'role_id', 'organization_id', 'created_by'])]
+#[Fillable(['name', 'email', 'phone_number', 'password', 'role_id', 'organization_id', 'created_by', 'must_change_password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail
 {

@@ -483,7 +483,7 @@ export default function Campaigns() {
 
                   {/* Delivered Column (non-wrapping formatting) */}
                   <TableCell className="text-center font-medium text-xs text-[#172B4D] dark:text-slate-100 py-1 whitespace-nowrap border-r border-slate-200 dark:border-slate-800 last:border-r-0">
-                    {isDraft ? '--' : `100.0% | ${(c.sent_count || 0).toLocaleString()}`}
+                    {isDraft ? '--' : `${(c.sent_count || 0) > 0 ? '100.0' : '0.0'}% | ${(c.sent_count || 0).toLocaleString()}`}
                   </TableCell>
 
                   {/* Open Rate */}

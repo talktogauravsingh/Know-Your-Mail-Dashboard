@@ -8,6 +8,7 @@ class CampaignVariant extends Model
 {
     protected $fillable = [
         'campaign_id',
+        'template_id',
         'name',
         'subject',
         'body',
@@ -24,6 +25,11 @@ class CampaignVariant extends Model
     public function campaign()
     {
         return $this->belongsTo(Campaign::class);
+    }
+
+    public function template()
+    {
+        return $this->belongsTo(EmailTemplate::class, 'template_id');
     }
 
     public function filterGroups()

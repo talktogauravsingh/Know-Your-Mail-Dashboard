@@ -8,7 +8,7 @@ ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/do
 
 RUN chmod +x /usr/local/bin/install-php-extensions && \
     apk update && apk add --no-cache git zip unzip && \
-    install-php-extensions pdo_pgsql
+    install-php-extensions pdo_pgsql pdo_mysql
 
 # Install Composer securely from the official image
 COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer

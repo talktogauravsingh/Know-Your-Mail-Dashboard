@@ -4,6 +4,7 @@ import { Button } from './ui/Button';
 import { Input, Label } from './ui/Input';
 import { Select } from './ui/Select';
 import api from '../lib/api';
+import FeatureGateLock from './ui/FeatureGateLock';
 
 const TONES = ['Professional', 'Casual', 'Persuasive', 'Urgent', 'Friendly', 'Enthusiastic', 'Other'];
 
@@ -70,66 +71,70 @@ export function AiRewriteModal({ isOpen, onClose, onApply, initialContent }) {
           </button>
         </div>
 
-        <div className="p-5 overflow-y-auto space-y-6">
-          {error && (
-            <div className="p-3 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-900/30">
-              {error}
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Target Tone</Label>
-              <Select value={toneType} onChange={(e) => setToneType(e.target.value)} className="bg-white dark:bg-slate-950">
-                {TONES.map(t => <option key={t} value={t}>{t}</option>)}
-              </Select>
-              {toneType === 'Other' && (
-                <Input 
-                  placeholder="e.g., Professional yet witty..." 
-                  value={customTone} 
-                  onChange={e => setCustomTone(e.target.value)} 
-                  className="mt-2 bg-white dark:bg-slate-950" 
-                />
+        <div className="p-5 overflow-y-auto">
+          <FeatureGateLock feature="ai_generation" showRemaining={true}>
+            <div className="space-y-6">
+              {error && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-900/30">
+                  {error}
+                </div>
               )}
-            </div>
 
-            <div className="flex items-center gap-2">
-              <input 
-                type="checkbox" 
-                id="correctGrammar" 
-                checked={correctGrammar}
-                onChange={e => setCorrectGrammar(e.target.checked)}
-                className="rounded border-slate-300 text-purple-600 focus:ring-purple-600 dark:border-slate-700 dark:bg-slate-900 dark:checked:bg-purple-600"
-              />
-              <Label htmlFor="correctGrammar" className="text-sm cursor-pointer">Auto-correct grammar & spelling</Label>
-            </div>
-          </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Target Tone</Label>
+                  <Select value={toneType} onChange={(e) => setToneType(e.target.value)} className="bg-white dark:bg-slate-950">
+                    {TONES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </Select>
+                  {toneType === 'Other' && (
+                    <Input 
+                      placeholder="e.g., Professional yet witty..." 
+                      value={customTone} 
+                      onChange={e => setCustomTone(e.target.value)} 
+                      className="mt-2 bg-white dark:bg-slate-950" 
+                    />
+                  )}
+                </div>
 
-          <Button 
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white gap-2" 
-            onClick={handleRewrite}
-            disabled={isGenerating || !initialContent?.trim()}
-          >
-            {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-            {isGenerating ? 'Rewriting...' : 'Rewrite Content'}
-          </Button>
-
-          {result && (
-            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 space-y-4 animate-in fade-in slide-in-from-top-2">
-              <div className="space-y-2">
-                <Label>Rewritten Result</Label>
-                <div className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto p-3 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800">
-                  {result}
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="correctGrammar" 
+                    checked={correctGrammar}
+                    onChange={e => setCorrectGrammar(e.target.checked)}
+                    className="rounded border-slate-300 text-purple-600 focus:ring-purple-600 dark:border-slate-700 dark:bg-slate-900 dark:checked:bg-purple-600"
+                  />
+                  <Label htmlFor="correctGrammar" className="text-sm cursor-pointer">Auto-correct grammar & spelling</Label>
                 </div>
               </div>
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setResult('')}>Cancel</Button>
-                <Button className="bg-slate-900 text-white dark:bg-slate-50 dark:text-slate-900" onClick={() => onApply(result)}>
-                  Replace Content
-                </Button>
-              </div>
+
+              <Button 
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white gap-2" 
+                onClick={handleRewrite}
+                disabled={isGenerating || !initialContent?.trim()}
+              >
+                {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                {isGenerating ? 'Rewriting...' : 'Rewrite Content'}
+              </Button>
+
+              {result && (
+                <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 space-y-4 animate-in fade-in slide-in-from-top-2">
+                  <div className="space-y-2">
+                    <Label>Rewritten Result</Label>
+                    <div className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto p-3 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800">
+                      {result}
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setResult('')}>Cancel</Button>
+                    <Button className="bg-slate-900 text-white dark:bg-slate-50 dark:text-slate-900" onClick={() => onApply(result)}>
+                      Replace Content
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          </FeatureGateLock>
         </div>
       </div>
     </div>
