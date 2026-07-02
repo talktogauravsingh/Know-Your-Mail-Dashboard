@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../components/ui/Card';
 import FeatureGateLock from '../components/ui/FeatureGateLock';
+import { WorldMap } from 'react-svg-worldmap';
+import { getCountryCode } from '../lib/countryMapper';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
@@ -125,6 +127,16 @@ export default function CampaignAnalytics() {
   const { currentCampaign, isLoading, fetchCampaignDetail } = useStore();
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
+  const [geoView, setGeoView] = useState('map');
+  const [isDarkMode, setIsDarkMode] = useState(document.documentElement.classList.contains('dark'));
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     fetchCampaignDetail(id);
@@ -146,13 +158,27 @@ export default function CampaignAnalytics() {
     summary,
     rates,
     hourlyOpens,
-    regionBreakdown,
+    regionBreakdown = [],
     deviceBreakdown = [],
     browserBreakdown = [],
     recipients = [],
     linkPerformance = [],
     timeSpentDistribution = []
   } = currentCampaign;
+
+  // Format regionBreakdown into ISO-coded data for react-svg-worldmap
+  const mapData = Object.values(
+    regionBreakdown.reduce((acc, item) => {
+      const code = getCountryCode(item.name);
+      if (code) {
+        if (!acc[code]) {
+          acc[code] = { country: code, value: 0 };
+        }
+        acc[code].value += item.value;
+      }
+      return acc;
+    }, {})
+  );
 
   const filteredRecipients = recipients.filter(r =>
     r.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -511,14 +537,71 @@ export default function CampaignAnalytics() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 
             {/* Geographic Opens */}
-            <Card className="border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base font-bold"><Globe className="h-5 w-5 text-indigo-500" /> Geographic Breakdown</CardTitle>
-                <CardDescription className="text-xs">Top regions where recipients interact with campaign emails.</CardDescription>
+            <Card className="border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950 md:col-span-2 lg:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base font-bold">
+                    <Globe className="h-5 w-5 text-indigo-500" /> Geographic Breakdown
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-1">
+                    Top regions where recipients interact with campaign emails.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200/50 dark:border-slate-800/50">
+                  <button
+                    onClick={() => setGeoView('map')}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                      geoView === 'map'
+                        ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-50'
+                    }`}
+                  >
+                    Map View
+                  </button>
+                  <button
+                    onClick={() => setGeoView('chart')}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                      geoView === 'chart'
+                        ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-50'
+                    }`}
+                  >
+                    Chart View
+                  </button>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="h-[280px] w-full">
-                  {regionBreakdown.length > 0 ? (
+                <div className="h-[280px] w-full flex items-center justify-center">
+                  {geoView === 'map' ? (
+                    <div className="w-full h-full flex items-center justify-center relative overflow-hidden [&_svg]:max-h-full">
+                      <WorldMap
+                        color="#6366f1"
+                        valueSuffix="opens"
+                        size="responsive"
+                        data={mapData}
+                        backgroundColor="transparent"
+                        styleFunction={({ countryValue, minValue, maxValue }) => {
+                          const activeColor = '#6366f1';
+                          const inactiveColor = isDarkMode ? '#1e293b' : '#f1f5f9';
+                          const borderColor = isDarkMode ? '#334155' : '#cbd5e1';
+                          return {
+                            fill: countryValue ? activeColor : inactiveColor,
+                            fillOpacity: countryValue ? 0.35 + (countryValue / (maxValue || 1)) * 0.65 : 1,
+                            stroke: borderColor,
+                            strokeWidth: 0.5,
+                            strokeOpacity: 0.8,
+                            cursor: countryValue ? 'pointer' : 'default',
+                            transition: 'all 0.2s ease',
+                          };
+                        }}
+                      />
+                      {mapData.length === 0 && (
+                        <div className="absolute bottom-2 left-2 bg-slate-900/85 dark:bg-slate-950/85 text-white border border-slate-700/50 backdrop-blur-sm px-2.5 py-1 rounded text-[10px] font-medium tracking-wide">
+                          No engagement data recorded
+                        </div>
+                      )}
+                    </div>
+                  ) : regionBreakdown.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={regionBreakdown}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" className="dark:stroke-slate-900" />
@@ -628,7 +711,7 @@ export default function CampaignAnalytics() {
             </Card>
 
             {/* Attention Span / Time Spent */}
-            <Card className="border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950 md:col-span-2 lg:col-span-1">
+            <Card className="border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950 md:col-span-2 lg:col-span-3">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base font-bold">
                   <CheckCircle className="h-5 w-5 text-purple-500" /> Attention Span
