@@ -23,13 +23,16 @@ class FeatureGateTest extends TestCase
     {
         parent::setUp();
 
-        // 1. Pre-create the missing recipients table in SQLite memory
-        $this->app['db']->connection()->getSchemaBuilder()->create('recipients', function (Blueprint $table) {
-            $table->id();
-            $table->string('email')->index();
-            $table->string('name')->nullable();
-            $table->timestamps();
-        });
+        // 1. Pre-create the missing recipients table if not exists
+        $schema = $this->app['db']->connection()->getSchemaBuilder();
+        if (!$schema->hasTable('recipients')) {
+            $schema->create('recipients', function (Blueprint $table) {
+                $table->id();
+                $table->string('email')->index();
+                $table->string('name')->nullable();
+                $table->timestamps();
+            });
+        }
 
         // 2. Run migrations
         $this->artisan('migrate');

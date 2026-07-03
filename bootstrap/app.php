@@ -13,12 +13,18 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $proxies = env('TRUSTED_PROXIES');
+        if ($proxies === '*') {
+            $middleware->trustProxies(at: '*');
+        } elseif (!empty($proxies)) {
+            $middleware->trustProxies(at: array_map('trim', explode(',', $proxies)));
+        }
+
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'permissions' => \App\Http\Middleware\RoleMiddleware::class,
             'feature' => \App\Http\Middleware\EnforceFeatureGate::class,
         ]);
-
     })
 
 

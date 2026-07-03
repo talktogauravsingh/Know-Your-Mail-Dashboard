@@ -90,10 +90,10 @@ Route::middleware('auth:sanctum')->prefix('campaigns')->group(function () {
     Route::post('/segments/validate-count/{campaign?}', [\App\Http\Controllers\Api\SegmentationController::class, 'validateCount']);
 });
 
-Route::get('/track/open/{sendLog}', [TrackingController::class, 'OpenMailTrack']);
-Route::get('/track/click/{sendLog}', [TrackingController::class, 'ClickMailTrack']);
-Route::get('/o/{sendLog}', [TrackingController::class, 'OpenMailTrack']);
-Route::get('/c/{sendLog}', [TrackingController::class, 'ClickMailTrack']);
+Route::get('/track/open/{sendLog}', [TrackingController::class, 'OpenMailTrack'])->whereUuid('sendLog');
+Route::get('/track/click/{sendLog}', [TrackingController::class, 'ClickMailTrack'])->whereUuid('sendLog');
+Route::get('/o/{sendLog}', [TrackingController::class, 'OpenMailTrack'])->whereUuid('sendLog');
+Route::get('/c/{sendLog}', [TrackingController::class, 'ClickMailTrack'])->whereUuid('sendLog');
 
 Route::get('/track/open/{recipientId}', [TrackingController::class, 'OpenRelayTrack'])->whereUuid('recipientId');
 Route::get('/track/click/{linkId}/{recipientId}', [TrackingController::class, 'ClickRelayTrack'])->whereUuid('linkId')->whereUuid('recipientId');
@@ -109,11 +109,11 @@ Route::middleware('auth:sanctum')->prefix('email-templates')->group(function () 
     Route::post('/{template}/test-send', [\App\Http\Controllers\EmailTemplateController::class, 'testSend']);
 });
 
-Route::get('/o/{requestUserId}', [TrackingController::class, 'OpenMailTrack']);
-Route::get('/c/{requestUserId}', [TrackingController::class, 'ClickMailTrack']);
+
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('spam/check', [\App\Http\Controllers\Api\EmailAIController::class, 'spamCheck'])->middleware('feature:ai_generation');
     Route::post('email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate'])->middleware('feature:ai_generation');
+    Route::post('email/generate-stream', [\App\Http\Controllers\Api\EmailAIController::class, 'generateStream'])->middleware('feature:ai_generation');
     Route::post('email/rewrite', [\App\Http\Controllers\Api\EmailAIController::class, 'rewrite'])->middleware('feature:ai_generation');
     Route::post('email/score', [\App\Http\Controllers\Api\EmailAIController::class, 'score'])->middleware('feature:ai_generation');
 });

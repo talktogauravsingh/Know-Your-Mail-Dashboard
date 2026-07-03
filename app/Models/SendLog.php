@@ -9,6 +9,7 @@ use App\Models\User;
 class SendLog extends Model
 {
     protected $fillable = [
+        'uuid',
         'campaign_id',
         'recipient_id',
         'variant_id',
@@ -28,6 +29,16 @@ class SendLog extends Model
         'last_activity_at',
         'tracking_data'
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($model) {
+            if (empty($model->uuid)) {
+                $model->uuid = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+    }
 
     protected $casts = [
         'opened_at' => 'datetime',
