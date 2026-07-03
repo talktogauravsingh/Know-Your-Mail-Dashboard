@@ -113,6 +113,7 @@ Route::middleware('auth:sanctum')->prefix('email-templates')->group(function () 
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('spam/check', [\App\Http\Controllers\Api\EmailAIController::class, 'spamCheck'])->middleware('feature:ai_generation');
     Route::post('email/generate', [\App\Http\Controllers\Api\EmailAIController::class, 'generate'])->middleware('feature:ai_generation');
+    Route::post('email/generate-stream', [\App\Http\Controllers\Api\EmailAIController::class, 'generateStream'])->middleware('feature:ai_generation');
     Route::post('email/rewrite', [\App\Http\Controllers\Api\EmailAIController::class, 'rewrite'])->middleware('feature:ai_generation');
     Route::post('email/score', [\App\Http\Controllers\Api\EmailAIController::class, 'score'])->middleware('feature:ai_generation');
 });

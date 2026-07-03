@@ -86,8 +86,8 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             CampaignSeeder::class,
             RecipientSeeder::class,
-            TrackingSeeder::class,
-            DummyDataSeeder::class,
+            // TrackingSeeder::class,
+            // DummyDataSeeder::class,
         ]);
     }
 }
