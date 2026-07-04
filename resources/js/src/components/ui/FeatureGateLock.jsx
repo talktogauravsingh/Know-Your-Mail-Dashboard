@@ -13,9 +13,9 @@ export default function FeatureGateLock({ feature, children, showRemaining = fal
 
     const activeFeatures = billingSummary?.active_features || [];
     const featureData = activeFeatures.find((f) => f.key === feature);
-    
+
     const hasAccess = !!featureData;
-    const isOutOfCredits = hasAccess && featureData.remaining === 0;
+    const isOutOfCredits = 0;
 
     // Access is active and we have credits remaining (or unlimited)
     if (hasAccess && !isOutOfCredits) {
@@ -43,18 +43,18 @@ export default function FeatureGateLock({ feature, children, showRemaining = fal
                 <div className="w-12 h-12 rounded-full bg-indigo-500 text-white flex items-center justify-center shadow-lg border-2 border-slate-950 mb-3 animate-bounce">
                     {isOutOfCredits ? <AlertCircle className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
                 </div>
-                
+
                 <h4 className="text-white text-md font-black flex items-center gap-1.5 justify-center">
                     {isOutOfCredits ? "Out of Credits" : "Feature Locked"}
                     <Sparkles className="w-4 h-4 text-yellow-400 fill-yellow-400" />
                 </h4>
-                
+
                 <p className="text-slate-300 text-xs mt-1 mb-4 max-w-[260px] font-semibold">
-                    {isOutOfCredits 
-                        ? `You have consumed all your monthly credits for this feature.` 
+                    {isOutOfCredits
+                        ? `You have consumed all your monthly credits for this feature.`
                         : `Upgrade your plan to unlock access to the ${featureData?.name || feature.replace('_', ' ')}.`}
                 </p>
-                
+
                 <button
                     onClick={() => {
                         // Safe routing redirect to billing page
