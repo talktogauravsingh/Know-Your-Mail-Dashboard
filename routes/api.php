@@ -121,7 +121,7 @@ Route::get('v1/health', [\App\Http\Controllers\Api\EmailAIController::class, 'he
 
 Route::post('/payments/webhooks/razorpay', [PaymentController::class, 'razorpayWebhook']);
 
-Route::middleware('auth:sanctum')->prefix('payments')->group(function () {
+Route::middleware(['auth:sanctum', 'throttle:6,1'])->prefix('payments')->group(function () {
     Route::post('/orders', [PaymentController::class, 'createOrder']);
     Route::post('/verify', [PaymentController::class, 'verify']);
     Route::get('/{transaction}/status', [PaymentController::class, 'status']);
@@ -175,4 +175,12 @@ Route::middleware('auth:sanctum')->prefix('automations')->group(function () {
     Route::patch('/{automation}', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'update']);
     Route::delete('/{automation}', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'destroy']);
     Route::post('/{automation}/toggle', [\App\Http\Controllers\Api\TriggerAutomationController::class, 'toggle']);
+});
+
+Route::prefix('founder')->group(function () {
+    Route::get('metrics', [\App\Http\Controllers\Api\FounderController::class, 'metrics']);
+    Route::post('run-command', [\App\Http\Controllers\Api\FounderController::class, 'runCommand']);
+    Route::post('retry-failed-job', [\App\Http\Controllers\Api\FounderController::class, 'retryFailedJob']);
+    Route::post('delete-failed-job', [\App\Http\Controllers\Api\FounderController::class, 'deleteFailedJob']);
+    Route::post('flush-queue', [\App\Http\Controllers\Api\FounderController::class, 'flushQueue']);
 });

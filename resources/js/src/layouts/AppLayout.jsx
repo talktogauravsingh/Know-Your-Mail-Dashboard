@@ -22,8 +22,10 @@ import {
   Menu,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Shield
 } from 'lucide-react';
+
 
 const navigation = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
@@ -35,7 +37,9 @@ const navigation = [
   { name: 'Global Import', href: '/bulk-import', icon: Database },
   { name: 'AI Chatbot', href: '#', icon: Bot, disabled: true },
   { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Founder Console', href: '/founder', icon: Shield },
 ];
+
 
 export default function AppLayout() {
   const { user, logout, theme, toggleTheme, billingSummary, fetchBillingSummary } = useStore();
@@ -44,11 +48,12 @@ export default function AppLayout() {
   const userRoleSlug = user?.role?.slug;
   const isSettingsAllowed = userRoleSlug === 'super-admin' || userRoleSlug === 'admin' || userRoleSlug === 'root';
   const filteredNavigation = navigation.filter(item => {
-    if (item.href === '/settings') {
+    if (item.href === '/settings' || item.href === '/founder') {
       return isSettingsAllowed;
     }
     return true;
   });
+
 
   // Desktop sidebar collapse state (persisted)
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -123,17 +128,25 @@ export default function AppLayout() {
           <nav className="space-y-1 px-3">
             {filteredNavigation.map((item) => {
               const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
+              const isExternal = item.href === '/founder' || item.href === '#';
+              
+              const LinkComponent = isExternal ? 'a' : Link;
+              const linkProps = isExternal 
+                ? { href: item.href, target: '_self' }
+                : { to: item.href };
+
               return (
-                <Link
+                <LinkComponent
                   key={item.name}
-                  to={item.disabled ? '#' : item.href}
+                  {...linkProps}
                   className={cn(
-                    "group flex items-center rounded-xl transition-all duration-200",
-                    isCollapsed ? "px-0 justify-center w-10 h-10 mx-auto" : "px-3 py-2.5 gap-3",
-                    item.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
-                    isActive 
-                      ? "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400" 
-                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-50"
+                    "group flex items-center transition-all duration-200",
+                    isCollapsed 
+                      ? "px-0 justify-center w-10 h-10 mx-auto rounded-xl" 
+                      : isActive 
+                        ? "px-3 py-2.5 gap-3 bg-blue-50/80 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 border-l-4 border-blue-600 dark:border-blue-400 rounded-r-xl rounded-l-none pl-2 font-bold"
+                        : "px-3 py-2.5 gap-3 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-50",
+                    item.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
                   )}
                   title={isCollapsed ? item.name : undefined}
                 >
@@ -146,7 +159,7 @@ export default function AppLayout() {
                   {item.disabled && !isCollapsed && (
                     <span className="ml-auto text-[9px] uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full animate-in fade-in duration-300">Soon</span>
                   )}
-                </Link>
+                </LinkComponent>
               );
             })}
           </nav>

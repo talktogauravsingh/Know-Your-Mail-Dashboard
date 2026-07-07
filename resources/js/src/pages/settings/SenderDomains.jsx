@@ -20,7 +20,9 @@ import {
     Copy, 
     ShieldCheck, 
     Zap,
-    AlertCircle
+    AlertCircle,
+    Eye,
+    EyeOff
 } from "lucide-react";
 import { useStore } from "../../store/useStore";
 
@@ -32,6 +34,7 @@ export default function SenderDomains({ setActiveTab }) {
 
     // Cloudflare state
     const [cfToken, setCfToken] = useState("");
+    const [showCfToken, setShowCfToken] = useState(false);
     const [cfZoneId, setCfZoneId] = useState("");
     const [cfLoading, setCfLoading] = useState(false);
 
@@ -325,11 +328,24 @@ export default function SenderDomains({ setActiveTab }) {
                                                         
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
                                                             <div className="space-y-1">
-                                                                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                    Cloudflare API Token
-                                                                </label>
+                                                                <div className="flex justify-between items-center">
+                                                                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                                                        Cloudflare API Token
+                                                                    </label>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setShowCfToken(!showCfToken)}
+                                                                        className="text-xs text-indigo-650 dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold focus:outline-none"
+                                                                    >
+                                                                        {showCfToken ? (
+                                                                            <><EyeOff className="h-3.5 w-3.5" /> Hide</>
+                                                                        ) : (
+                                                                            <><Eye className="h-3.5 w-3.5" /> Show</>
+                                                                        )}
+                                                                    </button>
+                                                                </div>
                                                                 <Input
-                                                                    type="password"
+                                                                    type={showCfToken ? "text" : "password"}
                                                                     placeholder="e.g. c254d3e-..."
                                                                     value={cfToken}
                                                                     onChange={(e) => setCfToken(e.target.value)}

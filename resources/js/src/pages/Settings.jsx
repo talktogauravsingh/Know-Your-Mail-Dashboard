@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import {
     Card,
     CardHeader,
@@ -25,6 +25,8 @@ import {
     KeyRound,
     Ban,
     Shield,
+    Eye,
+    EyeOff,
 } from "lucide-react";
 import { useStore } from "../store/useStore";
 import TeamManagement from "./settings/TeamManagement";
@@ -91,21 +93,26 @@ export default function Settings() {
     const isSettingsAllowed = userRoleSlug === "super-admin" || userRoleSlug === "admin" || userRoleSlug === "root";
     const isTeamAllowed = isSettingsAllowed; // Team management is accessible to all settings users since settings as a whole is now restricted
 
-    const [activeTab, setActiveTab] = useState("profile");
+    const [searchParams] = useSearchParams();
+    const tabParam = searchParams.get("tab");
+    const [activeTab, setActiveTab] = useState(tabParam || "profile");
     const [hasDefaulted, setHasDefaulted] = useState(false);
 
     useEffect(() => {
-        if (userRoleSlug && !hasDefaulted) {
+        if (tabParam) {
+            setActiveTab(tabParam);
+        } else if (userRoleSlug && !hasDefaulted) {
             setActiveTab(isTeamAllowed ? "team" : "profile");
             setHasDefaulted(true);
         }
-    }, [userRoleSlug, isTeamAllowed, hasDefaulted]);
+    }, [userRoleSlug, isTeamAllowed, hasDefaulted, tabParam]);
 
     if (user && !isSettingsAllowed) {
         return <Navigate to="/dashboard" replace />;
     }
 
     const [isAddingSmtp, setIsAddingSmtp] = useState(false);
+    const [showSmtpPassword, setShowSmtpPassword] = useState(false);
     const [newSmtp, setNewSmtp] = useState({
         provider: "Custom SMTP",
         host: "",
@@ -232,10 +239,10 @@ export default function Settings() {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition-all duration-200 ${
                                     activeTab === tab.id
-                                        ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300"
-                                        : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                                        ? "bg-indigo-50/80 text-indigo-700 border-l-4 border-indigo-600 rounded-r-md dark:bg-indigo-900/50 dark:text-indigo-300 dark:border-indigo-400 pl-2 font-bold"
+                                        : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 rounded-md"
                                 }`}
                             >
                                 <Icon
@@ -602,11 +609,24 @@ export default function Settings() {
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <label className="text-sm font-medium text-slate-900 dark:text-slate-50">
-                                                        Password / Secret
-                                                    </label>
+                                                    <div className="flex justify-between items-center">
+                                                        <label className="text-sm font-medium text-slate-900 dark:text-slate-50">
+                                                            Password / Secret
+                                                        </label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowSmtpPassword(!showSmtpPassword)}
+                                                            className="text-xs text-indigo-650 dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold focus:outline-none"
+                                                        >
+                                                            {showSmtpPassword ? (
+                                                                <><EyeOff className="h-3.5 w-3.5" /> Hide</>
+                                                            ) : (
+                                                                <><Eye className="h-3.5 w-3.5" /> Show</>
+                                                            )}
+                                                        </button>
+                                                    </div>
                                                     <Input
-                                                        type="password"
+                                                        type={showSmtpPassword ? "text" : "password"}
                                                         value={newSmtp.password}
                                                         onChange={(e) =>
                                                             setNewSmtp({

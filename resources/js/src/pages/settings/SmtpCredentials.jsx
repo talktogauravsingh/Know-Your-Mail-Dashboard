@@ -33,6 +33,7 @@ export default function SmtpCredentials() {
 
     const [generatedPassword, setGeneratedPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
+    const [showTestPassword, setShowTestPassword] = useState(false);
     const [copiedField, setCopiedField] = useState("");
 
     const credentials = useStore((state) => state.smtpCredentials);
@@ -383,11 +384,24 @@ export default function SmtpCredentials() {
                         </div>
                         <form onSubmit={handleSendTest} className="p-5 space-y-4 text-xs">
                             <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                                    SMTP Password
-                                </label>
+                                <div className="flex justify-between items-center">
+                                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                        SMTP Password
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowTestPassword(!showTestPassword)}
+                                        className="text-xs text-indigo-650 dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold focus:outline-none"
+                                    >
+                                        {showTestPassword ? (
+                                            <><EyeOff className="h-3.5 w-3.5" /> Hide</>
+                                        ) : (
+                                            <><Eye className="h-3.5 w-3.5" /> Show</>
+                                        )}
+                                    </button>
+                                </div>
                                 <Input
-                                    type="password"
+                                    type={showTestPassword ? "text" : "password"}
                                     required
                                     placeholder="Paste your SMTP key password"
                                     value={testPassword}

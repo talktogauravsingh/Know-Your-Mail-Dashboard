@@ -10,10 +10,11 @@ import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Badge } from "../../components/ui/Badge";
 import { useStore } from "../../store/useStore";
-import { Trash2, UserPlus, Shield, Mail, Key, UserCheck } from "lucide-react";
+import { Trash2, UserPlus, Shield, Mail, Key, UserCheck, Eye, EyeOff } from "lucide-react";
 
 export default function TeamManagement() {
     const [isAdding, setIsAdding] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const [formData, setFormData] = useState({
         name: "",
         email: "",
@@ -162,11 +163,24 @@ export default function TeamManagement() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                                        <Key className="w-4 h-4 text-slate-400" /> Password
-                                    </label>
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                            <Key className="w-4 h-4 text-slate-400" /> Password
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="text-xs text-indigo-650 dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold focus:outline-none"
+                                        >
+                                            {showPassword ? (
+                                                <><EyeOff className="h-3.5 w-3.5" /> Hide</>
+                                            ) : (
+                                                <><Eye className="h-3.5 w-3.5" /> Show</>
+                                            )}
+                                        </button>
+                                    </div>
                                     <Input
-                                        type="password"
+                                        type={showPassword ? "text" : "password"}
                                         placeholder="••••••••"
                                         value={formData.password}
                                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}

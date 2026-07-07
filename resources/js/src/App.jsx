@@ -23,6 +23,8 @@ import Billing from './pages/Billing';
 import TemplateDesigner from './pages/TemplateDesigner';
 import Automations from './pages/Automations';
 import AutomationBuilder from './pages/AutomationBuilder';
+import FounderDashboard from './pages/FounderDashboard';
+
 
 // Protected Route Wrapper
 function ProtectedRoute({ children }) {
@@ -49,6 +51,16 @@ function ProtectedRoute({ children }) {
 import { ToastList } from './components/ui/ToastList';
 
 export default function App() {
+  const theme = useStore((state) => state.theme);
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
   return (
     <BrowserRouter>
       <Routes>
@@ -58,6 +70,10 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
         </Route>
+
+        {/* Founder Standalone Route (bypasses app auth, protected on web server basic auth) */}
+        <Route path="/founder" element={<FounderDashboard />} />
+
 
         {/* Protected Routes */}
         <Route 

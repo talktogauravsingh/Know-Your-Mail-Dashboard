@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import api from '../lib/api';
+import { cn } from '../lib/utils';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
@@ -20,7 +21,8 @@ import {
   Loader2, 
   X, 
   Calendar,
-  Filter
+  Filter,
+  ShieldAlert
 } from 'lucide-react';
 
 export default function Campaigns() {
@@ -29,7 +31,9 @@ export default function Campaigns() {
     campaignsMetadata, 
     campaignsLoading, 
     fetchCampaigns, 
-    addToast 
+    addToast,
+    domains,
+    fetchDomains
   } = useStore();
   const navigate = useNavigate();
 
@@ -47,12 +51,39 @@ export default function Campaigns() {
   const [quickMailEmail, setQuickMailEmail] = useState('');
   const [quickMailSubject, setQuickMailSubject] = useState('');
   const [quickMailBody, setQuickMailBody] = useState('');
+  const [showDomainRequiredModal, setShowDomainRequiredModal] = useState(false);
+
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const menuRef = useRef(null);
 
+  // Ensure End Date cannot be earlier than Start Date
   useEffect(() => {
-    fetchCampaigns(currentPage);
-  }, [fetchCampaigns, currentPage]);
+    if (customStartDate && customEndDate && customEndDate < customStartDate) {
+      setCustomEndDate(customStartDate);
+    }
+  }, [customStartDate, customEndDate]);
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, dateFilter, customStartDate, customEndDate]);
+
+  useEffect(() => {
+    fetchCampaigns(currentPage, {
+      search: searchTerm,
+      status: statusFilter,
+      date_filter: dateFilter,
+      start_date: customStartDate,
+      end_date: customEndDate
+    });
+  }, [fetchCampaigns, currentPage, searchTerm, statusFilter, dateFilter, customStartDate, customEndDate]);
+
+  useEffect(() => {
+    fetchDomains().catch(() => {});
+  }, [fetchDomains]);
+
+  const hasVerifiedDomain = domains && domains.length > 0 && domains.some(d => d.status === 'verified');
 
   // Handle clicking outside action menu to close it
   useEffect(() => {
@@ -65,54 +96,8 @@ export default function Campaigns() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter Logic
-  const filteredCampaigns = campaigns.filter(c => {
-    // 1. Search filter
-    const matchesSearch = c.name?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // 2. Status filter
-    let matchesStatus = true;
-    const status = c.status?.toLowerCase();
-    if (statusFilter === 'active') {
-      matchesStatus = ['running', 'sent', 'scheduled', 'pending'].includes(status);
-    } else if (statusFilter === 'completed') {
-      matchesStatus = status === 'completed';
-    } else if (statusFilter === 'draft') {
-      matchesStatus = status === 'draft';
-    } else if (statusFilter === 'scheduled') {
-      matchesStatus = status === 'scheduled';
-    }
-
-    // 3. Date filter
-    let matchesDate = true;
-    if (dateFilter !== 'all' && c.created_at) {
-      const createdDate = new Date(c.created_at);
-      if (dateFilter === 'custom') {
-        if (customStartDate) {
-          const start = new Date(customStartDate);
-          start.setHours(0, 0, 0, 0);
-          matchesDate = createdDate >= start;
-        }
-        if (customEndDate && matchesDate) {
-          const end = new Date(customEndDate);
-          end.setHours(23, 59, 59, 999);
-          matchesDate = createdDate <= end;
-        }
-      } else {
-        const limitDate = new Date();
-        if (dateFilter === '7days') {
-          limitDate.setDate(limitDate.getDate() - 7);
-        } else if (dateFilter === '30days') {
-          limitDate.setDate(limitDate.getDate() - 30);
-        } else if (dateFilter === '90days') {
-          limitDate.setDate(limitDate.getDate() - 90);
-        }
-        matchesDate = createdDate >= limitDate;
-      }
-    }
-
-    return matchesSearch && matchesStatus && matchesDate;
-  });
+  // Filter Logic - server filtered, so campaigns is already filtered
+  const filteredCampaigns = campaigns;
 
   // Sort campaigns in descending order of creation/modification date client-side
   const sortedCampaigns = [...filteredCampaigns].sort((a, b) => {
@@ -314,14 +299,9 @@ export default function Campaigns() {
   };
 
   // Pagination Values
-  const isFiltered = searchTerm !== '' || statusFilter !== 'all' || dateFilter !== '30days' || customStartDate !== '' || customEndDate !== '';
-  const totalVal = isFiltered ? filteredCampaigns.length : (campaignsMetadata?.total ?? filteredCampaigns.length);
-  const fromVal = isFiltered 
-    ? (filteredCampaigns.length > 0 ? 1 : 0) 
-    : (campaignsMetadata ? campaignsMetadata.from : (filteredCampaigns.length > 0 ? 1 : 0));
-  const toVal = isFiltered 
-    ? filteredCampaigns.length 
-    : (campaignsMetadata ? campaignsMetadata.to : filteredCampaigns.length);
+  const totalVal = campaignsMetadata?.total ?? 0;
+  const fromVal = campaignsMetadata?.from ?? 0;
+  const toVal = campaignsMetadata?.to ?? 0;
   const lastPage = campaignsMetadata?.last_page ?? 1;
 
   if (campaignsLoading && campaigns.length === 0) {
@@ -346,19 +326,32 @@ export default function Campaigns() {
         <div className="flex items-center gap-3">
           <Button 
             variant="outline" 
-            onClick={() => setShowQuickMailModal(true)}
+            onClick={() => {
+              if (!hasVerifiedDomain) {
+                setShowDomainRequiredModal(true);
+              } else {
+                setShowQuickMailModal(true);
+              }
+            }}
             className="border-[#626F86] dark:border-slate-800 bg-white dark:bg-slate-900 text-[#626F86] dark:text-slate-350 gap-2 hover:bg-[#F4F5F7] dark:hover:bg-slate-850 rounded-none font-bold cursor-pointer transition-colors"
           >
             <Zap className="h-4 w-4 text-[#626F86]" />
             Send Quick Mail
           </Button>
 
-          <Link to="/campaigns/new">
-            <Button className="bg-[#0052CC] hover:bg-[#0043a4] text-white gap-2 font-bold rounded-none shadow-sm hover:shadow-md transition-all cursor-pointer">
-              <Plus className="h-4 w-4" />
-              Create New Campaign
-            </Button>
-          </Link>
+          <Button 
+            onClick={() => {
+              if (!hasVerifiedDomain) {
+                setShowDomainRequiredModal(true);
+              } else {
+                navigate('/campaigns/new');
+              }
+            }}
+            className="bg-[#0052CC] hover:bg-[#0043a4] text-white gap-2 font-bold rounded-none shadow-sm hover:shadow-md transition-all cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            Create New Campaign
+          </Button>
         </div>
       </div>
 
@@ -415,7 +408,13 @@ export default function Campaigns() {
               type="date"
               value={customStartDate}
               onChange={(e) => setCustomStartDate(e.target.value)}
-              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-none px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#0052CC]/30 text-[#172B4D] dark:text-slate-350 h-10 w-full sm:w-36 cursor-pointer"
+              onClick={(e) => {
+                try {
+                  e.currentTarget.showPicker();
+                } catch (err) {}
+              }}
+              max={customEndDate || todayStr}
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-none px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#0052CC]/30 text-[#172B4D] dark:text-slate-200 h-10 w-full sm:w-36 cursor-pointer"
               placeholder="Start Date"
             />
             <span className="text-[#626F86] text-xs font-semibold">to</span>
@@ -423,7 +422,14 @@ export default function Campaigns() {
               type="date"
               value={customEndDate}
               onChange={(e) => setCustomEndDate(e.target.value)}
-              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-none px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#0052CC]/30 text-[#172B4D] dark:text-slate-350 h-10 w-full sm:w-36 cursor-pointer"
+              onClick={(e) => {
+                try {
+                  e.currentTarget.showPicker();
+                } catch (err) {}
+              }}
+              min={customStartDate}
+              max={todayStr}
+              className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-none px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#0052CC]/30 text-[#172B4D] dark:text-slate-200 h-10 w-full sm:w-36 cursor-pointer"
               placeholder="End Date"
             />
           </div>
@@ -587,7 +593,19 @@ export default function Campaigns() {
             {sortedCampaigns.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="h-32 text-center text-slate-400 dark:text-slate-500 text-sm">
-                  No campaigns found. <Link to="/campaigns/new" className="text-[#0052CC] dark:text-[#0052CC] font-medium hover:underline">Create one</Link>
+                  No campaigns found.{' '}
+                  <button 
+                    onClick={() => {
+                      if (!hasVerifiedDomain) {
+                        setShowDomainRequiredModal(true);
+                      } else {
+                        navigate('/campaigns/new');
+                      }
+                    }} 
+                    className="text-[#0052CC] dark:text-blue-400 font-bold hover:underline cursor-pointer bg-transparent border-none p-0 inline align-baseline"
+                  >
+                    Create one
+                  </button>
                 </TableCell>
               </TableRow>
             )}
@@ -607,14 +625,14 @@ export default function Campaigns() {
             <button
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
-              className="h-8 w-8 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-center rounded-l-md text-[#626F86] hover:bg-[#F4F5F7] dark:hover:bg-slate-800 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+              className="h-8 w-8 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center rounded-l-md text-slate-700 dark:text-slate-200 hover:bg-[#F4F5F7] dark:hover:bg-slate-700 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <button
               onClick={() => setCurrentPage(prev => Math.min(lastPage, prev + 1))}
               disabled={currentPage === lastPage}
-              className="h-8 w-8 border-y border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-center rounded-r-md text-[#626F86] hover:bg-[#F4F5F7] dark:hover:bg-slate-800 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+              className="h-8 w-8 border-y border-r border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-[#F4F5F7] dark:hover:bg-slate-700 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -707,6 +725,57 @@ export default function Campaigns() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Verify Domain Required Modal */}
+      {showDomainRequiredModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 dark:border-slate-900 bg-slate-50 dark:bg-slate-900/20">
+              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
+                <ShieldAlert className="h-5 w-5" />
+                <h3 className="font-bold text-[#172B4D] dark:text-slate-50">Verified Domain Required</h3>
+              </div>
+              <button 
+                onClick={() => setShowDomainRequiredModal(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                You must configure and verify at least one sender domain in your organization before creating campaigns or sending quick emails.
+              </p>
+              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-lg p-3 text-xs text-amber-700 dark:text-amber-400">
+                Verifying a domain proves ownership and authorizes Know Your Mail to send relay emails securely.
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-900 bg-slate-50 dark:bg-slate-900/20 flex justify-end gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowDomainRequiredModal(false)}
+                className="border-slate-350 dark:border-slate-800 text-slate-700 dark:text-slate-350"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  setShowDomainRequiredModal(false);
+                  navigate('/settings?tab=domains');
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
+              >
+                Configure Domain
+              </Button>
+            </div>
           </div>
         </div>
       )}
