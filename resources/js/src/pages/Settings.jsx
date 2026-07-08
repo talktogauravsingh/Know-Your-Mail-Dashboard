@@ -230,32 +230,7 @@ export default function Settings() {
                 </p>
             </div>
 
-            <div className="flex flex-col md:flex-row gap-8">
-                {/* Sidebar Nav */}
-                <div className="w-full md:w-64 shrink-0 space-y-1">
-                    {tabs.map((tab) => {
-                        const Icon = tab.icon;
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition-all duration-200 ${
-                                    activeTab === tab.id
-                                        ? "bg-indigo-50/80 text-indigo-700 border-l-4 border-indigo-600 rounded-r-md dark:bg-indigo-900/50 dark:text-indigo-300 dark:border-indigo-400 pl-2 font-bold"
-                                        : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 rounded-md"
-                                }`}
-                            >
-                                <Icon
-                                    className={`w-4 h-4 ${activeTab === tab.id ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"}`}
-                                />
-                                {tab.label}
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {/* Content Area */}
-                <div className="flex-1 space-y-6">
+            <div className="w-full space-y-6">
                     {activeTab === "team" && (
                         <TeamManagement />
                     )}
@@ -836,7 +811,6 @@ export default function Settings() {
                             <KymConsole />
                         </div>
                     )}
-                </div>
             </div>
         </div>
     );
