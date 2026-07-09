@@ -55,12 +55,10 @@ class SenderDomainController extends Controller
                 'string',
                 'max:253',
                 'regex:/^(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/',
-                function ($attribute, $value, $fail) use ($request) {
-                    $exists = SenderDomain::where('organization_id', $request->user()->organization_id)
-                        ->where('domain', strtolower($value))
-                        ->exists();
+                function ($attribute, $value, $fail) {
+                    $exists = SenderDomain::where('domain', strtolower($value))->exists();
                     if ($exists) {
-                        $fail('This domain has already been added.');
+                        $fail('This domain has already been registered by another organization.');
                     }
                 },
             ],

@@ -16,7 +16,7 @@ class CampaignController extends Controller
 {
     public function index(Request $request)
     {
-        $campaigns = Campaign::where('organization_id', Auth::user()->organization_id ?? 1)
+        $query = Campaign::where('organization_id', Auth::user()->organization_id ?? 1)
             ->with(['variants'])
             ->withCount([
                 'sendLogs as sent_count',
@@ -24,9 +24,46 @@ class CampaignController extends Controller
                     $query->whereNotNull('opened_at');
                 }
             ])
-            ->withSum('sendLogs as total_clicks', 'clicks_count')
-            ->latest()
-            ->paginate(10);
+            ->withSum('sendLogs as total_clicks', 'clicks_count');
+
+        // Apply Search Filter
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where('name', 'like', '%' . $search . '%');
+        }
+
+        // Apply Status Filter
+        if ($request->filled('status') && $request->input('status') !== 'all') {
+            $status = $request->input('status');
+            if ($status === 'active') {
+                $query->whereIn('status', ['running', 'sent', 'scheduled', 'pending']);
+            } else {
+                $query->where('status', $status);
+            }
+        }
+
+        // Apply Date Filter
+        if ($request->filled('date_filter') && $request->input('date_filter') !== 'all') {
+            $dateFilter = $request->input('date_filter');
+            if ($dateFilter === 'custom') {
+                if ($request->filled('start_date')) {
+                    $query->whereDate('created_at', '>=', $request->input('start_date'));
+                }
+                if ($request->filled('end_date')) {
+                    $query->whereDate('created_at', '<=', $request->input('end_date'));
+                }
+            } else {
+                $days = 30;
+                if ($dateFilter === '7days') {
+                    $days = 7;
+                } elseif ($dateFilter === '90days') {
+                    $days = 90;
+                }
+                $query->where('created_at', '>=', now()->subDays($days));
+            }
+        }
+
+        $campaigns = $query->latest()->paginate(10);
 
         return response()->json($campaigns);
     }

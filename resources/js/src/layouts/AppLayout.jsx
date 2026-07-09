@@ -22,8 +22,14 @@ import {
   Menu,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Shield,
+  User,
+  Globe,
+  KeyRound,
+  Ban
 } from 'lucide-react';
+
 
 const navigation = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
@@ -35,7 +41,9 @@ const navigation = [
   { name: 'Global Import', href: '/bulk-import', icon: Database },
   { name: 'AI Chatbot', href: '#', icon: Bot, disabled: true },
   { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Founder Console', href: '/founder', icon: Shield },
 ];
+
 
 export default function AppLayout() {
   const { user, logout, theme, toggleTheme, billingSummary, fetchBillingSummary } = useStore();
@@ -44,11 +52,26 @@ export default function AppLayout() {
   const userRoleSlug = user?.role?.slug;
   const isSettingsAllowed = userRoleSlug === 'super-admin' || userRoleSlug === 'admin' || userRoleSlug === 'root';
   const filteredNavigation = navigation.filter(item => {
-    if (item.href === '/settings') {
+    if (item.href === '/settings' || item.href === '/founder') {
       return isSettingsAllowed;
     }
     return true;
   });
+
+  const searchParams = new URLSearchParams(location.search);
+  const activeTabParam = searchParams.get('tab');
+  const activeSettingsTab = activeTabParam || (isSettingsAllowed ? 'team' : 'profile');
+
+  const settingsTabs = [
+    { id: 'profile', name: 'My Profile', icon: User },
+    ...(isSettingsAllowed ? [{ id: 'team', name: 'Team Management', icon: Users }] : []),
+    { id: 'integrations', name: 'Third-Party SMTP', icon: Mail },
+    { id: 'domains', name: 'Sender Domains', icon: Globe },
+    { id: 'smtp-credentials', name: 'SMTP Relay Keys', icon: KeyRound },
+    { id: 'suppressions', name: 'Suppression List', icon: Ban },
+    ...(userRoleSlug === 'root' ? [{ id: 'kym-console', name: 'KYM Root Console', icon: Shield }] : []),
+  ];
+
 
   // Desktop sidebar collapse state (persisted)
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -119,34 +142,67 @@ export default function AppLayout() {
         </div>
 
         {/* Navigation */}
-        <div className="flex-1 overflow-y-auto py-2">
+        <div className="flex-1 overflow-y-auto scrollbar-thin py-2">
           <nav className="space-y-1 px-3">
             {filteredNavigation.map((item) => {
               const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
+              const isSettingsTabActive = location.pathname.startsWith('/settings');
+              const isExternal = item.href === '/founder' || item.href === '#';
+              
+              const LinkComponent = isExternal ? 'a' : Link;
+              const linkProps = isExternal 
+                ? { href: item.href, target: '_self' }
+                : { to: item.href };
+
               return (
-                <Link
-                  key={item.name}
-                  to={item.disabled ? '#' : item.href}
-                  className={cn(
-                    "group flex items-center rounded-xl transition-all duration-200",
-                    isCollapsed ? "px-0 justify-center w-10 h-10 mx-auto" : "px-3 py-2.5 gap-3",
-                    item.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
-                    isActive 
-                      ? "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400" 
-                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-50"
+                <div key={item.name} className="flex flex-col">
+                  <LinkComponent
+                    {...linkProps}
+                    className={cn(
+                      "group flex items-center transition-all duration-200",
+                      isCollapsed 
+                        ? "px-0 justify-center w-10 h-10 mx-auto rounded-xl" 
+                        : isActive 
+                          ? "px-3 py-2.5 gap-3 bg-blue-50/80 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 border-l-4 border-blue-600 dark:border-blue-400 rounded-r-xl rounded-l-none pl-2 font-bold"
+                          : "px-3 py-2.5 gap-3 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-50",
+                      item.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                    )}
+                    title={isCollapsed ? item.name : undefined}
+                  >
+                    <item.icon className={cn("h-[18px] w-[18px] shrink-0", isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300")} />
+                    {!isCollapsed && (
+                      <span className="text-sm font-semibold truncate animate-in fade-in duration-300">
+                        {item.name}
+                      </span>
+                    )}
+                    {item.disabled && !isCollapsed && (
+                      <span className="ml-auto text-[9px] uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full animate-in fade-in duration-300">Soon</span>
+                    )}
+                  </LinkComponent>
+                  {/* Nested Settings sub-items */}
+                  {item.name === 'Settings' && isSettingsTabActive && !isCollapsed && (
+                    <div className="mt-1 ml-6 pl-3 border-l border-slate-200 dark:border-slate-800 space-y-1 animate-in slide-in-from-top-1 duration-200">
+                      {settingsTabs.map((tab) => {
+                        const isTabActive = activeSettingsTab === tab.id;
+                        return (
+                          <Link
+                            key={tab.id}
+                            to={`/settings?tab=${tab.id}`}
+                            className={cn(
+                              "flex items-center gap-2.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer w-full text-left",
+                              isTabActive
+                                ? "text-blue-600 dark:text-blue-400 bg-blue-50/40 dark:bg-blue-500/5"
+                                : "text-slate-500 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-slate-50 dark:hover:bg-slate-800/20"
+                            )}
+                          >
+                            <tab.icon className={cn("h-3.5 w-3.5", isTabActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400")} />
+                            <span>{tab.name}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
                   )}
-                  title={isCollapsed ? item.name : undefined}
-                >
-                  <item.icon className={cn("h-[18px] w-[18px] shrink-0", isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300")} />
-                  {!isCollapsed && (
-                    <span className="text-sm font-semibold truncate animate-in fade-in duration-300">
-                      {item.name}
-                    </span>
-                  )}
-                  {item.disabled && !isCollapsed && (
-                    <span className="ml-auto text-[9px] uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full animate-in fade-in duration-300">Soon</span>
-                  )}
-                </Link>
+                </div>
               );
             })}
           </nav>
@@ -213,27 +269,58 @@ export default function AppLayout() {
             </button>
           </div>
           {/* Navigation Links */}
-          <div className="flex-1 overflow-y-auto py-4">
+          <div className="flex-1 overflow-y-auto scrollbar-thin py-4">
             <nav className="space-y-1 px-4">
-              {navigation.map((item) => {
+              {filteredNavigation.map((item) => {
                 const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
+                const isSettingsTabActive = location.pathname.startsWith('/settings');
+                const isExternal = item.href === '/founder' || item.href === '#';
+                const LinkComponent = isExternal ? 'a' : Link;
+                const linkProps = isExternal 
+                  ? { href: item.href, target: '_self' }
+                  : { to: item.disabled ? '#' : item.href };
+
                 return (
-                  <Link
-                    key={item.name}
-                    to={item.disabled ? '#' : item.href}
-                    onClick={() => setIsMobileOpen(false)}
-                    className={cn(
-                      "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200",
-                      item.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
-                      isActive 
-                        ? "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400" 
-                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-50"
+                  <div key={item.name} className="flex flex-col">
+                    <LinkComponent
+                      {...linkProps}
+                      onClick={() => !isSettingsTabActive && setIsMobileOpen(false)}
+                      className={cn(
+                        "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200",
+                        item.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
+                        isActive 
+                          ? "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400" 
+                          : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-50"
+                      )}
+                    >
+                      <item.icon className={cn("h-[18px] w-[18px] shrink-0", isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300")} />
+                      {item.name}
+                      {item.disabled && <span className="ml-auto text-[9px] uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Soon</span>}
+                    </LinkComponent>
+                    {item.name === 'Settings' && isSettingsTabActive && (
+                      <div className="mt-1 ml-6 pl-3 border-l border-slate-200 dark:border-slate-800 space-y-1">
+                        {settingsTabs.map((tab) => {
+                          const isTabActive = activeSettingsTab === tab.id;
+                          return (
+                            <Link
+                              key={tab.id}
+                              to={`/settings?tab=${tab.id}`}
+                              onClick={() => setIsMobileOpen(false)}
+                              className={cn(
+                                "flex items-center gap-2.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer w-full text-left",
+                                isTabActive
+                                  ? "text-blue-600 dark:text-blue-400 bg-blue-50/40 dark:bg-blue-500/5"
+                                  : "text-slate-500 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-slate-50 dark:hover:bg-slate-800/20"
+                              )}
+                            >
+                              <tab.icon className={cn("h-3.5 w-3.5", isTabActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400")} />
+                              <span>{tab.name}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
                     )}
-                  >
-                    <item.icon className={cn("h-[18px] w-[18px] shrink-0", isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300")} />
-                    {item.name}
-                    {item.disabled && <span className="ml-auto text-[9px] uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Soon</span>}
-                  </Link>
+                  </div>
                 );
               })}
             </nav>

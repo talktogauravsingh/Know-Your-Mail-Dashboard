@@ -86,6 +86,7 @@ export default function ChangePlan() {
     const [expandedPlans, setExpandedPlans] = useState({});
     const [sliderVal, setSliderVal] = useState(15); // Approx 5000 in logarithmic slider scale
     const [loadingPlanKey, setLoadingPlanKey] = useState(null); // Track which card button is loading
+    const [isProcessing, setIsProcessing] = useState(false); // Cooldown state to prevent multi-clicking
 
     // Enterprise Contact Modal States
     const [isContactOpen, setIsContactOpen] = useState(false);
@@ -270,6 +271,9 @@ export default function ChangePlan() {
             return;
         }
 
+        if (isProcessing) return;
+        setIsProcessing(true);
+
         // Set local loading key to avoid global multi-spinner bug!
         setLoadingPlanKey(planKey);
 
@@ -322,6 +326,7 @@ export default function ChangePlan() {
                     ondismiss: () => {
                         fetchBillingSummary().catch(() => {});
                         setLoadingPlanKey(null);
+                        setIsProcessing(false);
                     },
                 },
             };
@@ -340,6 +345,12 @@ export default function ChangePlan() {
         } catch (err) {
             console.error("Order payment initialization failed:", err);
             setLoadingPlanKey(null);
+            setIsProcessing(false);
+        } finally {
+            // Cooldown of 3 seconds to prevent double click stacking
+            setTimeout(() => {
+                setIsProcessing(false);
+            }, 3000);
         }
     };
 
@@ -528,7 +539,7 @@ export default function ChangePlan() {
                                                 ? "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-550 border-2 border-slate-300 dark:border-slate-700 cursor-not-allowed" 
                                                 : `${plan.btnColor} transform hover:-translate-y-0.5 transition-all duration-150 active:translate-y-0`
                                         }`}
-                                        disabled={btnDisabled || billingLoading || billingCheckoutLoading}
+                                        disabled={btnDisabled || billingLoading || billingCheckoutLoading || isProcessing}
                                     >
                                         {isCurrentlyLoading ? (
                                             <Loader2 className="w-4 h-4 animate-spin mx-auto" />

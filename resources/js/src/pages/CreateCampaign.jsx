@@ -33,11 +33,26 @@ export default function CreateCampaign() {
   const createCampaign = useStore((state) => state.createCampaign);
   const updateCampaign = useStore((state) => state.updateCampaign);
   const selectedTemplate = templates.find(t => String(t.id) === String(templateId));
+  const domains = useStore((state) => state.domains);
+  const fetchDomains = useStore((state) => state.fetchDomains);
+  const addToast = useStore((state) => state.addToast);
   
   const [campaignName, setCampaignName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [senderConfigId, setSenderConfigId] = useState('1');
   const [isLoadingCampaign, setIsLoadingCampaign] = useState(false);
+  const [hasChecked, setHasChecked] = useState(false);
+
+  useEffect(() => {
+    fetchDomains().finally(() => setHasChecked(true));
+  }, [fetchDomains]);
+
+  useEffect(() => {
+    if (hasChecked && (!domains || domains.length === 0 || !domains.some(d => d.status === 'verified'))) {
+      addToast('Please register and verify a sender domain before proceeding.', 'error');
+      navigate('/settings?tab=domains');
+    }
+  }, [hasChecked, domains, navigate, addToast]);
 
 
   // Scheduling State
@@ -681,11 +696,11 @@ export default function CreateCampaign() {
     }
   };
 
-  if (isLoadingCampaign) {
+  if (isLoadingCampaign || !hasChecked) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-2">
-        <Loader2 className="h-10 w-10 animate-spin text-indigo-650" />
-        <p className="text-slate-500 text-sm font-medium">Loading campaign progress...</p>
+        <Loader2 className="h-10 w-10 animate-spin text-[#0052CC]" />
+        <p className="text-slate-500 text-sm font-medium">Verifying domain settings...</p>
       </div>
     );
   }
@@ -1107,7 +1122,7 @@ export default function CreateCampaign() {
                               </div>
                             )}
                             
-                            {activeTemplate && activeHasContentBlock && variants[segment.id]?.body && (
+                            {activeTemplate && (
                               <button 
                                 type="button"
                                 onClick={() => {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Button } from '../components/ui/Button';
 import { Input, Label } from '../components/ui/Input';
@@ -11,6 +12,8 @@ export default function Login() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [mustReset, setMustReset] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const login = useStore((state) => state.login);
@@ -69,10 +72,23 @@ export default function Login() {
         <form onSubmit={handleReset}>
           <CardContent className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="newPassword">New Password</Label>
+              <div className="flex justify-between items-center">
+                <Label htmlFor="newPassword">New Password</Label>
+                <button
+                  type="button"
+                  onClick={() => setShowResetPassword(!showResetPassword)}
+                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold focus:outline-none"
+                >
+                  {showResetPassword ? (
+                    <><EyeOff className="h-3.5 w-3.5" /> Hide</>
+                  ) : (
+                    <><Eye className="h-3.5 w-3.5" /> Show</>
+                  )}
+                </button>
+              </div>
               <Input 
                 id="newPassword" 
-                type="password" 
+                type={showResetPassword ? "text" : "password"} 
                 placeholder="New Password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -83,7 +99,7 @@ export default function Login() {
               <Label htmlFor="confirmPassword">Confirm Password</Label>
               <Input 
                 id="confirmPassword" 
-                type="password" 
+                type={showResetPassword ? "text" : "password"} 
                 placeholder="Confirm Password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -125,12 +141,25 @@ export default function Login() {
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="password">Password</Label>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-xs text-indigo-650 dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold focus:outline-none"
+                >
+                  {showPassword ? (
+                    <><EyeOff className="h-3.5 w-3.5" /> Hide</>
+                  ) : (
+                    <><Eye className="h-3.5 w-3.5" /> Show</>
+                  )}
+                </button>
+              </div>
               <Link to="#" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">Forgot password?</Link>
             </div>
             <Input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

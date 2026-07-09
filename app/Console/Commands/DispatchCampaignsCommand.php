@@ -11,16 +11,22 @@ use App\Models\SendLog;
 
 class DispatchCampaignsCommand extends Command
 {
-    protected $signature = 'campaigns:dispatch';
+    protected $signature = 'campaigns:dispatch {campaignId?}';
     protected $description = 'Dispatch scheduled campaigns and queue their emails';
 
     public function handle()
     {
-        $campaigns = Campaign::where('status', 'scheduled')
-            ->where(function($q) {
-                $q->whereNull('scheduled_at')
-                  ->orWhere('scheduled_at', '<=', now());
-            })->get();
+        $campaignId = $this->argument('campaignId');
+
+        if ($campaignId) {
+            $campaigns = Campaign::where('id', $campaignId)->get();
+        } else {
+            $campaigns = Campaign::where('status', 'scheduled')
+                ->where(function($q) {
+                    $q->whereNull('scheduled_at')
+                      ->orWhere('scheduled_at', '<=', now());
+                })->get();
+        }
 
         if ($campaigns->isEmpty()) {
             $this->info('No scheduled campaigns to dispatch.');

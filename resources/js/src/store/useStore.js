@@ -125,6 +125,10 @@ export const useStore = create((set, get) => ({
   // Toasts
   toasts: [],
   addToast: (message, type = 'error') => {
+    // Prevent stacking duplicate toast messages
+    if (get().toasts.some(t => t.message === message)) {
+      return;
+    }
     const id = Date.now();
     set((state) => ({ toasts: [...state.toasts, { id, message, type }] }));
     setTimeout(() => get().removeToast(id), 5000);
@@ -132,27 +136,23 @@ export const useStore = create((set, get) => ({
   removeToast: (id) => set((state) => ({ 
     toasts: state.toasts.filter(t => t.id !== id) 
   })),
-
-  // Toast notifications
-  toasts: [],
-  addToast: (message, type = 'error') => {
-    const id = Date.now();
-    set((state) => ({ toasts: [...state.toasts, { id, message, type }] }));
-    setTimeout(() => get().removeToast(id), 5000);
-  },
-  removeToast: (id) => set((state) => ({ 
-    toasts: state.toasts.filter(toast => toast.id !== id) 
-  })),
   
   // Campaigns - Replace mocks with API
   campaigns: [],
   campaignsMetadata: null,
   currentCampaign: null,
   campaignsLoading: false,
-  fetchCampaigns: async (page = 1) => {
+  fetchCampaigns: async (page = 1, filters = {}) => {
     set({ campaignsLoading: true });
     try {
-      const { data } = await api.get(`/campaigns?page=${page}`);
+      const params = new URLSearchParams({ page });
+      if (filters.search) params.append('search', filters.search);
+      if (filters.status) params.append('status', filters.status);
+      if (filters.date_filter) params.append('date_filter', filters.date_filter);
+      if (filters.start_date) params.append('start_date', filters.start_date);
+      if (filters.end_date) params.append('end_date', filters.end_date);
+
+      const { data } = await api.get(`/campaigns?${params.toString()}`);
       if (data && data.data) {
         set({ 
           campaigns: data.data,

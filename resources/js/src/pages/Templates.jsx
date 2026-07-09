@@ -4,7 +4,7 @@ import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Input } from '../components/ui/Input';
-import { Search, Plus, LayoutTemplate, TrendingUp, Eye, Edit2, Trash2, X } from 'lucide-react';
+import { Search, Plus, LayoutTemplate, TrendingUp, Eye, Edit2, Trash2, X, Monitor, Smartphone } from 'lucide-react';
 import { useStore } from '../store/useStore';
 
 export default function Templates() {
@@ -24,6 +24,7 @@ export default function Templates() {
   const [modalMode, setModalMode] = useState('create');
   const [currentTemplate, setCurrentTemplate] = useState(null);
   const [formData, setFormData] = useState({ name: '', category: 'Newsletter', description: '' });
+  const [previewMode, setPreviewMode] = useState('desktop');
 
   const handleOpenCreate = () => {
     navigate('/templates/designer');
@@ -38,6 +39,7 @@ export default function Templates() {
     e.preventDefault();
     setModalMode('preview');
     setCurrentTemplate(template);
+    setPreviewMode('desktop');
     setIsModalOpen(true);
   };
 
@@ -188,8 +190,10 @@ export default function Templates() {
       {/* Modal Overlay */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-950 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-200 dark:border-slate-800">
-            <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-800">
+          <div className={`bg-white dark:bg-slate-950 rounded-2xl shadow-xl w-full overflow-hidden border border-slate-200 dark:border-slate-800 transition-all duration-350 flex flex-col max-h-[90vh] ${
+            modalMode === 'preview' ? 'max-w-4xl' : 'max-w-lg'
+          }`}>
+            <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-800 shrink-0">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
                 {modalMode === 'create' && 'Create Custom Template'}
                 {modalMode === 'edit' && 'Edit Template'}
@@ -203,9 +207,9 @@ export default function Templates() {
               </button>
             </div>
             
-            <div className="p-5">
+            <div className="p-5 overflow-y-auto flex-1">
               {modalMode === 'preview' && currentTemplate ? (
-                <div className="space-y-6">
+                <div className="space-y-6 animate-in fade-in duration-300">
                   <div className="flex items-center gap-4">
                      <div className={`p-4 rounded-xl ${currentTemplate.color} shrink-0`}>
                         <LayoutTemplate className="w-8 h-8 opacity-90" />
@@ -221,10 +225,54 @@ export default function Templates() {
                     </p>
                   </div>
                   
-                  {/* Mock content rendering area */}
-                  <div className="w-full h-64 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900/20">
-                     <LayoutTemplate className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-3" />
-                     <p className="text-sm text-slate-400">Mock Template Content Preview</p>
+                  {/* Preview Mode Toggle */}
+                  <div className="flex items-center gap-2 pb-1">
+                    <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-2">Device View:</span>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewMode('desktop')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        previewMode === 'desktop'
+                          ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-650/20'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <Monitor className="h-3.5 w-3.5" /> Desktop
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewMode('mobile')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        previewMode === 'mobile'
+                          ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-650/20'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <Smartphone className="h-3.5 w-3.5" /> Mobile
+                    </button>
+                  </div>
+
+                  {/* Real content rendering area */}
+                  <div className="w-full bg-slate-50 dark:bg-slate-900/20 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex justify-center items-center min-h-[350px] transition-all duration-300">
+                     {currentTemplate.html_content ? (
+                        <div
+                           className={`h-[400px] bg-white shadow-md overflow-hidden border border-slate-200/80 dark:border-slate-800/80 rounded-lg transition-all duration-300 ${
+                             previewMode === 'mobile' ? 'w-[360px]' : 'w-full'
+                           }`}
+                        >
+                           <iframe
+                              title="Template Preview"
+                              srcDoc={currentTemplate.html_content}
+                              className="w-full h-full border-none bg-white"
+                              sandbox=""
+                           />
+                        </div>
+                     ) : (
+                        <div className="w-full h-80 flex flex-col items-center justify-center bg-slate-50/50 dark:bg-slate-900/20 rounded-lg border-2 border-dashed border-slate-250 dark:border-slate-850">
+                           <LayoutTemplate className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-3" strokeWidth={1.5} />
+                           <p className="text-sm text-slate-450">No template content preview available</p>
+                        </div>
+                     )}
                   </div>
 
                   <div className="flex justify-end pt-2">
