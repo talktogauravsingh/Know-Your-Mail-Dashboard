@@ -33,6 +33,17 @@ export function AiGenerationModal({ isOpen, onClose, onApply }) {
   const typingIntervalRef = useRef(null);
   const targetTextRef = useRef({ subject: '', content: '' });
   const streamFinishedRef = useRef(false);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (thread.length > 0) {
+      scrollToBottom();
+    }
+  }, [thread, isGenerating]);
 
   useEffect(() => {
     return () => {
@@ -240,11 +251,6 @@ export function AiGenerationModal({ isOpen, onClose, onApply }) {
       combinedPrompt = `${basePrompt}\n\n[Improvement Request: ${instruction}]`;
     }
 
-    if (activeMode === 'custom') {
-      setCustomPrompt(combinedPrompt);
-    } else {
-      setContext(combinedPrompt);
-    }
     await handleGenerate(combinedPrompt, true, false);
     setImprovementPrompt('');
   };
@@ -259,11 +265,11 @@ export function AiGenerationModal({ isOpen, onClose, onApply }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
       <div className={cn(
-        "bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full flex flex-col border border-slate-200 dark:border-slate-800 transition-all duration-500 ease-out",
-        hasResults ? "max-w-5xl" : "max-w-3xl"
+        "bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full flex flex-col border border-slate-200 dark:border-slate-800 transition-all duration-500 ease-out h-[85vh] max-h-[750px] overflow-hidden",
+        hasResults ? "max-w-5xl" : "max-w-xl"
       )}>
         
-        <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
               <Sparkles className="w-5 h-5" />
@@ -278,17 +284,20 @@ export function AiGenerationModal({ isOpen, onClose, onApply }) {
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto flex-1">
+        <div className="p-6 flex-1 min-h-0 overflow-hidden flex flex-col">
           <FeatureGateLock feature="ai_generation" showRemaining={true}>
-            <div className="space-y-6">
+            <div className="h-full flex flex-col min-h-0">
               {error && (
-                <div className="p-3 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-900/30">
+                <div className="p-3 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-900/30 shrink-0 mb-4">
                   {error}
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-4">
+              <div className={cn(
+                "grid gap-6 h-full min-h-0 overflow-hidden flex-1",
+                hasResults ? "grid-cols-2" : "grid-cols-1"
+              )}>
+                <div className="space-y-4 overflow-y-auto h-full pr-3 pb-6">
                   {/* Mode Segment Selector */}
                   <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                     <button 
@@ -403,133 +412,127 @@ export function AiGenerationModal({ isOpen, onClose, onApply }) {
                   </Button>
                 </div>
 
-                <div className="border border-slate-100 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950/30 p-4 min-h-[300px] flex flex-col transition-all duration-350 overflow-hidden">
-                  {thread.length === 0 && !isGenerating && (
-                    <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 space-y-3 flex-1">
-                      <div className="p-4 bg-slate-100 dark:bg-slate-900 rounded-full">
-                        <Sparkles className="w-8 h-8 text-slate-300" />
-                      </div>
-                      <p className="text-sm max-w-[200px]">Fill out the details on the left and hit generate.</p>
-                    </div>
-                  )}
+                {hasResults && (
+                  <div className="border border-slate-100 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950/30 p-4 h-full flex flex-col transition-all duration-350 overflow-hidden">
+                    {isGenerating && thread.length === 0 && (
+                      <div className="h-full flex flex-col justify-start space-y-6 flex-1 animate-pulse">
+                        <div className="flex items-center justify-between">
+                          <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-full w-24"></div>
+                          <div className="h-7 bg-slate-200 dark:bg-slate-700 rounded-lg w-20"></div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded-full w-12"></div>
+                          <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded-lg w-full"></div>
+                        </div>
 
-                  {isGenerating && thread.length === 0 && (
-                    <div className="h-full flex flex-col justify-start space-y-6 flex-1 animate-pulse">
-                      <div className="flex items-center justify-between">
-                        <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-full w-24"></div>
-                        <div className="h-7 bg-slate-200 dark:bg-slate-700 rounded-lg w-20"></div>
+                        <div className="space-y-2">
+                          <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded-full w-8"></div>
+                          <div className="h-40 bg-slate-200 dark:bg-slate-700 rounded-lg w-full"></div>
+                        </div>
                       </div>
-                      
-                      <div className="space-y-2">
-                        <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded-full w-12"></div>
-                        <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded-lg w-full"></div>
-                      </div>
+                    )}
 
-                      <div className="space-y-2">
-                        <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded-full w-8"></div>
-                        <div className="h-40 bg-slate-200 dark:bg-slate-700 rounded-lg w-full"></div>
-                      </div>
-                    </div>
-                  )}
-
-                  {thread.length > 0 && (
-                    <div className="space-y-6 overflow-y-auto max-h-[60vh] pr-2 flex-1 flex flex-col pb-4">
-                      {thread.map((msg, i) => {
-                        if (msg.role === 'user') {
-                          return (
-                            <div key={i} className="flex justify-end animate-in slide-in-from-bottom duration-300 my-2">
-                              <div className="bg-indigo-600 text-white rounded-2xl px-4 py-2 text-sm max-w-[85%] shadow-sm font-medium">
-                                {msg.content}
+                    {thread.length > 0 && (
+                      <div className="space-y-6 overflow-y-auto pr-2 flex-1 flex flex-col pb-4 scroll-smooth">
+                        {thread.map((msg, i) => {
+                          if (msg.role === 'user') {
+                            return (
+                              <div key={i} className="flex justify-end animate-in slide-in-from-bottom duration-300 my-2 shrink-0">
+                                <div className="bg-indigo-600 text-white rounded-2xl px-4 py-2 text-sm max-w-[85%] shadow-sm font-medium">
+                                  {msg.content}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        }
+                            );
+                          }
 
-                        const subject = msg.subject || '';
-                        const content = msg.content || '';
-                        const isLastAssistant = i === thread.length - 1;
+                          const subject = msg.subject || '';
+                          const content = msg.content || '';
+                          const isLastAssistant = i === thread.length - 1;
 
-                        if (isGenerating && isLastAssistant && !subject && !content) {
+                          if (isGenerating && isLastAssistant && !subject && !content) {
+                            return (
+                              <div key={i} className="h-48 flex items-center justify-center animate-pulse shrink-0">
+                                <Loader2 className="w-6 h-6 text-indigo-500 animate-spin mr-2" />
+                                <span className="text-sm text-slate-400">AI is thinking...</span>
+                              </div>
+                            );
+                          }
+
                           return (
-                            <div key={i} className="h-48 flex items-center justify-center animate-pulse">
-                              <Loader2 className="w-6 h-6 text-indigo-500 animate-spin mr-2" />
-                              <span className="text-sm text-slate-400">AI is thinking...</span>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div key={i} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4 animate-in slide-in-from-bottom duration-300">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">AI Copywriter</span>
-                              <div className="flex gap-2">
-                                {isLastAssistant && (
+                            <div key={i} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4 animate-in slide-in-from-bottom duration-300 shrink-0">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">AI Copywriter</span>
+                                <div className="flex gap-2">
+                                  {isLastAssistant && (
+                                    <Button 
+                                      variant="secondary" 
+                                      size="sm" 
+                                      className="text-xs h-7 px-3 bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-750 border-0"
+                                      onClick={handleRegenerate}
+                                    >
+                                      Regenerate
+                                    </Button>
+                                  )}
                                   <Button 
                                     variant="secondary" 
                                     size="sm" 
-                                    className="text-xs h-7 px-3 bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-750 border-0"
-                                    onClick={handleRegenerate}
+                                    className="text-xs h-7 px-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50 border-0"
+                                    onClick={() => onApply({ subject, content })}
                                   >
-                                    Regenerate
+                                    Use Subject & Body
                                   </Button>
-                                )}
-                                <Button 
-                                  variant="secondary" 
-                                  size="sm" 
-                                  className="text-xs h-7 px-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50 border-0"
-                                  onClick={() => onApply({ subject, content })}
-                                >
-                                  Use Both
-                                </Button>
+                                </div>
                               </div>
-                            </div>
-                            
-                            <div className="space-y-1">
-                              <div className="flex justify-between items-end">
-                                <span className="text-xs text-slate-500 font-medium">Subject</span>
-                                <button onClick={() => onApply({ subject })} className="text-[10px] text-indigo-600 hover:underline">Use Subject</button>
+                              
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-end">
+                                  <span className="text-xs text-slate-500 font-medium">Subject</span>
+                                  <button onClick={() => onApply({ subject })} className="text-[10px] text-indigo-600 hover:underline">Use Subject</button>
+                                </div>
+                                <p className="text-sm font-medium text-slate-900 dark:text-white">{subject}</p>
                               </div>
-                              <p className="text-sm font-medium text-slate-900 dark:text-white">{subject}</p>
-                            </div>
 
-                            <div className="space-y-1">
-                              <div className="flex justify-between items-end">
-                                <span className="text-xs text-slate-500 font-medium">Body</span>
-                                <button onClick={() => onApply({ content })} className="text-[10px] text-indigo-600 hover:underline">Use Body</button>
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-end">
+                                  <span className="text-xs text-slate-500 font-medium">Body</span>
+                                  <button onClick={() => onApply({ content })} className="text-[10px] text-indigo-600 hover:underline">Use Body</button>
+                                </div>
+                                <div className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap max-h-40 overflow-y-auto p-2 bg-slate-50 dark:bg-slate-950 rounded border border-slate-100 dark:border-slate-800">
+                                  {content}
+                                </div>
                               </div>
-                              <div className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap max-h-40 overflow-y-auto p-2 bg-slate-50 dark:bg-slate-950 rounded border border-slate-100 dark:border-slate-800">
-                                {content}
-                              </div>
-                            </div>
 
-                            {isLastAssistant && (
-                              <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex gap-2">
-                                <Input 
-                                  placeholder="Ask AI to improve this copy (e.g. 'slightly casual and use slangs')..." 
-                                  value={improvementPrompt} 
-                                  onChange={e => setImprovementPrompt(e.target.value)}
-                                  onKeyDown={e => {
-                                    if (e.key === 'Enter') {
-                                      handleImprove(improvementPrompt);
-                                    }
-                                  }}
-                                  className="text-xs h-8 bg-slate-50 dark:bg-slate-950 flex-1 border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
-                                />
-                                <Button 
-                                  size="sm" 
-                                  onClick={() => handleImprove(improvementPrompt)}
-                                  className="text-xs h-8 bg-indigo-600 hover:bg-indigo-700 text-white"
-                                >
-                                  Improve
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                              {isLastAssistant && (
+                                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex gap-2">
+                                  <Input 
+                                    placeholder="Ask AI to improve this copy (e.g. 'slightly casual and use slangs')..." 
+                                    value={improvementPrompt} 
+                                    onChange={e => setImprovementPrompt(e.target.value)}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') {
+                                        handleImprove(improvementPrompt);
+                                      }
+                                    }}
+                                    className="text-xs h-8 bg-slate-50 dark:bg-slate-950 flex-1 border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
+                                  />
+                                  <Button 
+                                    size="sm" 
+                                    onClick={() => handleImprove(improvementPrompt)}
+                                    className="text-xs h-8 bg-indigo-600 hover:bg-indigo-700 text-white"
+                                  >
+                                    Improve
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        <div ref={messagesEndRef} />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </FeatureGateLock>
