@@ -1107,7 +1107,7 @@ export default function CreateCampaign() {
                               </div>
                             )}
                             
-                            {activeTemplate && activeHasContentBlock && variants[segment.id]?.body && (
+                            {activeTemplate && (
                               <button 
                                 type="button"
                                 onClick={() => {
