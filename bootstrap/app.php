@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'permissions' => \App\Http\Middleware\RoleMiddleware::class,
             'feature' => \App\Http\Middleware\EnforceFeatureGate::class,
+            'page_action' => \App\Http\Middleware\PageActionMiddleware::class,
         ]);
     })
 

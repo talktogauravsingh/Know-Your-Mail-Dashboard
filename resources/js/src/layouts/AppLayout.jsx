@@ -65,6 +65,7 @@ export default function AppLayout() {
   const settingsTabs = [
     { id: 'profile', name: 'My Profile', icon: User },
     ...(isSettingsAllowed ? [{ id: 'team', name: 'Team Management', icon: Users }] : []),
+    ...(isSettingsAllowed ? [{ id: 'permissions', name: 'Roles & Permissions', icon: Shield }] : []),
     { id: 'integrations', name: 'Third-Party SMTP', icon: Mail },
     { id: 'domains', name: 'Sender Domains', icon: Globe },
     { id: 'smtp-credentials', name: 'SMTP Relay Keys', icon: KeyRound },

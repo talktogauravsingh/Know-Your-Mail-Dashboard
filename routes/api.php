@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\BulkRecipientController;
 use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Tracking\TrackingController;
+use App\Http\Controllers\Api\AuthPermissionController;
 
 Route::get('/user', function (Request $request) {
     return $request->user()->load('role.permissions');
@@ -183,4 +184,35 @@ Route::prefix('founder')->group(function () {
     Route::post('retry-failed-job', [\App\Http\Controllers\Api\FounderController::class, 'retryFailedJob']);
     Route::post('delete-failed-job', [\App\Http\Controllers\Api\FounderController::class, 'deleteFailedJob']);
     Route::post('flush-queue', [\App\Http\Controllers\Api\FounderController::class, 'flushQueue']);
+});
+
+Route::middleware('auth:sanctum')->prefix('auth-permissions')->group(function () {
+    // Pages
+    Route::get('pages', [AuthPermissionController::class, 'getPages']);
+    Route::post('pages', [AuthPermissionController::class, 'storePage']);
+    Route::put('pages/{page}', [AuthPermissionController::class, 'updatePage']);
+    Route::delete('pages/{page}', [AuthPermissionController::class, 'destroyPage']);
+
+    // Actions
+    Route::get('actions', [AuthPermissionController::class, 'getActions']);
+    Route::post('actions', [AuthPermissionController::class, 'storeAction']);
+    Route::put('actions/{action}', [AuthPermissionController::class, 'updateAction']);
+    Route::delete('actions/{action}', [AuthPermissionController::class, 'destroyAction']);
+
+    // Page Action mapping
+    Route::post('page-actions', [AuthPermissionController::class, 'assignPageAction']);
+    Route::delete('page-actions/{pageAction}', [AuthPermissionController::class, 'removePageAction']);
+
+    // Roles
+    Route::get('roles', [AuthPermissionController::class, 'getRoles']);
+    Route::post('roles', [AuthPermissionController::class, 'storeRole']);
+    Route::put('roles/{role}', [AuthPermissionController::class, 'updateRole']);
+    Route::delete('roles/{role}', [AuthPermissionController::class, 'destroyRole']);
+
+    // Role Permissions mapping (Page Actions)
+    Route::post('roles/{role}/permissions', [AuthPermissionController::class, 'assignRolePermissions']);
+
+    // User Roles assignment
+    Route::get('users/{user}/roles', [AuthPermissionController::class, 'getUserRoles']);
+    Route::post('users/{user}/roles', [AuthPermissionController::class, 'assignUserRoles']);
 });

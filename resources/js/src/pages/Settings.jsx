@@ -34,6 +34,7 @@ import SenderDomains from "./settings/SenderDomains";
 import SmtpCredentials from "./settings/SmtpCredentials";
 import Suppressions from "./settings/Suppressions";
 import KymConsole from "./settings/KymConsole";
+import AuthPermissions from "./settings/AuthPermissions";
 
 function formatMoney(amountMinor = 0, currency = "INR") {
     const safeAmountMinor = Number(amountMinor) || 0;
@@ -233,6 +234,10 @@ export default function Settings() {
             <div className="w-full space-y-6">
                     {activeTab === "team" && (
                         <TeamManagement />
+                    )}
+
+                    {activeTab === "permissions" && (
+                        <AuthPermissions />
                     )}
 
                     {activeTab === "billing" && (

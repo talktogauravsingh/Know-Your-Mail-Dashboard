@@ -95,5 +95,39 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->permissions()->whereIn('slug', $permissionSlugs)->exists();
     }
+
+    public function authRoles(): BelongsToMany
+    {
+        return $this->belongsToMany(AuthRole::class, 'auth_user_roles', 'user_id', 'role_id')
+                    ->withPivot('status', 'added_by')
+                    ->withTimestamps('created', 'updated');
+    }
+
+    public function hasAuthPermission(string $pageName, string $actionName): bool
+    {
+        // root user has permission for everything by default
+        if (($this->role && $this->role->slug === 'root') || 
+            $this->authRoles()->where('auth_roles.name', 'root')->where('auth_user_roles.status', 1)->exists()) {
+            return true;
+        }
+
+        $roleIds = $this->authRoles()->where('auth_user_roles.status', 1)->pluck('auth_roles.id');
+
+        if ($roleIds->isEmpty()) {
+            return false;
+        }
+
+        return DB::table('auth_role_page_actions')
+            ->join('auth_page_actions', 'auth_role_page_actions.page_action_id', '=', 'auth_page_actions.id')
+            ->join('auth_pages', 'auth_page_actions.page_id', '=', 'auth_pages.id')
+            ->join('auth_actions', 'auth_page_actions.action_id', '=', 'auth_actions.id')
+            ->whereIn('auth_role_page_actions.role_id', $roleIds)
+            ->where('auth_pages.name', $pageName)
+            ->where('auth_actions.name', $actionName)
+            ->where('auth_pages.status', 1)
+            ->where('auth_page_actions.status', 1)
+            ->where('auth_role_page_actions.access', 1)
+            ->exists();
+    }
 }
 
