@@ -48,13 +48,19 @@ public function bulkValidate(array $data)
         return [false, 'email_disposable_domain'];
     }
 
-    // Basic phone check (digits + optional separators)
+    // Basic phone check (digits + optional separators, no special characters/letters)
+    if (!preg_match('/^\+?[0-9\s\-()]+$/', $data['phone'])) {
+        return [false, 'invalid_phone_format'];
+    }
     $phone = preg_replace('/[^0-9]/', '', $data['phone']);
     if (strlen($phone) < 10) {
         return [false, 'invalid_phone'];
     }
 
-    // Name basic check
+    // Name basic check (no special characters)
+    if (!preg_match('/^[a-zA-Z0-9\s\-_,\.\'\"]+$/', trim($data['name']))) {
+        return [false, 'invalid_name_format'];
+    }
     if (strlen(trim($data['name'])) < 2) {
         return [false, 'invalid_name'];
     }

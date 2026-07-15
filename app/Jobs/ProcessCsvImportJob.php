@@ -78,6 +78,7 @@ class ProcessCsvImportJob implements ShouldQueue
         $chunk = [];
         $chunkSize = 1000;
         $stats = []; // For 100% accurate insights
+        $processedEmails = [];
 
         while (($row = fgetcsv($file, 4000, $detected)) !== false) {
             if (count($headers) !== count($row)) continue;
@@ -85,6 +86,25 @@ class ProcessCsvImportJob implements ShouldQueue
             
             $email = strtolower(trim($rowAssoc[$emailColumn] ?? ''));
             if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) continue;
+
+            $email = $this->normalizeEmail($email);
+            if (in_array($email, $processedEmails)) {
+                continue;
+            }
+
+            // Validate name format if present
+            $nameVal = trim($rowAssoc['name'] ?? '');
+            if ($nameVal !== '' && !preg_match('/^[a-zA-Z0-9\s\-_,\.\'\"]+$/', $nameVal)) {
+                continue;
+            }
+
+            // Validate phone format if present
+            $phoneVal = trim($rowAssoc['phone'] ?? '');
+            if ($phoneVal !== '' && !preg_match('/^\+?[0-9\s\-()]+$/', $phoneVal)) {
+                continue;
+            }
+
+            $processedEmails[] = $email;
             
             $attributes = [];
             foreach ($rowAssoc as $key => $value) {
@@ -165,6 +185,18 @@ class ProcessCsvImportJob implements ShouldQueue
         }
         
         Storage::disk('local')->delete($this->filePath);
+    }
+    
+    private function normalizeEmail(string $email): string
+    {
+        if (str_contains($email, '@')) {
+            [$local, $domain] = explode('@', $email, 2);
+            if (($pos = strpos($local, '+')) !== false) {
+                $local = substr($local, 0, $pos);
+            }
+            return $local . '@' . $domain;
+        }
+        return $email;
     }
     
     private function upsertChunk(array $chunk)

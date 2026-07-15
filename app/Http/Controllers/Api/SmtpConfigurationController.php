@@ -34,13 +34,13 @@ class SmtpConfigurationController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'provider' => ['required', 'string', 'max:255'],
-            'host' => ['required', 'string', 'max:255'],
+            'provider' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\s\-]+$/'],
+            'host' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\.\-]+$/'],
             'port' => ['required', 'integer'],
             'username' => ['nullable', 'string', 'max:255'],
             'password' => ['nullable', 'string'],
             'encryption' => ['nullable', 'string', 'in:tls,ssl'],
-            'from_name' => ['required', 'string', 'max:255'],
+            'from_name' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\s\-_,\.\'\"]+$/'],
             'from_address' => ['required', 'email', 'max:255'],
             'is_global' => ['boolean']
         ]);
@@ -69,13 +69,13 @@ class SmtpConfigurationController extends Controller
         }
 
         $request->validate([
-            'provider' => ['sometimes', 'required', 'string', 'max:255'],
-            'host' => ['sometimes', 'required', 'string', 'max:255'],
+            'provider' => ['sometimes', 'required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\s\-]+$/'],
+            'host' => ['sometimes', 'required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\.\-]+$/'],
             'port' => ['sometimes', 'required', 'integer'],
             'username' => ['nullable', 'string', 'max:255'],
             'password' => ['nullable', 'string'],
             'encryption' => ['nullable', 'string', 'in:tls,ssl'],
-            'from_name' => ['sometimes', 'required', 'string', 'max:255'],
+            'from_name' => ['sometimes', 'required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\s\-_,\.\'\"]+$/'],
             'from_address' => ['sometimes', 'required', 'email', 'max:255'],
             'is_global' => ['boolean']
         ]);

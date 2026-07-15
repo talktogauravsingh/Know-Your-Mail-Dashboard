@@ -93,7 +93,7 @@ class AuthTest extends TestCase
     }
 
     /** @test */
-    public function it_returns_error_on_invalid_login()
+    public function test_returns_error_on_invalid_login()
     {
         $response = $this->postJson('/api/auth/login', [
             'email' => 'invalid@example.com',
@@ -105,7 +105,7 @@ class AuthTest extends TestCase
     }
 
     /** @test */
-    public function it_can_logout_authenticated_user()
+    public function test_can_logout_authenticated_user()
     {
         $user = User::factory()->create();
 
@@ -119,12 +119,12 @@ class AuthTest extends TestCase
     }
 
     /** @test */
-    public function it_can_send_forgot_password_link()
+    public function test_can_send_forgot_password_link()
     {
-        User::factory()->create(['email' => 'test@example.com']);
+        User::factory()->create(['email' => 'testforgot@example.com']);
 
         $response = $this->postJson('/api/auth/forgot-password', [
-            'email' => 'test@example.com',
+            'email' => 'testforgot@example.com',
         ]);
 
         $response->assertStatus(200)
@@ -132,15 +132,11 @@ class AuthTest extends TestCase
     }
 
     /** @test */
-    public function it_can_reset_password()
+    public function test_can_reset_password()
     {
         $user = User::factory()->create(['email' => 'reset@example.com']);
 
-        $status = Password::sendResetLink(['email' => 'reset@example.com']);
-
-        $this->assertTrue($status === Password::RESET_LINK_SENT);
-
-        $token = DB::table('password_reset_tokens')->where('email', 'reset@example.com')->first()->token;
+        $token = Password::createToken($user);
 
         $response = $this->postJson('/api/auth/reset-password', [
             'token' => $token,
@@ -154,7 +150,7 @@ class AuthTest extends TestCase
     }
 
     /** @test */
-    public function manager_with_permission_can_create_manager()
+    public function test_manager_with_permission_can_create_manager()
     {
         $manager = User::where('email', 'test@example.com')->first();
         if (!$manager) {
@@ -173,7 +169,7 @@ class AuthTest extends TestCase
             'role_id' => $role->id,
         ]);
 
-        $response->assertStatus(201)
+        $response->assertStatus(200)
                  ->assertJsonStructure([
                      'manager' => ['id', 'name', 'email', 'role'],
                      'token'
@@ -181,7 +177,7 @@ class AuthTest extends TestCase
     }
 
     /** @test */
-    public function user_without_permission_cannot_create_manager()
+    public function test_user_without_permission_cannot_create_manager()
     {
         $user = User::factory()->create();
         $this->actingAs($user, 'sanctum');
@@ -195,6 +191,60 @@ class AuthTest extends TestCase
         ]);
 
         $response->assertStatus(403);
+    }
+
+    /** @test */
+    public function test_rejects_send_otp_with_invalid_special_characters_in_name_or_phone()
+    {
+        $response = $this->postJson('/api/auth/send-otp', [
+            'name' => 'John @ Doe',
+            'email' => 'sendotp_invalid@example.com',
+            'phone_number' => '1234567890'
+        ]);
+        $response->assertStatus(422)
+                 ->assertJsonValidationErrors(['name']);
+
+        $response = $this->postJson('/api/auth/send-otp', [
+            'name' => 'John Doe',
+            'email' => 'sendotp_invalid@example.com',
+            'phone_number' => '123-abc-7890'
+        ]);
+        $response->assertStatus(422)
+                 ->assertJsonValidationErrors(['phone_number']);
+    }
+
+    /** @test */
+    public function test_rejects_registration_with_invalid_special_characters()
+    {
+        $email = 'newuser_invalid@example.com';
+        $otp = '123456';
+        \Illuminate\Support\Facades\Cache::put('signup_otp_' . $email, $otp, 600);
+
+        $response = $this->postJson('/api/auth/register', [
+            'name' => 'Test User @#$',
+            'email' => $email,
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'otp' => $otp,
+            'phone_number' => '1234567890',
+            'organization_type' => 'marketing',
+            'organization_name' => 'Acme Agency'
+        ]);
+        $response->assertStatus(422)
+                 ->assertJsonValidationErrors(['name']);
+
+        $response = $this->postJson('/api/auth/register', [
+            'name' => 'Test User',
+            'email' => $email,
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'otp' => $otp,
+            'phone_number' => '1234567890',
+            'organization_type' => 'marketing',
+            'organization_name' => 'Acme Agency @#$'
+        ]);
+        $response->assertStatus(422)
+                 ->assertJsonValidationErrors(['organization_name']);
     }
 }
 

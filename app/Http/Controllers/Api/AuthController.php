@@ -27,9 +27,9 @@ class AuthController extends Controller
     public function sendOtp(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email',
-            'phone_number' => 'nullable|string|max:20',
+            'name' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\s\-_,\.\(\)\'\"]+$/'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'phone_number' => ['nullable', 'string', 'max:20', 'regex:/^\+?[0-9\s\-()]+$/'],
         ]);
 
         $email = $validated['email'];
@@ -98,14 +98,14 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'phone_number' => 'nullable|string|max:20',
-            'organization_type' => 'nullable|string|max:50',
-            'organization_name' => 'nullable|string|max:255',
-            'is_skipped' => 'nullable|boolean',
+            'name' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\s\-_,\.\(\)\'\"]+$/'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'phone_number' => ['nullable', 'string', 'max:20', 'regex:/^\+?[0-9\s\-()]+$/'],
+            'organization_type' => ['nullable', 'string', 'max:50', 'regex:/^[a-zA-Z0-9\s\-]+$/'],
+            'organization_name' => ['nullable', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\s\-_,\.\(\)\'\"]+$/'],
+            'is_skipped' => ['nullable', 'boolean'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'otp' => 'required|string|size:6',
+            'otp' => ['required', 'string', 'size:6'],
         ]);
 
         // Verify OTP
@@ -231,13 +231,13 @@ public function createManager(Request $request)
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            'name' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\s\-_,\.\(\)\'\"]+$/'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'role_id' => 'required|exists:roles,id',
-            'organization_id' => 'nullable|exists:organizations,id',
-            'permission_slugs' => 'nullable|array',
-            'permission_slugs.*' => 'exists:permissions,slug',
+            'role_id' => ['required', 'exists:roles,id'],
+            'organization_id' => ['nullable', 'exists:organizations,id'],
+            'permission_slugs' => ['nullable', 'array'],
+            'permission_slugs.*' => ['exists:permissions,slug'],
         ]);
 
         try {

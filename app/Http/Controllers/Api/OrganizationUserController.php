@@ -44,10 +44,10 @@ class OrganizationUserController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email',
+            'name' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\s\-_,\.\(\)\'\"]+$/'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', Rules\Password::defaults()],
-            'role_id' => 'required|exists:roles,id',
+            'role_id' => ['required', 'exists:roles,id'],
         ]);
 
         $targetRole = Role::find($validated['role_id']);

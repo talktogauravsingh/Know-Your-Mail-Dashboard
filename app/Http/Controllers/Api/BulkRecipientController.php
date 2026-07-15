@@ -103,10 +103,10 @@ class BulkRecipientController extends Controller
                     $csvHeaders = array_map(fn($h) => strtolower(trim($h)), $rawHeaders);
                 }
 
+                $processedEmails = [];
                 // Use the detected delimiter for the preview rows as well
                 while (($row = fgetcsv($fh, 4000, $detected)) !== false) {
                     if (count($csvHeaders) !== count($row)) continue;
-                    $totalRows++;
                     $assoc = array_combine($csvHeaders, $row);
 
                     // Find the email value heuristically (first column containing @)
@@ -115,7 +115,30 @@ class BulkRecipientController extends Controller
                         if (str_contains((string)$val, '@')) { $emailValue = trim($val); break; }
                     }
 
+                    $emailValue = strtolower(trim($emailValue));
                     $isValid = $emailValue && filter_var($emailValue, FILTER_VALIDATE_EMAIL);
+                    
+                    if ($isValid) {
+                        $nameVal = trim($assoc['name'] ?? '');
+                        if ($nameVal !== '' && !preg_match('/^[a-zA-Z0-9\s\-_,\.\'\"]+$/', $nameVal)) {
+                            $isValid = false;
+                        }
+                        
+                        $phoneVal = trim($assoc['phone'] ?? '');
+                        if ($phoneVal !== '' && !preg_match('/^\+?[0-9\s\-()]+$/', $phoneVal)) {
+                            $isValid = false;
+                        }
+                    }
+                    
+                    if ($isValid) {
+                        $normalizedEmail = $this->normalizeEmail($emailValue);
+                        if (in_array($normalizedEmail, $processedEmails)) {
+                            continue;
+                        }
+                        $processedEmails[] = $normalizedEmail;
+                    }
+
+                    $totalRows++;
                     $isValid ? $validRows++ : $invalidRows++;
 
                     if (count($previewRows) < $previewLimit) {
@@ -157,5 +180,17 @@ class BulkRecipientController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    private function normalizeEmail(string $email): string
+    {
+        if (str_contains($email, '@')) {
+            [$local, $domain] = explode('@', $email, 2);
+            if (($pos = strpos($local, '+')) !== false) {
+                $local = substr($local, 0, $pos);
+            }
+            return $local . '@' . $domain;
+        }
+        return $email;
     }
 }
