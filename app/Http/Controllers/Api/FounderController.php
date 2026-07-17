@@ -356,4 +356,123 @@ class FounderController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Retrieve all founder configurations from cache.
+     */
+    public function getConfigs()
+    {
+        try {
+            $configs = \Illuminate\Support\Facades\Cache::get('founder_system_configs', []);
+            
+            // Format for easy consumption
+            $formattedConfigs = [];
+            foreach ($configs as $key => $data) {
+                $formattedConfigs[] = [
+                    'key' => $key,
+                    'value' => $data['value'] ?? '',
+                    'description' => $data['description'] ?? '',
+                    'updated_at' => $data['updated_at'] ?? null,
+                ];
+            }
+            
+            return response()->json([
+                'success' => true,
+                'configs' => $formattedConfigs,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve founder configurations: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error retrieving configurations: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Add or update a configuration key-value pair in cache.
+     */
+    public function saveConfig(Request $request)
+    {
+        $request->validate([
+            'key' => 'required|string|max:100',
+            'value' => 'required|string',
+            'description' => 'nullable|string|max:255',
+        ]);
+
+        $key = strtoupper(preg_replace('/[^A-Za-z0-9_]/', '', $request->input('key')));
+        $value = $request->input('value');
+        $description = $request->input('description', '');
+
+        try {
+            $configs = \Illuminate\Support\Facades\Cache::get('founder_system_configs', []);
+            $configs[$key] = [
+                'value' => $value,
+                'description' => $description,
+                'updated_at' => now()->toIso8601String(),
+            ];
+            
+            \Illuminate\Support\Facades\Cache::forever('founder_system_configs', $configs);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Configuration '{$key}' saved successfully.",
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to save configuration {$key}: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error saving configuration: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a configuration from cache.
+     */
+    public function deleteConfig($key)
+    {
+        $key = strtoupper($key);
+        try {
+            $configs = \Illuminate\Support\Facades\Cache::get('founder_system_configs', []);
+            
+            if (!isset($configs[$key])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Configuration '{$key}' not found.",
+                ], 404);
+            }
+
+            unset($configs[$key]);
+            \Illuminate\Support\Facades\Cache::forever('founder_system_configs', $configs);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Configuration '{$key}' deleted successfully.",
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to delete configuration {$key}: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error deleting configuration: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Public static helper to refer to a cached configuration key.
+     */
+    public static function getSetting($key, $default = null)
+    {
+        try {
+            $configs = \Illuminate\Support\Facades\Cache::get('founder_system_configs', []);
+            $key = strtoupper($key);
+            if (isset($configs[$key])) {
+                return $configs[$key]['value'] ?? $default;
+            }
+        } catch (\Exception $e) {
+            Log::error("Failed to retrieve setting {$key}: " . $e->getMessage());
+        }
+        return $default;
+    }
 }
