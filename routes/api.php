@@ -189,4 +189,6 @@ Route::prefix('founder')->group(function () {
     Route::get('config', [\App\Http\Controllers\Api\FounderController::class, 'getConfigs']);
     Route::post('config', [\App\Http\Controllers\Api\FounderController::class, 'saveConfig']);
     Route::delete('config/{key}', [\App\Http\Controllers\Api\FounderController::class, 'deleteConfig']);
+    Route::get('redis-connection', [\App\Http\Controllers\Api\FounderController::class, 'getRedisConnection']);
+    Route::post('redis-connection', [\App\Http\Controllers\Api\FounderController::class, 'saveRedisConnection']);
 });

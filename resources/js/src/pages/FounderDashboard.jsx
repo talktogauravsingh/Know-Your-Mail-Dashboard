@@ -56,6 +56,14 @@ export default function FounderDashboard() {
   const [savingConfig, setSavingConfig] = useState(false);
   const [editingKey, setEditingKey] = useState(null);
 
+  // Dynamic Redis Connection States
+  const [redisHost, setRedisHost] = useState("");
+  const [redisPort, setRedisPort] = useState("6379");
+  const [redisPassword, setRedisPassword] = useState("");
+  const [redisStatus, setRedisStatus] = useState("disconnected");
+  const [redisError, setRedisError] = useState(null);
+  const [savingRedis, setSavingRedis] = useState(false);
+
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -72,6 +80,22 @@ export default function FounderDashboard() {
   );
   
   const terminalEndRef = useRef(null);
+
+  const fetchRedisConnection = async () => {
+    try {
+      const response = await axios.get("/api/founder/redis-connection");
+      if (response.data.success) {
+        setRedisHost(response.data.connection.host || "");
+        setRedisPort(response.data.connection.port || "6379");
+        setRedisPassword(response.data.connection.password || "");
+        setRedisStatus(response.data.status);
+        setRedisError(response.data.error);
+      }
+    } catch (error) {
+      console.error("Failed to fetch Redis connection status", error);
+      appendTerminal(`Error fetching Redis connection: ${error.message}\n`);
+    }
+  };
 
   const fetchConfigs = async () => {
     try {
@@ -91,12 +115,46 @@ export default function FounderDashboard() {
       if (response.data.success) {
         setData(response.data);
       }
+      await fetchRedisConnection();
       await fetchConfigs();
     } catch (error) {
       console.error("Failed to fetch founder metrics", error);
       appendTerminal(`Error fetching system metrics: ${error.message}\n`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveRedisConnection = async (e) => {
+    e.preventDefault();
+    if (!redisHost.trim() || !redisPort) return;
+
+    setSavingRedis(true);
+    appendTerminal(`$ testing & saving redis connection info for ${redisHost}:${redisPort}...\n`);
+
+    try {
+      const response = await axios.post("/api/founder/redis-connection", {
+        host: redisHost,
+        port: parseInt(redisPort),
+        password: redisPassword
+      });
+
+      if (response.data.success) {
+        appendTerminal(`[SUCCESS] ${response.data.message}\n\n`);
+        setRedisStatus("connected");
+        setRedisError(null);
+        fetchConfigs();
+      } else {
+        appendTerminal(`[FAILED] ${response.data.message}\n\n`);
+        setRedisStatus("disconnected");
+      }
+    } catch (error) {
+      const msg = error.response?.data?.message || error.message;
+      appendTerminal(`[ERROR] Redis connection failed:\n${msg}\n\n`);
+      setRedisStatus("disconnected");
+      setRedisError(msg);
+    } finally {
+      setSavingRedis(false);
     }
   };
 
@@ -869,156 +927,276 @@ export default function FounderDashboard() {
         </CardContent>
       </Card>
 
-      {/* System Configurations (Redis Cache) */}
-      <Card className="bg-white dark:bg-slate-800/30 border-slate-200 dark:border-slate-700/50 mt-8 mb-8">
-        <CardHeader className="border-b border-slate-200 dark:border-slate-700/50 pb-3 flex flex-row items-center justify-between">
+      {/* QA Configuration Hub (Redis & Variable Controls) */}
+      <div className="grid gap-8 lg:grid-cols-3 mb-8">
+        
+        {/* Step 1: Redis Instance Connection Card */}
+        <Card className="lg:col-span-1 bg-white dark:bg-slate-800/30 border-slate-200 dark:border-slate-700/50 flex flex-col justify-between">
           <div>
+            <CardHeader className="border-b border-slate-200 dark:border-slate-700/50 pb-3 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Database className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+                  1. Redis Connection Info
+                </CardTitle>
+                <p className="text-xs text-slate-550 dark:text-slate-400 mt-0.5">
+                  Point to the Redis server on the kym-relay EC2.
+                </p>
+              </div>
+              <Badge
+                variant={redisStatus === "connected" ? "success" : "destructive"}
+                className="text-[9px] uppercase tracking-wider rounded font-mono"
+              >
+                {redisStatus}
+              </Badge>
+            </CardHeader>
+            <CardContent className="pt-5 space-y-4">
+              {redisError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-sm break-all font-mono leading-normal">
+                  <span className="font-bold uppercase tracking-wider block text-[10px] mb-1">Connection Error</span>
+                  {redisError}
+                </div>
+              )}
+              
+              <form onSubmit={handleSaveRedisConnection} className="space-y-4">
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-1">
+                    Redis Host / IP Address
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 54.210.12.190"
+                    value={redisHost}
+                    onChange={(e) => setRedisHost(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 outline-none focus:border-indigo-500 font-mono"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">Input changing EC2 Public IP address</span>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-1">
+                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-1">
+                      Port
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="6379"
+                      value={redisPort}
+                      onChange={(e) => setRedisPort(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 outline-none focus:border-indigo-500 font-mono"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-1">
+                      Redis Password (Auth)
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Optional"
+                      value={redisPassword}
+                      onChange={(e) => setRedisPassword(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 outline-none focus:border-indigo-500 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  isLoading={savingRedis}
+                  className="w-full bg-indigo-650 hover:bg-indigo-600 text-white font-bold"
+                  size="sm"
+                >
+                  Verify & Save Connection
+                </Button>
+              </form>
+            </CardContent>
+          </div>
+        </Card>
+        
+        {/* Step 2: Configuration Key-Value Editor Card */}
+        <Card className="lg:col-span-2 bg-white dark:bg-slate-800/30 border-slate-200 dark:border-slate-700/50">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700/50 pb-3">
             <CardTitle className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Settings className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
-              System Configurations (Redis Cache)
+              2. System Configurations (Redis Cache)
             </CardTitle>
             <p className="text-xs text-slate-550 dark:text-slate-400 mt-0.5">
-              Manage global variables cached directly in Redis (hosted on kym-relay-services).
+              Variables stored dynamically in remote Redis for ingestion by kym-relay-services.
             </p>
-          </div>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid gap-8 lg:grid-cols-3">
-            {/* Form column */}
-            <div className="lg:col-span-1 bg-slate-50/50 dark:bg-slate-900/10 border border-slate-200/60 dark:border-slate-800 p-5 rounded-lg shadow-sm">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4">
-                {editingKey ? `Edit Setting: ${editingKey}` : "Add New Setting"}
-              </h3>
-              <form onSubmit={handleSaveConfig} className="space-y-4">
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-1">
-                    Config Key
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. SPECIAL_ROUTE_RELAY"
-                    value={configKey}
-                    onChange={(e) => setConfigKey(e.target.value.toUpperCase())}
-                    disabled={!!editingKey}
-                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 outline-none focus:border-indigo-500 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-1">
-                    Config Value
-                  </label>
-                  <textarea
-                    required
-                    placeholder="Value stored under this key"
-                    value={configValue}
-                    onChange={(e) => setConfigValue(e.target.value)}
-                    rows={4}
-                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 outline-none focus:border-indigo-500 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-1">
-                    Description / Notes
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Describe what this config does"
-                    value={configDesc}
-                    onChange={(e) => setConfigDesc(e.target.value)}
-                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    type="submit"
-                    isLoading={savingConfig}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold"
-                    size="sm"
-                  >
-                    {editingKey ? "Update Cache" : "Save to Cache"}
-                  </Button>
-                  {editingKey && (
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        setConfigKey("");
-                        setConfigValue("");
-                        setConfigDesc("");
-                        setEditingKey(null);
-                      }}
-                      className="bg-slate-100 hover:bg-slate-200 border border-slate-250 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 text-slate-750 dark:text-slate-350"
-                      size="sm"
-                    >
-                      Cancel
-                    </Button>
-                  )}
-                </div>
-              </form>
-            </div>
+          </CardHeader>
+          
+          <CardContent className="p-6">
+            {redisStatus !== "connected" ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center text-slate-500">
+                <AlertTriangle className="h-10 w-10 text-yellow-500 mb-3 animate-bounce" />
+                <h4 className="text-sm font-bold text-slate-800 dark:text-slate-350">Connection Required</h4>
+                <p className="text-xs text-slate-550 dark:text-slate-455 mt-1 max-w-sm">
+                  Please configure and connect to the remote Redis instance in Step 1 first before editing caching configurations.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* Configuration form */}
+                <div className="bg-slate-50/50 dark:bg-slate-900/10 border border-slate-200/60 dark:border-slate-850 p-4 rounded shadow-sm">
+                  {/* Predefined Quick-Fill Badges */}
+                  <div className="mb-4">
+                    <label className="text-[9px] uppercase font-bold text-slate-500 tracking-wider block mb-2">
+                      Quick-Fill Predefined QA Keys
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { key: "TRACKING_HOST", placeholder: "https://yourtunnel.trycloudflare.com/api" },
+                        { key: "LARAVEL_INTERNAL_URL", placeholder: "http://<mail-tracker-server-ip>" },
+                        { key: "DATABASE_URL", placeholder: "mysql://root:root@<database-server-ip>:3306/know_your_mail" },
+                        { key: "REDIS_URL", placeholder: "redis://<redis-server-ip>:6379" },
+                        { key: "MAILGUN_API_KEY", placeholder: "key-xxxxxxxxxxxxxx" },
+                        { key: "MAILGUN_DOMAIN", placeholder: "knowyourmail.in" }
+                      ].map((item) => (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => {
+                            if (!editingKey) {
+                              setConfigKey(item.key);
+                              setConfigValue(item.placeholder);
+                            }
+                          }}
+                          className="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-650 dark:text-indigo-400 border border-indigo-500/20 text-[9px] px-2 py-0.5 rounded cursor-pointer transition"
+                        >
+                          {item.key}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-            {/* List column */}
-            <div className="lg:col-span-2">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-slate-200 dark:border-slate-800 hover:bg-transparent">
-                      <TableHead className="text-xs text-slate-500 dark:text-slate-400 font-bold w-1/3">Key</TableHead>
-                      <TableHead className="text-xs text-slate-500 dark:text-slate-400 font-bold w-1/3">Value</TableHead>
-                      <TableHead className="text-xs text-slate-500 dark:text-slate-400 font-bold">Notes</TableHead>
-                      <TableHead className="text-xs text-slate-500 dark:text-slate-400 font-bold text-right w-24">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {configs && configs.length > 0 ? (
-                      configs.map((conf) => (
-                        <TableRow key={conf.key} className="border-slate-200 dark:border-slate-855 hover:bg-slate-50 dark:hover:bg-slate-800/10">
-                          <TableCell className="py-3 font-mono font-bold text-slate-900 dark:text-indigo-350 text-xs">
-                            {conf.key}
-                          </TableCell>
-                          <TableCell className="py-3 font-mono text-slate-650 dark:text-slate-300 text-xs break-all max-w-[200px]">
-                            {conf.value}
-                          </TableCell>
-                          <TableCell className="py-3 text-xs text-slate-500">
-                            {conf.description || <span className="italic text-slate-400">None</span>}
-                          </TableCell>
-                          <TableCell className="text-right py-3 pr-4">
-                            <div className="flex justify-end gap-1.5">
-                              <button
-                                onClick={() => handleEditConfig(conf)}
-                                className="bg-slate-105 hover:bg-slate-205 dark:bg-slate-800 dark:hover:bg-slate-700 text-indigo-650 dark:text-indigo-400 border border-slate-250 dark:border-slate-700 p-1.5 transition cursor-pointer"
-                                title="Edit Setting"
-                              >
-                                <Settings className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteConfig(conf.key)}
-                                className="bg-slate-105 hover:bg-slate-205 dark:bg-slate-800 dark:hover:bg-slate-700 text-red-650 dark:text-red-400 border border-slate-250 dark:border-slate-700 p-1.5 transition cursor-pointer"
-                                title="Delete Setting"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                  <form onSubmit={handleSaveConfig} className="space-y-4">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-1">
+                        Config Key
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. TRACKING_HOST"
+                        value={configKey}
+                        onChange={(e) => setConfigKey(e.target.value.toUpperCase())}
+                        disabled={!!editingKey}
+                        className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 outline-none focus:border-indigo-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-1">
+                        Config Value
+                      </label>
+                      <textarea
+                        required
+                        placeholder="Configuration value string"
+                        value={configValue}
+                        onChange={(e) => setConfigValue(e.target.value)}
+                        rows={3}
+                        className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 outline-none focus:border-indigo-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-1">
+                        Notes / Info
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="What is this setting for?"
+                        value={configDesc}
+                        onChange={(e) => setConfigDesc(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 outline-none focus:border-indigo-500 text-xs"
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <Button
+                        type="submit"
+                        isLoading={savingConfig}
+                        className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold"
+                        size="sm"
+                      >
+                        {editingKey ? "Update Cache" : "Save to Cache"}
+                      </Button>
+                      {editingKey && (
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setConfigKey("");
+                            setConfigValue("");
+                            setConfigDesc("");
+                            setEditingKey(null);
+                          }}
+                          className="bg-slate-100 hover:bg-slate-200 border border-slate-250 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 text-slate-750 dark:text-slate-350"
+                          size="sm"
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </div>
+                  </form>
+                </div>
+
+                {/* Configurations Table List */}
+                <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-slate-200 dark:border-slate-800 hover:bg-transparent">
+                        <TableHead className="text-xs text-slate-500 dark:text-slate-400 font-bold w-1/2">Key</TableHead>
+                        <TableHead className="text-xs text-slate-500 dark:text-slate-400 font-bold w-1/2">Value</TableHead>
+                        <TableHead className="text-xs text-slate-500 dark:text-slate-400 font-bold text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {configs && configs.length > 0 ? (
+                        configs.map((conf) => (
+                          <TableRow key={conf.key} className="border-slate-200 dark:border-slate-855 hover:bg-slate-50 dark:hover:bg-slate-800/10">
+                            <TableCell className="py-2.5 font-mono font-bold text-slate-900 dark:text-indigo-350 text-[11px] truncate max-w-[120px]">
+                              {conf.key}
+                            </TableCell>
+                            <TableCell className="py-2.5 font-mono text-slate-600 dark:text-slate-300 text-[11px] break-all max-w-[150px]">
+                              {conf.value}
+                            </TableCell>
+                            <TableCell className="text-right py-2.5 pr-2">
+                              <div className="flex justify-end gap-1">
+                                <button
+                                  onClick={() => handleEditConfig(conf)}
+                                  className="bg-slate-105 hover:bg-slate-205 dark:bg-slate-800 dark:hover:bg-slate-700 text-indigo-650 dark:text-indigo-400 border border-slate-205 dark:border-slate-700 p-1 rounded cursor-pointer"
+                                  title="Edit"
+                                >
+                                  <Settings className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteConfig(conf.key)}
+                                  className="bg-slate-105 hover:bg-slate-205 dark:bg-slate-800 dark:hover:bg-slate-700 text-red-650 dark:text-red-400 border border-slate-205 dark:border-slate-700 p-1 rounded cursor-pointer"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-center text-slate-500 py-10">
+                            <div className="flex flex-col items-center justify-center gap-1.5 text-slate-450">
+                              <Database className="w-6 h-6" />
+                              <span className="text-xs">No caching variables configured yet.</span>
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center text-slate-500 py-10">
-                          <div className="flex flex-col items-center justify-center gap-2">
-                            <Database className="w-8 h-8 text-slate-400" />
-                            <span>No configurations stored in Redis cache.</span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      </div>
       </div>
     </div>
   );

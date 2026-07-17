@@ -50,6 +50,31 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerPolicies();
+
+        // Dynamically override Redis host/port if a custom connection has been saved by QA
+        $connectionFile = storage_path('app/redis_connection.json');
+        if (file_exists($connectionFile)) {
+            try {
+                $connectionData = json_decode(file_get_contents($connectionFile), true);
+                if (is_array($connectionData) && !empty($connectionData['host'])) {
+                    $host = $connectionData['host'];
+                    $port = $connectionData['port'] ?? '6379';
+                    $password = $connectionData['password'] ?? null;
+
+                    config([
+                        'database.redis.default.host' => $host,
+                        'database.redis.default.port' => $port,
+                        'database.redis.default.password' => $password,
+                        'database.redis.cache.host' => $host,
+                        'database.redis.cache.port' => $port,
+                        'database.redis.cache.password' => $password,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                // Gracefully log instead of crashing application boot if configuration is corrupt
+                \Illuminate\Support\Facades\Log::error('Failed to bootstrap dynamic Redis connection: ' . $e->getMessage());
+            }
+        }
     }
 
     protected function registerPolicies(): void

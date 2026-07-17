@@ -475,4 +475,126 @@ class FounderController extends Controller
         }
         return $default;
     }
+
+    /**
+     * Get the current Redis connection details and check status.
+     */
+    public function getRedisConnection()
+    {
+        $filePath = storage_path('app/redis_connection.json');
+        $configData = [
+            'host' => config('database.redis.default.host'),
+            'port' => config('database.redis.default.port'),
+            'password' => config('database.redis.default.password') ? '********' : '',
+            'configured' => false,
+        ];
+
+        if (file_exists($filePath)) {
+            $data = json_decode(file_get_contents($filePath), true);
+            if (is_array($data)) {
+                $configData['host'] = $data['host'] ?? '';
+                $configData['port'] = $data['port'] ?? '6379';
+                $configData['password'] = !empty($data['password']) ? '********' : '';
+                $configData['configured'] = true;
+            }
+        }
+
+        // Test active connection status
+        $status = 'disconnected';
+        $error = null;
+        try {
+            // Attempt to ping Redis connection
+            \Illuminate\Support\Facades\Redis::connection()->ping();
+            $status = 'connected';
+        } catch (\Exception $e) {
+            $error = $e->getMessage();
+        }
+
+        return response()->json([
+            'success' => true,
+            'connection' => $configData,
+            'status' => $status,
+            'error' => $error,
+        ]);
+    }
+
+    /**
+     * Test and save dynamic Redis connection details.
+     */
+    public function saveRedisConnection(Request $request)
+    {
+        $request->validate([
+            'host' => 'required|string',
+            'port' => 'required|integer|min:1|max:65535',
+            'password' => 'nullable|string',
+        ]);
+
+        $host = $request->input('host');
+        $port = (int)$request->input('port');
+        $password = $request->input('password');
+
+        // If password is sent as mask (********) and config file exists, keep original password
+        if ($password === '********') {
+            $filePath = storage_path('app/redis_connection.json');
+            if (file_exists($filePath)) {
+                $existing = json_decode(file_get_contents($filePath), true);
+                $password = $existing['password'] ?? null;
+            } else {
+                $password = config('database.redis.default.password');
+            }
+        }
+
+        // Test connection using Predis
+        try {
+            $client = new \Predis\Client([
+                'scheme' => 'tcp',
+                'host'   => $host,
+                'port'   => $port,
+                'password' => $password,
+                'timeout' => 2.0,
+            ]);
+            $client->ping();
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Redis connection failed: ' . $e->getMessage(),
+            ], 422);
+        }
+
+        // Save to file
+        try {
+            $filePath = storage_path('app/redis_connection.json');
+            $dir = dirname($filePath);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            
+            file_put_contents($filePath, json_encode([
+                'host' => $host,
+                'port' => $port,
+                'password' => $password,
+                'updated_at' => now()->toIso8601String(),
+            ], JSON_PRETTY_PRINT));
+
+            // Dynamically update config for current request so subsequent queries use it immediately
+            config([
+                'database.redis.default.host' => $host,
+                'database.redis.default.port' => $port,
+                'database.redis.default.password' => $password,
+                'database.redis.cache.host' => $host,
+                'database.redis.cache.port' => $port,
+                'database.redis.cache.password' => $password,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Redis connection saved and established successfully.',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to save Redis configuration: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }
