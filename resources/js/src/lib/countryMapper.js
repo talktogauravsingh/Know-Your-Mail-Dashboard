@@ -90,12 +90,12 @@ export function getCountryCode(name) {
   const sanitized = name.trim().toLowerCase();
   
   if (COUNTRY_MAP[sanitized]) {
-    return COUNTRY_MAP[sanitized];
+    return COUNTRY_MAP[sanitized].toLowerCase();
   }
   
-  // If the input is already a 2-character ISO code (e.g. "US"), return it capitalized
+  // If the input is already a 2-character ISO code (e.g. "US"), return it lowercase
   if (sanitized.length === 2) {
-    return sanitized.toUpperCase();
+    return sanitized.toLowerCase();
   }
   
   return null;

@@ -71,7 +71,7 @@ class CampaignController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|max:255|regex:/^[a-zA-Z0-9\s\-_]*$/',
             'subject' => 'nullable|string|max:255',
             'body' => 'nullable|string',
             'template_id' => [
@@ -84,7 +84,7 @@ class CampaignController extends Controller
             'sender_config_id' => 'nullable',
             'segments' => 'nullable|array',
             'segments.*.id' => 'nullable|string',
-            'segments.*.name' => 'nullable|string|max:255',
+            'segments.*.name' => 'nullable|string|max:255|regex:/^[a-zA-Z0-9\s\-_]*$/',
             'segments.*.isDefault' => 'nullable|boolean',
             'segments.*.priority' => 'nullable|integer',
             'segments.*.filters' => 'nullable|array',
@@ -208,7 +208,7 @@ class CampaignController extends Controller
             ->findOrFail($id);
 
         $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
+            'name' => 'sometimes|required|string|max:255|regex:/^[a-zA-Z0-9\s\-_]*$/',
             'subject' => 'sometimes|nullable|string|max:255',
             'body' => 'sometimes|nullable|string',
             'template_id' => [
@@ -222,7 +222,7 @@ class CampaignController extends Controller
             'audience_segment' => 'nullable|string',
             'segments' => 'nullable|array',
             'segments.*.id' => 'nullable|string',
-            'segments.*.name' => 'nullable|string|max:255',
+            'segments.*.name' => 'nullable|string|max:255|regex:/^[a-zA-Z0-9\s\-_]*$/',
             'segments.*.isDefault' => 'nullable|boolean',
             'segments.*.priority' => 'nullable|integer',
             'segments.*.filters' => 'nullable|array',
@@ -231,7 +231,7 @@ class CampaignController extends Controller
             'segments.*.filters.*.operator' => 'nullable|string',
             'segments.*.filters.*.value' => 'nullable',
             'segments.*.filters.*.field_value' => 'nullable',
-            'segments.*.name' => 'nullable|string',
+            'segments.*.name' => 'nullable|string|regex:/^[a-zA-Z0-9\s\-_]*$/',
             'segments.*.priority' => 'nullable|integer',
             'segments.*.isDefault' => 'nullable|boolean',
             'variants' => 'nullable|array',

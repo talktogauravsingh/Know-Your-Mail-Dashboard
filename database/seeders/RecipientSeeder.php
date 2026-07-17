@@ -44,7 +44,7 @@ class RecipientSeeder extends Seeder
                         'module_type' => 1,
                         'module_id' => $org->id,
 
-                        'email' => $faker->unique()->safeEmail,
+                        'email' => 'recipient_' . $agent->id . '_' . uniqid() . '_' . $i . '@example.com',
                         'name' => $faker->name,
                         'phone' => $faker->phoneNumber,
 
@@ -84,7 +84,7 @@ class RecipientSeeder extends Seeder
                             'module_type' => 2,
                             'module_id' => $campaign->id,
 
-                            'email' => $faker->unique()->safeEmail,
+                            'email' => 'campaign_' . $agent->id . '_' . $campaign->id . '_' . uniqid() . '_' . $i . '@example.com',
                             'name' => $faker->name,
                             'phone' => $faker->phoneNumber,
 
@@ -127,7 +127,7 @@ class RecipientSeeder extends Seeder
                     'module_type' => 1,
                     'module_id' => $defaultOrgId,
 
-                    'email' => $faker->unique()->email,
+                    'email' => 'invalid_' . $i . '_' . uniqid() . '@invalid-domain.com',
                     'name' => $faker->name,
                     'phone' => $faker->phoneNumber,
 

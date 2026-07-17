@@ -44,7 +44,7 @@ class OrganizationUserController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|max:255|regex:/^[a-zA-Z0-9\s\-_]*$/',
             'email' => 'required|string|email|max:255|unique:users,email',
             'password' => ['required', 'string', Rules\Password::defaults()],
             'role_id' => 'required|exists:roles,id',
@@ -152,5 +152,59 @@ class OrganizationUserController extends Controller
         $user->delete();
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * Update a user's details in the organization.
+     */
+    public function update(Request $request, User $user)
+    {
+        $currentUser = $request->user();
+        $currentUser->load('role');
+
+        // Only root, super-admin, or users with manage_roles permission can edit users
+        if ($currentUser->role->slug !== 'root' && 
+            $currentUser->role->slug !== 'super-admin' && 
+            !$currentUser->hasPermission('manage_roles')) {
+            return response()->json(['message' => 'Unauthorized to update organization members.'], 403);
+        }
+
+        // Ensure user belongs to the same organization
+        if ((int)$user->organization_id !== (int)$currentUser->organization_id) {
+            return response()->json(['message' => 'User does not belong to your organization.'], 403);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|regex:/^[a-zA-Z0-9\s\-_]*$/',
+            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'password' => ['nullable', 'string', Rules\Password::defaults()],
+            'role_id' => 'required|exists:roles,id',
+        ]);
+
+        $targetRole = Role::find($validated['role_id']);
+
+        // Check root role constraint
+        if ($targetRole->slug === 'root' && $currentUser->role->slug !== 'root') {
+            return response()->json([
+                'message' => 'The root role cannot be assigned.',
+                'errors' => [
+                    'role_id' => ['The root role cannot be assigned.']
+                ]
+            ], 422);
+        }
+
+        $userData = [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'role_id' => $validated['role_id'],
+        ];
+
+        if (!empty($validated['password'])) {
+            $userData['password'] = Hash::make($validated['password']);
+        }
+
+        $user->update($userData);
+
+        return response()->json($user->load('role'));
     }
 }

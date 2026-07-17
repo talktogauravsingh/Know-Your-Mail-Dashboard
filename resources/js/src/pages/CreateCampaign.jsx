@@ -369,6 +369,21 @@ export default function CreateCampaign() {
     }
   }, [templateId, selectedTemplate]);
   
+  const downloadSampleCsv = () => {
+    const csvContent = "email,name,phone,city,gender,age\n" +
+                       "john.doe@example.com,John Doe,+1234567890,New York,male,30\n" +
+                       "jane.smith@example.com,Jane Smith,+1987654321,London,female,28\n";
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "sample_recipients.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -1601,7 +1616,16 @@ export default function CreateCampaign() {
                   <Upload className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                   Upload Campaign Audience
                 </CardTitle>
-                <CardDescription>Upload a CSV file containing recipient email addresses and any personalization data.</CardDescription>
+                <CardDescription className="flex items-center justify-between gap-4">
+                  <span>Upload a CSV file containing recipient email addresses and any personalization data.</span>
+                  <button 
+                    type="button" 
+                    onClick={downloadSampleCsv} 
+                    className="text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 underline font-semibold focus:outline-none shrink-0"
+                  >
+                    Download Sample CSV
+                  </button>
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div 
@@ -1713,6 +1737,7 @@ export default function CreateCampaign() {
                 <SegmentationEngine 
                   campaignId={campaignId} 
                   insights={insights}
+                  initialSegments={segments}
                   onSegmentsChange={(segs) => setSegments(segs)}
                   moduleType={1}
                   moduleId={user?.organization_id || 1}
@@ -1742,6 +1767,7 @@ export default function CreateCampaign() {
                 <SegmentationEngine 
                   campaignId={campaignId} 
                   insights={insights}
+                  initialSegments={segments}
                   onSegmentsChange={(segs) => setSegments(segs)}
                   moduleType={2}
                   moduleId={campaignId}

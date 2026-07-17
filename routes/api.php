@@ -17,6 +17,8 @@ Route::get('/user', function (Request $request) {
     return $request->user()->load('role.permissions');
 })->middleware('auth:sanctum');
 
+Route::put('/user', [\App\Http\Controllers\Api\AuthController::class, 'updateProfile'])->middleware('auth:sanctum');
+
 Route::get('/insights/org', [\App\Http\Controllers\Api\SegmentationController::class, 'getOrgInsights'])->middleware('auth:sanctum');
 
 Route::prefix('auth')->group(function () {
@@ -36,6 +38,7 @@ Route::middleware('auth:sanctum')->prefix('managers')->group(function () {
 Route::middleware('auth:sanctum')->prefix('organization/users')->group(function () {
     Route::get('/', [\App\Http\Controllers\Api\OrganizationUserController::class, 'index']);
     Route::post('/', [\App\Http\Controllers\Api\OrganizationUserController::class, 'store']);
+    Route::put('/{user}', [\App\Http\Controllers\Api\OrganizationUserController::class, 'update']);
     Route::delete('/{user}', [\App\Http\Controllers\Api\OrganizationUserController::class, 'destroy']);
 });
 

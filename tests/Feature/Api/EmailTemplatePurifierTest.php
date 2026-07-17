@@ -36,6 +36,6 @@ class EmailTemplatePurifierTest extends TestCase
         $this->assertStringNotContainsString('<script>', $template->html_content);
         $this->assertStringNotContainsString('onclick', $template->html_content);
         $this->assertStringContainsString('class="card"', $template->html_content);
-        $this->assertStringContainsString('style="color:#FF0000;"', str_replace(' ', '', $template->html_content));
+        $this->assertStringContainsString('style="color:red;"', str_replace(' ', '', $template->html_content));
     }
 }

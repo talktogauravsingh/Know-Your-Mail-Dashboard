@@ -29,7 +29,7 @@ class PermissionController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:permissions',
+            'name' => 'required|string|max:255|unique:permissions|regex:/^[a-zA-Z0-9\s\-_]*$/',
         ]);
 
         $permission = $this->permissionRepo->create($validated);
@@ -40,7 +40,7 @@ class PermissionController extends Controller
     public function update(Request $request, Permission $permission)
     {
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:255|unique:permissions,name,' . $permission->id,
+            'name' => 'sometimes|string|max:255|unique:permissions,name,' . $permission->id . '|regex:/^[a-zA-Z0-9\s\-_]*$/',
         ]);
 
         $this->permissionRepo->update($permission, $validated);
