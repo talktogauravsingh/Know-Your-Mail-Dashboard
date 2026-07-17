@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 
 class SenderDomainController extends Controller
 {
@@ -64,7 +65,7 @@ class SenderDomainController extends Controller
             ],
         ]);
 
-        $appHost = config('app.tracking_domain', parse_url(config('app.url'), PHP_URL_HOST));
+        $appHost = config('app.tracking_domain') ?: parse_url(config('app.url'), PHP_URL_HOST);
 
         // Generate RSA 2048-bit keypair
         $config = [
@@ -116,7 +117,7 @@ class SenderDomainController extends Controller
             ->where('organization_id', $request->user()->organization_id)
             ->firstOrFail();
 
-        $appHost = config('app.tracking_domain', parse_url(config('app.url'), PHP_URL_HOST));
+        $appHost = config('app.tracking_domain') ?: parse_url(config('app.url'), PHP_URL_HOST);
 
         // DNS checks
         $spfVerified   = $this->checkSpf($senderDomain->domain);
@@ -158,7 +159,7 @@ class SenderDomainController extends Controller
         $zoneId = $request->cloudflare_zone_id;
         $domainName = $domain->domain;
 
-        $appHost = config('app.tracking_domain', parse_url(config('app.url'), PHP_URL_HOST));
+        $appHost = config('app.tracking_domain') ?: parse_url(config('app.url'), PHP_URL_HOST);
 
         try {
             // 1. Resolve Zone ID if not provided

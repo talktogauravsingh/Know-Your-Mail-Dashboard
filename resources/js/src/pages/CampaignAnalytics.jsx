@@ -101,7 +101,7 @@ const RegionTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
     return (
       <div style={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', padding: '10px', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)' }}>
-        <p style={{ color: '#94a3b8', margin: '0 0 4px 0', fontSize: '11px', fontWeight: '500' }}>{`Region: ${payload[0].name}`}</p>
+        <p style={{ color: '#94a3b8', margin: '0 0 4px 0', fontSize: '11px', fontWeight: '500' }}>{`Region: ${payload[0].payload.name}`}</p>
         <p style={{ color: '#818cf8', margin: 0, fontSize: '12px', fontWeight: '700' }}>{`Opens: ${payload[0].value}`}</p>
       </div>
     );

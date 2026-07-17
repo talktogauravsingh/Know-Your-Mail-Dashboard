@@ -38,9 +38,9 @@ class BulkRecipientTest extends TestCase
             'file' => $file,
         ]);
 
-        $response->assertStatus(200)
+        $response->assertStatus(202)
                  ->assertJsonPath('success', true)
-                 ->assertJsonStructure(['summary']);
+                 ->assertJsonStructure(['details']);
     }
 
     public function test_requires_file_for_bulk_upload()
@@ -59,7 +59,7 @@ class BulkRecipientTest extends TestCase
         $user = User::where('email', 'test@example.com')->first();
         $this->actingAs($user, 'sanctum');
 
-        $file = UploadedFile::fake()->create('test.txt', 'not csv', 'text/plain');
+        $file = UploadedFile::fake()->create('test.pdf', 'not csv', 'application/pdf');
 
         $response = $this->postJson('/api/recipients/bulk-upload', [
             'file' => $file,

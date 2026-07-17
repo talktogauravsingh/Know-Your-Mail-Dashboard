@@ -50,7 +50,7 @@ class TriggerAutomationController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\s\-_]*$/'],
             'trigger_campaign_id' => ['required', 'integer', 'exists:campaigns,id'],
             'trigger_variant_ids' => ['nullable', 'array'],
             'trigger_event' => ['required', 'string', 'in:open,click'],
@@ -158,7 +158,7 @@ class TriggerAutomationController extends Controller
         }
 
         $request->validate([
-            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'name' => ['sometimes', 'required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\s\-_]*$/'],
             'trigger_campaign_id' => ['sometimes', 'required', 'integer', 'exists:campaigns,id'],
             'trigger_variant_ids' => ['nullable', 'array'],
             'trigger_event' => ['sometimes', 'required', 'string', 'in:open,click'],

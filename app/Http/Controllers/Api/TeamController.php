@@ -49,7 +49,7 @@ class TeamController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'name'                  => 'required|string|max:255',
+            'name'                  => 'required|string|max:255|regex:/^[a-zA-Z0-9\s\-_]*$/',
             'email'                 => 'required|string|email|max:255|unique:users',
             'password'              => ['required', 'confirmed', Rules\Password::defaults()],
             'role_id'               => 'required|exists:roles,id',

@@ -15,8 +15,8 @@ class StoreEmailTemplateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'template_name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', 'unique:email_templates,slug'],
+            'template_name' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\s\-_]*$/'],
+            'slug' => ['required', 'string', 'max:255', 'alpha_dash', 'unique:email_templates,slug'],
             'category' => ['nullable', 'string', 'max:255'],
             'subject' => ['required', 'string', 'max:255'],
             'preview_text' => ['nullable', 'string', 'max:255'],

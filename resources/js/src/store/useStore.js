@@ -115,6 +115,20 @@ export const useStore = create((set, get) => ({
       get().clearAuth();
     }
   },
+  updateProfile: async (payload) => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.put('/user', payload);
+      const token = get().token;
+      get().persistAuth(data, token);
+      get().addToast('Profile updated successfully', 'success');
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to update profile', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
 
   toggleTheme: () => set((state) => {
     const newTheme = state.theme === 'light' ? 'dark' : 'light';
@@ -589,6 +603,19 @@ export const useStore = create((set, get) => ({
       get().addToast('Team member added successfully', 'success');
     } catch (error) {
       get().addToast(error.response?.data?.message || 'Failed to add team member', 'error');
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  updateTeamMember: async (id, payload) => {
+    set({ isLoading: true });
+    try {
+      await api.put(`/organization/users/${id}`, payload);
+      get().fetchTeamMembers();
+      get().addToast('Team member updated successfully', 'success');
+    } catch (error) {
+      get().addToast(error.response?.data?.message || 'Failed to update team member', 'error');
       throw error;
     } finally {
       set({ isLoading: false });

@@ -37,9 +37,10 @@ export default function Campaigns() {
   } = useStore();
   const navigate = useNavigate();
 
+  const [searchValue, setSearchValue] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('30days');
+  const [dateFilter, setDateFilter] = useState('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,10 +65,15 @@ export default function Campaigns() {
     }
   }, [customStartDate, customEndDate]);
 
-  // Reset page to 1 when filters change
+  // Debounce search term updates
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, statusFilter, dateFilter, customStartDate, customEndDate]);
+    const handler = setTimeout(() => {
+      setSearchTerm(searchValue);
+      setCurrentPage(1);
+    }, 300);
+
+    return () => clearTimeout(handler);
+  }, [searchValue]);
 
   useEffect(() => {
     fetchCampaigns(currentPage, {
@@ -363,8 +369,8 @@ export default function Campaigns() {
           <Input 
             placeholder="Search campaigns..." 
             className="pl-9 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-[#172B4D] focus:border-[#0052CC] focus:ring-[#0052CC]/20 h-10 rounded-none w-full" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
           />
         </div>
 
@@ -372,7 +378,7 @@ export default function Campaigns() {
         <div className="relative w-full sm:w-44">
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
             className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-none pl-4 pr-8 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#0052CC]/30 text-[#172B4D] dark:text-slate-300 appearance-none cursor-pointer h-10"
           >
             <option value="all">All Statuses</option>
@@ -389,7 +395,7 @@ export default function Campaigns() {
           <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-[#626F86]" />
           <select
             value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
+            onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
             className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-none pl-9 pr-8 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#0052CC]/30 text-[#172B4D] dark:text-slate-300 appearance-none cursor-pointer h-10"
           >
             <option value="all">All Dates</option>
@@ -407,7 +413,7 @@ export default function Campaigns() {
             <input
               type="date"
               value={customStartDate}
-              onChange={(e) => setCustomStartDate(e.target.value)}
+              onChange={(e) => { setCustomStartDate(e.target.value); setCurrentPage(1); }}
               onClick={(e) => {
                 try {
                   e.currentTarget.showPicker();
@@ -421,7 +427,7 @@ export default function Campaigns() {
             <input
               type="date"
               value={customEndDate}
-              onChange={(e) => setCustomEndDate(e.target.value)}
+              onChange={(e) => { setCustomEndDate(e.target.value); setCurrentPage(1); }}
               onClick={(e) => {
                 try {
                   e.currentTarget.showPicker();

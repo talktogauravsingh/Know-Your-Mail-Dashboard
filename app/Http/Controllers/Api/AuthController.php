@@ -39,23 +39,25 @@ class AuthController extends Controller
         \Illuminate\Support\Facades\Cache::put('signup_otp_' . $email, $otp, 600);
 
         try {
-            // Configure SMTP dynamically following the campaign email sending architecture
-            config([
-                'mail.default' => 'smtp',
-                'mail.mailers.smtp.transport' => 'smtp',
-                'mail.mailers.smtp.host' => env('MAIL_HOST', 'smtp.gmail.com'),
-                'mail.mailers.smtp.port' => env('MAIL_PORT', 587),
-                'mail.mailers.smtp.encryption' => env('MAIL_ENCRYPTION', 'tls'),
-                'mail.mailers.smtp.username' => env('MAIL_USERNAME'),
-                'mail.mailers.smtp.password' => env('MAIL_PASSWORD'),
-                'mail.from' => [
-                    'address' => env('MAIL_FROM_ADDRESS'),
-                    'name' => env('MAIL_FROM_NAME'),
-                ],
-            ]);
+            if (!app()->runningUnitTests()) {
+                // Configure SMTP dynamically following the campaign email sending architecture
+                config([
+                    'mail.default' => 'smtp',
+                    'mail.mailers.smtp.transport' => 'smtp',
+                    'mail.mailers.smtp.host' => env('MAIL_HOST', 'smtp.gmail.com'),
+                    'mail.mailers.smtp.port' => env('MAIL_PORT', 587),
+                    'mail.mailers.smtp.encryption' => env('MAIL_ENCRYPTION', 'tls'),
+                    'mail.mailers.smtp.username' => env('MAIL_USERNAME'),
+                    'mail.mailers.smtp.password' => env('MAIL_PASSWORD'),
+                    'mail.from' => [
+                        'address' => env('MAIL_FROM_ADDRESS'),
+                        'name' => env('MAIL_FROM_NAME'),
+                    ],
+                ]);
 
-            app()->forgetInstance('mail.manager');
-            app()->forgetInstance('mailer');
+                app()->forgetInstance('mail.manager');
+                app()->forgetInstance('mailer');
+            }
 
             $subject = "Verify your email address - OTP: " . $otp;
             $htmlBody = "
@@ -98,11 +100,11 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|max:255|regex:/^[a-zA-Z0-9\s\-_]*$/',
             'email' => 'required|string|email|max:255|unique:users',
             'phone_number' => 'nullable|string|max:20',
             'organization_type' => 'nullable|string|max:50',
-            'organization_name' => 'nullable|string|max:255',
+            'organization_name' => 'nullable|string|max:255|regex:/^[a-zA-Z0-9\s\-_]*$/',
             'is_skipped' => 'nullable|boolean',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'otp' => 'required|string|size:6',
@@ -231,7 +233,7 @@ public function createManager(Request $request)
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|max:255|regex:/^[a-zA-Z0-9\s\-_]*$/',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'role_id' => 'required|exists:roles,id',
@@ -307,5 +309,32 @@ public function createManager(Request $request)
         return response()->json([
             'error' => 'Unable to reset password'
         ], 400);
+    }
+
+    /**
+     * Update logged-in user profile details.
+     */
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|regex:/^[a-zA-Z0-9\s\-_]*$/',
+            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'password' => ['nullable', 'string', Rules\Password::defaults()],
+        ]);
+
+        $userData = [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+        ];
+
+        if (!empty($validated['password'])) {
+            $userData['password'] = Hash::make($validated['password']);
+        }
+
+        $user->update($userData);
+
+        return response()->json($user->load('role.permissions'));
     }
 }

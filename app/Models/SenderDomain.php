@@ -95,7 +95,7 @@ class SenderDomain extends Model
      */
     public function getDnsRecords(): array
     {
-        $appHost = config('app.tracking_domain', parse_url(config('app.url'), PHP_URL_HOST));
+        $appHost = config('app.tracking_domain') ?: parse_url(config('app.url'), PHP_URL_HOST);
 
         return [
             [

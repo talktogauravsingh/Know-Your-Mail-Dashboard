@@ -30,7 +30,7 @@ class RoleController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:roles',
+            'name' => 'required|string|max:255|unique:roles|regex:/^[a-zA-Z0-9\s\-_]*$/',
         ]);
 
         $role = $this->roleRepo->create($validated);
@@ -41,7 +41,7 @@ class RoleController extends Controller
     public function update(Request $request, Role $role)
     {
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:255|unique:roles,name,' . $role->id,
+            'name' => 'sometimes|string|max:255|unique:roles,name,' . $role->id . '|regex:/^[a-zA-Z0-9\s\-_]*$/',
         ]);
 
         $this->roleRepo->update($role, $validated);

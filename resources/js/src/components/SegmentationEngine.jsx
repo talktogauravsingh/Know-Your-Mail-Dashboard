@@ -7,13 +7,26 @@ import { Plus, Trash2, Users, AlertCircle, CheckCircle2, ChevronRight, Filter } 
 import api from '../lib/api';
 import { cn } from '../lib/utils';
 
-export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange, moduleType, moduleId, maxSegments = 3, isSingleMode = false, canAddSegments = true }) {
+export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange, moduleType, moduleId, maxSegments = 3, isSingleMode = false, canAddSegments = true, initialSegments }) {
   const [segments, setSegments] = useState([
     { id: 'default', name: 'Default Segment', isDefault: true, priority: 100, filters: [{ field: '', operator: '=', value: '' }] }
   ]);
   const [counts, setCounts] = useState({});
   const [loading, setLoading] = useState({});
   const prevFiltersRef = React.useRef({});
+  const initializedRef = React.useRef(false);
+
+  useEffect(() => {
+    if (initialSegments && initialSegments.length > 0 && !initializedRef.current) {
+      setSegments(initialSegments.map(s => ({
+        ...s,
+        filters: (s.filters && s.filters.length > 0)
+          ? s.filters
+          : [{ field: '', operator: '=', value: '' }]
+      })));
+      initializedRef.current = true;
+    }
+  }, [initialSegments]);
 
   useEffect(() => {
     // Clear cache if module/campaign context changes
@@ -153,9 +166,44 @@ export function SegmentationEngine({ campaignId, insights = [], onSegmentsChange
 
       // 4. Update the fallback/default segment or single segment count
       if (isSingleMode) {
-        const singleId = segments[0]?.id || 'default';
-        if (counts[singleId] !== total) {
-          setCounts(prev => ({ ...prev, [singleId]: total }));
+        const singleSegment = segments[0];
+        const singleId = singleSegment?.id || 'default';
+        const hasValidFilters = singleSegment?.filters && 
+                                singleSegment.filters.length > 0 && 
+                                !singleSegment.filters.some(f => !f.field || !f.value);
+
+        if (hasValidFilters) {
+          const filtersStr = JSON.stringify(singleSegment.filters);
+          if (prevFiltersRef.current[singleId] !== filtersStr || counts[singleId] === undefined) {
+            setLoading(prev => ({ ...prev, [singleId]: true }));
+            try {
+              const url = campaignId 
+                ? `/campaigns/segments/validate-count/${campaignId}` 
+                : `/campaigns/segments/validate-count`;
+
+              const response = await api.post(url, {
+                module_type: moduleType,
+                module_id: moduleId,
+                groups: [{
+                  filters: singleSegment.filters.map(f => ({
+                    field_name: f.field,
+                    operator: f.operator,
+                    field_value: f.value
+                  }))
+                }]
+              });
+              setCounts(prev => ({ ...prev, [singleId]: response.data.count }));
+              prevFiltersRef.current[singleId] = filtersStr;
+            } catch (error) {
+              console.error('Failed to fetch count for single segment', error);
+            } finally {
+              setLoading(prev => ({ ...prev, [singleId]: false }));
+            }
+          }
+        } else {
+          if (counts[singleId] !== total) {
+            setCounts(prev => ({ ...prev, [singleId]: total }));
+          }
         }
       } else {
         const defaultSegment = segments.find(s => s.isDefault);

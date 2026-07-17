@@ -10,10 +10,11 @@ import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Badge } from "../../components/ui/Badge";
 import { useStore } from "../../store/useStore";
-import { Trash2, UserPlus, Shield, Mail, Key, UserCheck, Eye, EyeOff } from "lucide-react";
+import { Trash2, UserPlus, Shield, Mail, Key, UserCheck, Eye, EyeOff, Edit2 } from "lucide-react";
 
 export default function TeamManagement() {
     const [isAdding, setIsAdding] = useState(false);
+    const [editingMemberId, setEditingMemberId] = useState(null);
     const [showPassword, setShowPassword] = useState(false);
     const [formData, setFormData] = useState({
         name: "",
@@ -27,6 +28,7 @@ export default function TeamManagement() {
     const teamMembersLoading = useStore((state) => state.teamMembersLoading);
     const fetchTeamMembers = useStore((state) => state.fetchTeamMembers);
     const addTeamMember = useStore((state) => state.addTeamMember);
+    const updateTeamMember = useStore((state) => state.updateTeamMember);
     const deleteTeamMember = useStore((state) => state.deleteTeamMember);
     
     const roles = useStore((state) => state.roles);
@@ -53,11 +55,21 @@ export default function TeamManagement() {
 
     const handleInvite = async (e) => {
         e.preventDefault();
-        if (!formData.name || !formData.email || !formData.password || !formData.role_id) return;
+        if (!formData.name || !formData.email || !formData.role_id) return;
         
         try {
-            await addTeamMember(formData);
+            if (editingMemberId) {
+                const payload = { ...formData };
+                if (!payload.password) {
+                    delete payload.password;
+                }
+                await updateTeamMember(editingMemberId, payload);
+            } else {
+                if (!formData.password) return;
+                await addTeamMember(formData);
+            }
             setIsAdding(false);
+            setEditingMemberId(null);
             setFormData({
                 name: "",
                 email: "",
@@ -67,6 +79,17 @@ export default function TeamManagement() {
         } catch (err) {
             // Handled by store toasts
         }
+    };
+
+    const handleEditClick = (member) => {
+        setEditingMemberId(member.id);
+        setFormData({
+            name: member.name || "",
+            email: member.email || "",
+            password: "",
+            role_id: String(member.role?.id || ""),
+        });
+        setIsAdding(true);
     };
 
     const handleDelete = async (member) => {
@@ -134,6 +157,9 @@ export default function TeamManagement() {
                             onSubmit={handleInvite}
                             className="mb-6 border border-indigo-100 dark:border-indigo-900/40 rounded-xl p-5 bg-indigo-50/10 dark:bg-indigo-950/10 space-y-4 animate-in slide-in-from-top duration-200"
                         >
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-50">
+                                {editingMemberId ? "Edit User Details" : "Add New User"}
+                            </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
@@ -165,7 +191,7 @@ export default function TeamManagement() {
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-center">
                                         <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                                            <Key className="w-4 h-4 text-slate-400" /> Password
+                                            <Key className="w-4 h-4 text-slate-400" /> Password {editingMemberId && "(leave blank to keep current)"}
                                         </label>
                                         <button
                                             type="button"
@@ -186,7 +212,7 @@ export default function TeamManagement() {
                                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                         className="bg-white dark:bg-slate-950"
                                         disabled={isLoading}
-                                        required
+                                        required={!editingMemberId}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -219,7 +245,16 @@ export default function TeamManagement() {
                                 <Button
                                     variant="ghost"
                                     type="button"
-                                    onClick={() => setIsAdding(false)}
+                                    onClick={() => {
+                                        setIsAdding(false);
+                                        setEditingMemberId(null);
+                                        setFormData({
+                                            name: "",
+                                            email: "",
+                                            password: "",
+                                            role_id: roles.find(r => r.slug !== 'root')?.id || "",
+                                        });
+                                    }}
                                     className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800"
                                 >
                                     Cancel
@@ -243,10 +278,10 @@ export default function TeamManagement() {
                             {teamMembers.map((member) => {
                                 const isCurrentUser = user?.id === member.id;
                                 const isRootRole = member.role?.slug === 'root';
-                                // Logged-in user can delete a member if:
+                                // Logged-in user can delete/edit a member if:
                                 // 1. It is not themselves
                                 // 2. The member is not root (unless the logged-in user themselves is root)
-                                const canDelete = !isCurrentUser && (!isRootRole || user?.role?.slug === 'root');
+                                const canModify = !isCurrentUser && (!isRootRole || user?.role?.slug === 'root');
 
                                 return (
                                     <div key={member.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-950 flex-wrap gap-4">
@@ -277,15 +312,27 @@ export default function TeamManagement() {
                                                 {member.role?.name || "No Role"}
                                             </Badge>
 
-                                            {canDelete && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                                    onClick={() => handleDelete(member)}
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
+                                            {canModify && (
+                                                <div className="flex items-center gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-8 w-8 p-0 text-indigo-650 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+                                                        onClick={() => handleEditClick(member)}
+                                                        title="Edit User"
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                        onClick={() => handleDelete(member)}
+                                                        title="Remove User"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
                                             )}
                                         </div>
                                     </div>

@@ -81,9 +81,36 @@ export default function SenderDomains({ setActiveTab }) {
     };
 
     const copyText = (text, fieldId) => {
-        navigator.clipboard.writeText(text);
-        setCopiedField(fieldId);
-        setTimeout(() => setCopiedField(""), 2000);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    setCopiedField(fieldId);
+                    setTimeout(() => setCopiedField(""), 2000);
+                })
+                .catch(err => {
+                    console.error('Failed to copy using navigator.clipboard', err);
+                    fallbackCopyText(text, fieldId);
+                });
+        } else {
+            fallbackCopyText(text, fieldId);
+        }
+    };
+
+    const fallbackCopyText = (text, fieldId) => {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            setCopiedField(fieldId);
+            setTimeout(() => setCopiedField(""), 2000);
+        } catch (err) {
+            console.error('Fallback copy failed', err);
+        }
+        document.body.removeChild(textArea);
     };
 
     const VerifyBadge = ({ ok }) => (

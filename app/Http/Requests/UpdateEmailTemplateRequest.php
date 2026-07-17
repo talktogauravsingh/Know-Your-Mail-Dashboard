@@ -17,8 +17,8 @@ class UpdateEmailTemplateRequest extends FormRequest
         $templateId = $this->route('template')?->id;
 
         return [
-            'template_name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', Rule::unique('email_templates', 'slug')->ignore($templateId)],
+            'template_name' => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9\s\-_]*$/'],
+            'slug' => ['required', 'string', 'max:255', 'alpha_dash', Rule::unique('email_templates', 'slug')->ignore($templateId)],
             'category' => ['nullable', 'string', 'max:255'],
             'subject' => ['required', 'string', 'max:255'],
             'preview_text' => ['nullable', 'string', 'max:255'],
