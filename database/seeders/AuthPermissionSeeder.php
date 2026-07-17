@@ -44,9 +44,9 @@ class AuthPermissionSeeder extends Seeder
             $rootLegacyRole = \App\Models\Role::where('slug', 'root')->first();
 
             User::create([
-                'name' => 'Shravani testone',
+                'name' => 'TECH KYM',
                 'email' => 'techknowyourmail@gmail.com',
-                'password' => bcrypt('Shivam@rs1'),
+                'password' => bcrypt('password'),
                 'role_id' => $rootLegacyRole?->id ?? $superAdminRole?->id,
                 'organization_id' => $organization->id,
             ]);
