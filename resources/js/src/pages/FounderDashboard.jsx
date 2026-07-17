@@ -48,6 +48,14 @@ export default function FounderDashboard() {
   const [runningCommand, setRunningCommand] = useState(null);
   const [specificCampaignId, setSpecificCampaignId] = useState("");
 
+  // Configuration States
+  const [configs, setConfigs] = useState([]);
+  const [configKey, setConfigKey] = useState("");
+  const [configValue, setConfigValue] = useState("");
+  const [configDesc, setConfigDesc] = useState("");
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [editingKey, setEditingKey] = useState(null);
+
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -55,6 +63,7 @@ export default function FounderDashboard() {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+
   const [terminalOutput, setTerminalOutput] = useState(
     "==========================================================\n" +
     "         KNOWYOURMAIL FOUNDER ADMINISTRATION CONSOLE       \n" +
@@ -64,18 +73,86 @@ export default function FounderDashboard() {
   
   const terminalEndRef = useRef(null);
 
+  const fetchConfigs = async () => {
+    try {
+      const response = await axios.get("/api/founder/config");
+      if (response.data.success) {
+        setConfigs(response.data.configs);
+      }
+    } catch (error) {
+      console.error("Failed to fetch configurations", error);
+      appendTerminal(`Error fetching configurations: ${error.message}\n`);
+    }
+  };
+
   const fetchData = async () => {
     try {
       const response = await axios.get("/api/founder/metrics");
       if (response.data.success) {
         setData(response.data);
       }
+      await fetchConfigs();
     } catch (error) {
       console.error("Failed to fetch founder metrics", error);
       appendTerminal(`Error fetching system metrics: ${error.message}\n`);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSaveConfig = async (e) => {
+    e.preventDefault();
+    if (!configKey.trim() || !configValue.trim()) return;
+    
+    setSavingConfig(true);
+    const cmdStr = `saving setting ${configKey.toUpperCase()}...`;
+    appendTerminal(`$ ${cmdStr}\n`);
+
+    try {
+      const response = await axios.post("/api/founder/config", {
+        key: configKey,
+        value: configValue,
+        description: configDesc
+      });
+      if (response.data.success) {
+        appendTerminal(`[SUCCESS] ${response.data.message}\n\n`);
+        setConfigKey("");
+        setConfigValue("");
+        setConfigDesc("");
+        setEditingKey(null);
+        fetchConfigs();
+      } else {
+        appendTerminal(`[FAILED] ${response.data.message}\n\n`);
+      }
+    } catch (error) {
+      appendTerminal(`[ERROR] failed to save configuration: ${error.message}\n\n`);
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const handleDeleteConfig = async (key) => {
+    if (!window.confirm(`Are you sure you want to delete setting '${key}' from Redis cache?`)) return;
+
+    appendTerminal(`$ deleting setting ${key}...\n`);
+    try {
+      const response = await axios.delete(`/api/founder/config/${key}`);
+      if (response.data.success) {
+        appendTerminal(`[SUCCESS] ${response.data.message}\n\n`);
+        fetchConfigs();
+      } else {
+        appendTerminal(`[FAILED] ${response.data.message}\n\n`);
+      }
+    } catch (error) {
+      appendTerminal(`[ERROR] failed to delete: ${error.message}\n\n`);
+    }
+  };
+
+  const handleEditConfig = (conf) => {
+    setConfigKey(conf.key);
+    setConfigValue(conf.value);
+    setConfigDesc(conf.description || "");
+    setEditingKey(conf.key);
   };
 
   const appendTerminal = (text) => {
@@ -789,6 +866,157 @@ export default function FounderDashboard() {
               )}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      {/* System Configurations (Redis Cache) */}
+      <Card className="bg-white dark:bg-slate-800/30 border-slate-200 dark:border-slate-700/50 mt-8 mb-8">
+        <CardHeader className="border-b border-slate-200 dark:border-slate-700/50 pb-3 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Settings className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+              System Configurations (Redis Cache)
+            </CardTitle>
+            <p className="text-xs text-slate-550 dark:text-slate-400 mt-0.5">
+              Manage global variables cached directly in Redis (hosted on kym-relay-services).
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="grid gap-8 lg:grid-cols-3">
+            {/* Form column */}
+            <div className="lg:col-span-1 bg-slate-50/50 dark:bg-slate-900/10 border border-slate-200/60 dark:border-slate-800 p-5 rounded-lg shadow-sm">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4">
+                {editingKey ? `Edit Setting: ${editingKey}` : "Add New Setting"}
+              </h3>
+              <form onSubmit={handleSaveConfig} className="space-y-4">
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-1">
+                    Config Key
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. SPECIAL_ROUTE_RELAY"
+                    value={configKey}
+                    onChange={(e) => setConfigKey(e.target.value.toUpperCase())}
+                    disabled={!!editingKey}
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 outline-none focus:border-indigo-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-1">
+                    Config Value
+                  </label>
+                  <textarea
+                    required
+                    placeholder="Value stored under this key"
+                    value={configValue}
+                    onChange={(e) => setConfigValue(e.target.value)}
+                    rows={4}
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 outline-none focus:border-indigo-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-1">
+                    Description / Notes
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Describe what this config does"
+                    value={configDesc}
+                    onChange={(e) => setConfigDesc(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-200 outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    type="submit"
+                    isLoading={savingConfig}
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold"
+                    size="sm"
+                  >
+                    {editingKey ? "Update Cache" : "Save to Cache"}
+                  </Button>
+                  {editingKey && (
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setConfigKey("");
+                        setConfigValue("");
+                        setConfigDesc("");
+                        setEditingKey(null);
+                      }}
+                      className="bg-slate-100 hover:bg-slate-200 border border-slate-250 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 text-slate-750 dark:text-slate-350"
+                      size="sm"
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            {/* List column */}
+            <div className="lg:col-span-2">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-slate-200 dark:border-slate-800 hover:bg-transparent">
+                      <TableHead className="text-xs text-slate-500 dark:text-slate-400 font-bold w-1/3">Key</TableHead>
+                      <TableHead className="text-xs text-slate-500 dark:text-slate-400 font-bold w-1/3">Value</TableHead>
+                      <TableHead className="text-xs text-slate-500 dark:text-slate-400 font-bold">Notes</TableHead>
+                      <TableHead className="text-xs text-slate-500 dark:text-slate-400 font-bold text-right w-24">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {configs && configs.length > 0 ? (
+                      configs.map((conf) => (
+                        <TableRow key={conf.key} className="border-slate-200 dark:border-slate-855 hover:bg-slate-50 dark:hover:bg-slate-800/10">
+                          <TableCell className="py-3 font-mono font-bold text-slate-900 dark:text-indigo-350 text-xs">
+                            {conf.key}
+                          </TableCell>
+                          <TableCell className="py-3 font-mono text-slate-650 dark:text-slate-300 text-xs break-all max-w-[200px]">
+                            {conf.value}
+                          </TableCell>
+                          <TableCell className="py-3 text-xs text-slate-500">
+                            {conf.description || <span className="italic text-slate-400">None</span>}
+                          </TableCell>
+                          <TableCell className="text-right py-3 pr-4">
+                            <div className="flex justify-end gap-1.5">
+                              <button
+                                onClick={() => handleEditConfig(conf)}
+                                className="bg-slate-105 hover:bg-slate-205 dark:bg-slate-800 dark:hover:bg-slate-700 text-indigo-650 dark:text-indigo-400 border border-slate-250 dark:border-slate-700 p-1.5 transition cursor-pointer"
+                                title="Edit Setting"
+                              >
+                                <Settings className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteConfig(conf.key)}
+                                className="bg-slate-105 hover:bg-slate-205 dark:bg-slate-800 dark:hover:bg-slate-700 text-red-650 dark:text-red-400 border border-slate-250 dark:border-slate-700 p-1.5 transition cursor-pointer"
+                                title="Delete Setting"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-slate-500 py-10">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <Database className="w-8 h-8 text-slate-400" />
+                            <span>No configurations stored in Redis cache.</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
       </div>
