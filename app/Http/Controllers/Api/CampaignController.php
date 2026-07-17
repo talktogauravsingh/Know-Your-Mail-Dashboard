@@ -16,16 +16,54 @@ class CampaignController extends Controller
 {
     public function index(Request $request)
     {
-        $campaigns = Campaign::where('organization_id', Auth::user()->organization_id ?? 1)
+        $query = Campaign::where('organization_id', Auth::user()->organization_id ?? 1)
+            ->with(['variants'])
             ->withCount([
                 'sendLogs as sent_count',
                 'sendLogs as opened_count' => function ($query) {
                     $query->whereNotNull('opened_at');
                 }
             ])
-            ->withSum('sendLogs as total_clicks', 'clicks_count')
-            ->latest()
-            ->paginate(10);
+            ->withSum('sendLogs as total_clicks', 'clicks_count');
+
+        // Apply Search Filter
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where('name', 'like', '%' . $search . '%');
+        }
+
+        // Apply Status Filter
+        if ($request->filled('status') && $request->input('status') !== 'all') {
+            $status = $request->input('status');
+            if ($status === 'active') {
+                $query->whereIn('status', ['running', 'sent', 'scheduled', 'pending']);
+            } else {
+                $query->where('status', $status);
+            }
+        }
+
+        // Apply Date Filter
+        if ($request->filled('date_filter') && $request->input('date_filter') !== 'all') {
+            $dateFilter = $request->input('date_filter');
+            if ($dateFilter === 'custom') {
+                if ($request->filled('start_date')) {
+                    $query->whereDate('created_at', '>=', $request->input('start_date'));
+                }
+                if ($request->filled('end_date')) {
+                    $query->whereDate('created_at', '<=', $request->input('end_date'));
+                }
+            } else {
+                $days = 30;
+                if ($dateFilter === '7days') {
+                    $days = 7;
+                } elseif ($dateFilter === '90days') {
+                    $days = 90;
+                }
+                $query->where('created_at', '>=', now()->subDays($days));
+            }
+        }
+
+        $campaigns = $query->latest()->paginate(10);
 
         return response()->json($campaigns);
     }
@@ -33,9 +71,9 @@ class CampaignController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'subject' => 'required|string|max:255',
-            'body' => 'required|string',
+            'name' => 'required|string|max:255|regex:/^[a-zA-Z0-9\s\-_]*$/',
+            'subject' => 'nullable|string|max:255',
+            'body' => 'nullable|string',
             'template_id' => [
                 'nullable',
                 Rule::exists('email_templates', 'id')->where(function ($query) {
@@ -46,14 +84,20 @@ class CampaignController extends Controller
             'sender_config_id' => 'nullable',
             'segments' => 'nullable|array',
             'segments.*.id' => 'nullable|string',
+            'segments.*.name' => 'nullable|string|max:255|regex:/^[a-zA-Z0-9\s\-_]*$/',
+            'segments.*.isDefault' => 'nullable|boolean',
+            'segments.*.priority' => 'nullable|integer',
             'segments.*.filters' => 'nullable|array',
-            'segments.*.filters.*.field' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_]+$/'],
-            'segments.*.filters.*.field_name' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_]+$/'],
+            'segments.*.filters.*.field' => ['nullable', 'string'],
+            'segments.*.filters.*.field_name' => ['nullable', 'string'],
             'segments.*.filters.*.operator' => 'nullable|string',
             'segments.*.filters.*.value' => 'nullable',
             'segments.*.filters.*.field_value' => 'nullable',
+            'segments.*.name' => 'nullable|string',
+            'segments.*.priority' => 'nullable|integer',
+            'segments.*.isDefault' => 'nullable|boolean',
             'variants' => 'nullable|array',
-            'status' => 'nullable|string|in:draft,scheduled',
+            'status' => 'nullable|string|in:draft,scheduled,sent,running,completed,pending',
             'schedule_type' => 'nullable|string|in:immediate,once,recurring',
             'scheduled_at' => 'nullable|date',
             'schedule_frequency' => 'nullable|string|in:daily,weekly,monthly',
@@ -61,13 +105,15 @@ class CampaignController extends Controller
             'schedule_time' => 'nullable|string',
             'variable_mappings' => 'nullable|array',
             'variable_mappings.*' => 'nullable|string|max:255',
+            'wizard_step' => 'nullable|integer|min:1|max:5',
+            'recipient_source' => 'nullable|string|in:org,campaign',
         ]);
 
         $campaign = Campaign::create([
             'organization_id' => Auth::user()->organization_id ?? 1,
             'name' => $validated['name'],
-            'subject' => $validated['subject'],
-            'body' => $validated['body'],
+            'subject' => $validated['subject'] ?? '',
+            'body' => $validated['body'] ?? '',
             'template_id' => $validated['template_id'] ?? null,
             'cta_url' => $this->formatUrl($validated['cta_link'] ?? null),
             'sender_config_id' => $validated['sender_config_id'] ?? null,
@@ -79,6 +125,8 @@ class CampaignController extends Controller
             'schedule_days' => $validated['schedule_days'] ?? null,
             'schedule_time' => $validated['schedule_time'] ?? null,
             'variable_mappings' => $validated['variable_mappings'] ?? null,
+            'wizard_step' => $validated['wizard_step'] ?? 1,
+            'recipient_source' => $validated['recipient_source'] ?? 'campaign',
             'user_id' => Auth::id(),
         ]);
 
@@ -86,13 +134,70 @@ class CampaignController extends Controller
             $this->syncSegments($campaign, $validated['segments'], $validated['variants'] ?? []);
         }
 
-        return response()->json($campaign->load('sendLogs'), 201);
+        return response()->json($campaign->load(['sendLogs', 'variants.filterGroups.filters', 'variants.template', 'template']), 201);
     }
 
     public function show($id)
     {
         $campaign = Campaign::where('organization_id', Auth::user()->organization_id ?? 1)
+            ->with(['variants.filterGroups.filters', 'variants.template', 'template'])
             ->findOrFail($id);
+
+        $moduleType = $campaign->recipient_source === 'org' ? 1 : 2;
+        $moduleId = $campaign->recipient_source === 'org' ? ($campaign->organization_id ?? 1) : $campaign->id;
+
+        $insights = DB::table('campaign_csv_insights')
+            ->where('module_type', $moduleType)
+            ->where('module_id', $moduleId)
+            ->get();
+        
+        $headers = $insights->pluck('field_name')->toArray();
+        if (!in_array('email', $headers)) {
+            array_unshift($headers, 'email');
+        }
+        if (!in_array('name', $headers)) {
+            $headers[] = 'name';
+        }
+        if (!in_array('phone', $headers)) {
+            $headers[] = 'phone';
+        }
+
+        $sampleRecipients = DB::table('recipients')
+            ->where('module_type', $moduleType)
+            ->where('module_id', $moduleId)
+            ->limit(5)
+            ->get();
+
+        $previewRows = [];
+        foreach ($sampleRecipients as $r) {
+            $attrs = json_decode($r->attributes, true) ?: [];
+            $previewRows[] = array_merge([
+                'email' => $r->email,
+                'name' => $r->name,
+                'phone' => $r->phone,
+            ], $attrs);
+        }
+
+        $totalRows = DB::table('recipients')
+            ->where('module_type', $moduleType)
+            ->where('module_id', $moduleId)
+            ->count();
+            
+        $validRows = DB::table('recipients')
+            ->where('module_type', $moduleType)
+            ->where('module_id', $moduleId)
+            ->where('is_valid', true)
+            ->count();
+
+        $invalidRows = $totalRows - $validRows;
+
+        $campaign->recipient_preview = [
+            'headers' => $headers,
+            'preview_rows' => $previewRows,
+            'total_rows' => $totalRows,
+            'valid_rows' => $validRows,
+            'invalid_rows' => $invalidRows,
+        ];
         
         return response()->json($campaign);
     }
@@ -103,9 +208,9 @@ class CampaignController extends Controller
             ->findOrFail($id);
 
         $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'subject' => 'sometimes|required|string|max:255',
-            'body' => 'sometimes|required|string',
+            'name' => 'sometimes|required|string|max:255|regex:/^[a-zA-Z0-9\s\-_]*$/',
+            'subject' => 'sometimes|nullable|string|max:255',
+            'body' => 'sometimes|nullable|string',
             'template_id' => [
                 'nullable',
                 Rule::exists('email_templates', 'id')->where(function ($query) {
@@ -117,14 +222,20 @@ class CampaignController extends Controller
             'audience_segment' => 'nullable|string',
             'segments' => 'nullable|array',
             'segments.*.id' => 'nullable|string',
+            'segments.*.name' => 'nullable|string|max:255|regex:/^[a-zA-Z0-9\s\-_]*$/',
+            'segments.*.isDefault' => 'nullable|boolean',
+            'segments.*.priority' => 'nullable|integer',
             'segments.*.filters' => 'nullable|array',
-            'segments.*.filters.*.field' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_]+$/'],
-            'segments.*.filters.*.field_name' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_]+$/'],
+            'segments.*.filters.*.field' => ['nullable', 'string'],
+            'segments.*.filters.*.field_name' => ['nullable', 'string'],
             'segments.*.filters.*.operator' => 'nullable|string',
             'segments.*.filters.*.value' => 'nullable',
             'segments.*.filters.*.field_value' => 'nullable',
+            'segments.*.name' => 'nullable|string|regex:/^[a-zA-Z0-9\s\-_]*$/',
+            'segments.*.priority' => 'nullable|integer',
+            'segments.*.isDefault' => 'nullable|boolean',
             'variants' => 'nullable|array',
-            'status' => 'nullable|string|in:draft,scheduled',
+            'status' => 'nullable|string|in:draft,scheduled,sent,running,completed,pending',
             'schedule_type' => 'nullable|string|in:immediate,once,recurring',
             'scheduled_at' => 'nullable|date',
             'schedule_frequency' => 'nullable|string|in:daily,weekly,monthly',
@@ -132,29 +243,34 @@ class CampaignController extends Controller
             'schedule_time' => 'nullable|string',
             'variable_mappings' => 'nullable|array',
             'variable_mappings.*' => 'nullable|string|max:255',
+            'wizard_step' => 'nullable|integer|min:1|max:5',
+            'recipient_source' => 'nullable|string|in:org,campaign',
         ]);
 
         $campaign->update([
             'name' => $validated['name'] ?? $campaign->name,
-            'subject' => $validated['subject'] ?? $campaign->subject,
-            'body' => $validated['body'] ?? $campaign->body,
-            'template_id' => $validated['template_id'] ?? $campaign->template_id,
+            'subject' => array_key_exists('subject', $validated) ? ($validated['subject'] ?? '') : $campaign->subject,
+            'body' => array_key_exists('body', $validated) ? ($validated['body'] ?? '') : $campaign->body,
+            'template_id' => array_key_exists('template_id', $validated) ? $validated['template_id'] : $campaign->template_id,
             'cta_url' => isset($validated['cta_link']) ? $this->formatUrl($validated['cta_link']) : $campaign->cta_url,
-            'sender_config_id' => $validated['sender_config_id'] ?? $campaign->sender_config_id,
+            'sender_config_id' => array_key_exists('sender_config_id', $validated) ? $validated['sender_config_id'] : $campaign->sender_config_id,
             'segmentation_mode' => $request->input('segmentation_mode', $campaign->segmentation_mode),
             'status' => $validated['status'] ?? $campaign->status,
             'schedule_type' => $validated['schedule_type'] ?? $campaign->schedule_type,
-            'scheduled_at' => isset($validated['scheduled_at']) ? $validated['scheduled_at'] : $campaign->scheduled_at,
-            'schedule_frequency' => $validated['schedule_frequency'] ?? $campaign->schedule_frequency,
-            'schedule_days' => isset($validated['schedule_days']) ? $validated['schedule_days'] : $campaign->schedule_days,
-            'schedule_time' => isset($validated['schedule_time']) ? $validated['schedule_time'] : $campaign->schedule_time,
-            'variable_mappings' => isset($validated['variable_mappings']) ? $validated['variable_mappings'] : $campaign->variable_mappings,
+            'scheduled_at' => array_key_exists('scheduled_at', $validated) ? $validated['scheduled_at'] : $campaign->scheduled_at,
+            'schedule_frequency' => array_key_exists('schedule_frequency', $validated) ? $validated['schedule_frequency'] : $campaign->schedule_frequency,
+            'schedule_days' => array_key_exists('schedule_days', $validated) ? $validated['schedule_days'] : $campaign->schedule_days,
+            'schedule_time' => array_key_exists('schedule_time', $validated) ? $validated['schedule_time'] : $campaign->schedule_time,
+            'variable_mappings' => array_key_exists('variable_mappings', $validated) ? $validated['variable_mappings'] : $campaign->variable_mappings,
+            'wizard_step' => $validated['wizard_step'] ?? $campaign->wizard_step,
+            'recipient_source' => $validated['recipient_source'] ?? $campaign->recipient_source,
         ]);
 
         if (isset($validated['segments'])) {
             $this->syncSegments($campaign, $validated['segments'], $validated['variants'] ?? []);
         }
 
+        $campaign->load(['variants.filterGroups.filters', 'variants.template', 'template']);
         return response()->json($campaign);
     }
 
@@ -171,6 +287,7 @@ class CampaignController extends Controller
     protected function syncSegments($campaign, $segments, $variantData)
     {
         DB::transaction(function () use ($campaign, $segments, $variantData) {
+            $isSingle = $campaign->segmentation_mode === 'single';
             $incomingIds = collect($segments)->pluck('id')->filter(function ($id) {
                 return is_numeric($id);
             })->toArray();
@@ -181,8 +298,13 @@ class CampaignController extends Controller
                 $campaign->variants()->whereNotIn('id', $incomingIds)->delete();
             }
 
+            $isFirst = true;
             foreach ($segments as $segment) {
                 $isDefault = $segment['isDefault'] ?? false;
+                if ($isSingle && $isFirst) {
+                    $isDefault = true;
+                }
+                $isFirst = false;
                 $segmentId = $segment['id'] ?? null;
                 $custom = $segmentId !== null ? ($variantData[$segmentId] ?? []) : [];
 
@@ -196,6 +318,7 @@ class CampaignController extends Controller
                             'name' => $segment['name'] ?? 'Untitled Segment',
                             'subject' => $custom['subject'] ?? $campaign->subject,
                             'body' => $custom['body'] ?? $campaign->body,
+                            'template_id' => $custom['template_id'] ?? null,
                             'cta_url' => $this->formatUrl($custom['cta_link'] ?? $campaign->cta_url),
                             'is_default' => $isDefault,
                             'priority' => $segment['priority'] ?? 0,
@@ -208,6 +331,7 @@ class CampaignController extends Controller
                             'name' => $segment['name'] ?? 'Untitled Segment',
                             'subject' => $custom['subject'] ?? $campaign->subject,
                             'body' => $custom['body'] ?? $campaign->body,
+                            'template_id' => $custom['template_id'] ?? null,
                             'cta_url' => $this->formatUrl($custom['cta_link'] ?? $campaign->cta_url),
                             'is_default' => $isDefault,
                             'priority' => $segment['priority'] ?? 0,
@@ -218,6 +342,7 @@ class CampaignController extends Controller
                         'name' => $segment['name'] ?? 'Untitled Segment',
                         'subject' => $custom['subject'] ?? $campaign->subject,
                         'body' => $custom['body'] ?? $campaign->body,
+                        'template_id' => $custom['template_id'] ?? null,
                         'cta_url' => $this->formatUrl($custom['cta_link'] ?? $campaign->cta_url),
                         'is_default' => $isDefault,
                         'priority' => $segment['priority'] ?? 0,
@@ -261,8 +386,8 @@ class CampaignController extends Controller
     public function preview(Request $request)
     {
         $validated = $request->validate([
-            'template_id' => 'required|exists:email_templates,id',
-            'body' => 'required|string',
+            'template_id' => 'nullable',
+            'body' => 'nullable|string',
             'subject' => 'nullable|string',
             'variables' => 'nullable|array',
             'variable_mappings' => 'nullable|array',
@@ -270,8 +395,11 @@ class CampaignController extends Controller
         ]);
 
         try {
-            $template = EmailTemplate::where('organization_id', Auth::user()->organization_id ?? 1)
-                ->findOrFail($validated['template_id']);
+            $template = null;
+            if (!empty($validated['template_id']) && is_numeric($validated['template_id'])) {
+                $template = EmailTemplate::where('organization_id', Auth::user()->organization_id ?? 1)
+                    ->find($validated['template_id']);
+            }
 
             // Build variables from mappings + first CSV row if provided
             $variables = $validated['variables'] ?? [];
@@ -288,23 +416,27 @@ class CampaignController extends Controller
 
             // Also substitute variables inside the body content itself
             $engine = new TemplateVariableEngine();
-            $processedBody = $engine->render($validated['body'], $variables);
+            $processedBody = $engine->render($validated['body'] ?? '', $variables);
             $processedSubject = isset($validated['subject'])
                 ? $engine->render($validated['subject'], $variables)
                 : '';
 
-            $templateService = new \App\Services\EmailTemplateService();
-            $htmlBody = $templateService->mergeWithContent(
-                $template,
-                $processedBody,
-                $variables
-            );
+            if ($template) {
+                $templateService = new \App\Services\EmailTemplateService();
+                $htmlBody = $templateService->mergeWithContent(
+                    $template,
+                    $processedBody,
+                    $variables
+                );
+            } else {
+                $htmlBody = nl2br($processedBody);
+            }
 
             return response()->json([
                 'success' => true,
                 'htmlBody' => $htmlBody,
                 'processedSubject' => $processedSubject,
-                'template' => $template->only(['id', 'template_name', 'subject']),
+                'template' => $template ? $template->only(['id', 'template_name', 'subject']) : null,
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -377,6 +509,91 @@ class CampaignController extends Controller
         return response()->json([
             'success' => true,
             'variables' => array_values($result),
+        ]);
+    }
+
+    public function getOrgRecipients(Request $request)
+    {
+        $user = Auth::user();
+        $orgId = $user->organization_id ?? 1;
+
+        // Fetch insights to get the headers
+        $insights = DB::table('campaign_csv_insights')
+            ->where('module_type', 1)
+            ->where('module_id', $orgId)
+            ->get();
+        
+        $headers = $insights->pluck('field_name')->toArray();
+        if (!in_array('email', $headers)) {
+            array_unshift($headers, 'email');
+        }
+        if (!in_array('name', $headers)) {
+            $headers[] = 'name';
+        }
+        if (!in_array('phone', $headers)) {
+            $headers[] = 'phone';
+        }
+
+        // Get 5 unique sample recipients based on email in a driver-agnostic way
+        $subQuery = DB::table('recipients')
+            ->select(DB::raw('MIN(id) as id'))
+            ->where('module_type', 1)
+            ->where('module_id', $orgId)
+            ->groupBy('email');
+
+        $sampleRecipients = DB::table('recipients')
+            ->whereIn('id', $subQuery)
+            ->limit(5)
+            ->get();
+
+        // Convert sample recipients to associative array of header => value
+        $previewRows = [];
+        foreach ($sampleRecipients as $r) {
+            $attrs = json_decode($r->attributes, true) ?: [];
+            $row = [
+                'email' => $r->email,
+                'name' => $r->name,
+                'phone' => $r->phone,
+                'lead_type' => $r->lead_type,
+                'city' => $r->city,
+                'gender' => $r->gender,
+            ];
+            // Merge in custom attributes (lowercased keys)
+            foreach ($attrs as $key => $val) {
+                $row[strtolower($key)] = $val;
+            }
+            
+            // Build the row in the order of headers
+            $orderedRow = [];
+            foreach ($headers as $h) {
+                $orderedRow[$h] = $row[strtolower($h)] ?? null;
+            }
+            $previewRows[] = $orderedRow;
+        }
+
+        // Count unique totals
+        $totalRows = DB::table('recipients')
+            ->where('module_type', 1)
+            ->where('module_id', $orgId)
+            ->distinct('email')
+            ->count('email');
+            
+        $validRows = DB::table('recipients')
+            ->where('module_type', 1)
+            ->where('module_id', $orgId)
+            ->where('is_valid', true)
+            ->distinct('email')
+            ->count('email');
+
+        $invalidRows = $totalRows - $validRows;
+
+        return response()->json([
+            'success' => true,
+            'headers' => $headers,
+            'preview_rows' => $previewRows,
+            'total_rows' => $totalRows,
+            'valid_rows' => $validRows,
+            'invalid_rows' => $invalidRows,
         ]);
     }
 }

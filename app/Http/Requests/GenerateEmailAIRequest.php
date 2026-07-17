@@ -20,6 +20,7 @@ class GenerateEmailAIRequest extends FormRequest
             'context' => ['required', 'string'],
             'variants' => ['sometimes', 'integer', 'min:1', 'max:5'],
             'async' => ['sometimes', 'boolean'],
+            'char_limit' => ['sometimes', 'integer', 'nullable', 'min:50', 'max:5000'],
         ];
     }
 }

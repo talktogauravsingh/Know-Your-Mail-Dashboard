@@ -53,12 +53,10 @@ class SendCampaignEmailJob implements ShouldQueue
             ->where('status', 1)
             ->first();
         
-        // If config found, set dynamically. Otherwise it falls back to .env default
+        // If config found, set dynamically. Otherwise it falls back to organization SmtpCredential
         if ($config) {
-
             config([
                 'mail.default' => 'smtp',
-
                 'mail.mailers.smtp.transport' => 'smtp',
                 'mail.mailers.smtp.host' => $config->host,
                 'mail.mailers.smtp.port' => $config->port,
@@ -67,7 +65,6 @@ class SendCampaignEmailJob implements ShouldQueue
                     : null,
                 'mail.mailers.smtp.username' => $config->username,
                 'mail.mailers.smtp.password' => trim($config->password),
-
                 'mail.from' => [
                     'address' => $config->from_address,
                     'name' => $config->from_name,
@@ -77,7 +74,50 @@ class SendCampaignEmailJob implements ShouldQueue
             app()->forgetInstance('mail.manager');
             app()->forgetInstance('mailer');
         } else {
-            Log::warning("SMTP Config not found for Campaign {$campaign->id}, using default.");
+            // Re-evaluate using our generated SmtpCredential for the organization
+            $credential = \App\Models\SmtpCredential::where('organization_id', $campaign->organization_id)
+                ->where('is_active', true)
+                ->whereNotNull('encrypted_password')
+                ->first();
+
+            if ($credential) {
+                try {
+                    $plainPassword = \Illuminate\Support\Facades\Crypt::decryptString($credential->encrypted_password);
+                    $fromDomain = $credential->domain?->domain;
+                    
+                    if (!$fromDomain) {
+                        // Fall back to first verified domain under organization
+                        $verifiedDomain = \App\Models\SenderDomain::where('organization_id', $campaign->organization_id)
+                            ->where('status', 'verified')
+                            ->first();
+                        $fromDomain = $verifiedDomain?->domain;
+                    }
+
+                    if ($fromDomain) {
+                        config([
+                            'mail.default' => 'smtp',
+                            'mail.mailers.smtp.transport' => 'smtp',
+                            'mail.mailers.smtp.host' => '127.0.0.1',
+                            'mail.mailers.smtp.port' => 25,
+                            'mail.mailers.smtp.encryption' => null,
+                            'mail.mailers.smtp.username' => $credential->username,
+                            'mail.mailers.smtp.password' => $plainPassword,
+                            'mail.from' => [
+                                'address' => 'campaign@' . $fromDomain,
+                                'name' => $campaign->name ?? 'KYM Campaign',
+                            ],
+                        ]);
+                        app()->forgetInstance('mail.manager');
+                        app()->forgetInstance('mailer');
+                    } else {
+                        Log::warning("No verified domain found for SmtpCredential in Campaign {$campaign->id}.");
+                    }
+                } catch (\Exception $e) {
+                    Log::error("Failed to decrypt SMTP Credential password for Campaign {$campaign->id}: " . $e->getMessage());
+                }
+            } else {
+                Log::warning("SMTP Config and SmtpCredential not found for Campaign {$campaign->id}, using default.");
+            }
         }
 
         $sendLog = SendLog::where('campaign_id', $campaign->id)
@@ -123,11 +163,15 @@ class SendCampaignEmailJob implements ShouldQueue
             $subject = $engine->render($subject, $variables);
 
             // Prepare HTML body
+            $trackingBase = rtrim(env('TRACKING_BASE_URL', config('app.url')), '/');
             $htmlBody = '';
 
-            // If campaign has a template with content block, use template merging
-            if ($campaign->template_id && $campaign->template) {
-                $template = $campaign->template;
+            // Resolve the template for this variant: use variant's template_id first, falling back to campaign's template_id
+            $templateId = $variant->template_id ?: $campaign->template_id;
+            $template = $templateId ? \App\Models\EmailTemplate::find($templateId) : null;
+
+            // If template exists, use template merging
+            if ($template) {
                 $templateService = new EmailTemplateService();
                 
                 // Prepare the variant body (with variable substitution)
@@ -141,14 +185,37 @@ class SendCampaignEmailJob implements ShouldQueue
                 $htmlBody = nl2br($body);
             }
 
+            // Convert plain text URLs to anchor tags (if not already wrapped in an href or src)
+            $htmlBody = preg_replace_callback(
+                '/(?<!href=["\'])(?<!src=["\'])\b(https?:\/\/[^\s<>\]]+)/i',
+                function($matches) {
+                    $url = rtrim($matches[1], '.,;:!?)"\'>');
+                    return '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($url) . '</a>';
+                },
+                $htmlBody
+            );
+
+            // Rewrite all <a href="..."> links to route through click tracking
+            $htmlBody = preg_replace_callback(
+                '/href="([^"]+)"/i',
+                function($matches) use ($trackingBase, $sendLog) {
+                    $url = htmlspecialchars_decode($matches[1]);
+                    if (str_contains($url, '/api/track/')) {
+                        return $matches[0]; // already tracked
+                    }
+                    return 'href="' . $trackingBase . '/api/track/click/' . $sendLog->uuid . '?url=' . urlencode($url) . '"';
+                },
+                $htmlBody
+            );
+
             // Add tracking pixel to the HTML body
-            $trackingUrl = url("/api/track/open/{$sendLog->id}");
+            $trackingUrl = "{$trackingBase}/api/track/open/{$sendLog->uuid}";
             $trackingPixel = "<img src='{$trackingUrl}' width='1' height='1' style='display:none;' />";
             
             // Add CTA tracking if there is one
             $ctaLink = $variant->cta_url;
             if ($ctaLink) {
-                $trackedCta = url("/api/track/click/{$sendLog->id}?url=" . urlencode($ctaLink));
+                $trackedCta = "{$trackingBase}/api/track/click/{$sendLog->uuid}?url=" . urlencode($ctaLink);
                 // Append CTA link if not already in body
                 if (!str_contains($htmlBody, $ctaLink)) {
                     $htmlBody .= "<br><br><a href='{$trackedCta}'>Click Here</a>";
@@ -162,26 +229,52 @@ class SendCampaignEmailJob implements ShouldQueue
             Mail::to($recipient->email)->send(new BulkMail($subject, $htmlBody));
 
             $sendLog->update([
-                'status' => 'sent',
+                'status' => 'delivered',
                 'sent_at' => now(),
+                'delivered_at' => now(),
             ]);
 
             Log::info("Sent email to {$recipient->email} for campaign {$campaign->id} using Variant: {$variant->name}");
 
+            // Auto-complete campaign if this was the last pending email
+            $hasPending = SendLog::where('campaign_id', $campaign->id)
+                ->where('status', 'pending')
+                ->exists();
+            if (!$hasPending) {
+                $campaign->update(['status' => 'completed']);
+                Log::info("Campaign {$campaign->id} marked as completed after successful dispatch.");
+            }
+
         } catch (\Exception $e) {
             Log::error("Failed to send email to {$recipient->email}: " . $e->getMessage());
-            if ($sendLog) {
-                $sendLog->update([
-                    'status' => 'failed',
-                    'response' => substr($e->getMessage(), 0, 255),
-                ]);
-            }
             
-            // Release the job back to the queue for retry
-            if ($this->attempts() <= $this->tries) {
+            // Release the job back to the queue for retry if attempts remaining
+            if ($this->attempts() < $this->tries) {
+                if ($sendLog) {
+                    $sendLog->update([
+                        'status' => 'pending', // keep as pending to allow retrying
+                        'response' => substr($e->getMessage(), 0, 255),
+                    ]);
+                }
                 $this->release($this->backoff[$this->attempts() - 1] ?? 300);
             } else {
                 // Job exceeded max attempts, fail it permanently
+                if ($sendLog) {
+                    $sendLog->update([
+                        'status' => 'failed',
+                        'response' => substr($e->getMessage(), 0, 255),
+                    ]);
+                }
+                
+                // Auto-complete campaign if this was the last pending email
+                $hasPending = SendLog::where('campaign_id', $campaign->id)
+                    ->where('status', 'pending')
+                    ->exists();
+                if (!$hasPending) {
+                    $campaign->update(['status' => 'completed']);
+                    Log::info("Campaign {$campaign->id} marked as completed after dispatch failure limit.");
+                }
+                
                 $this->fail($e);
             }
         }

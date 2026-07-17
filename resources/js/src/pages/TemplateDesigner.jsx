@@ -395,6 +395,7 @@ export default function TemplateDesigner() {
     description: template.description || template.preview_text || template.subject || '',
     avgOpenRate: template.avg_open_rate || '-',
     color: template.color || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+    html_content: template.html_content || template.htmlContent || '',
   });
 
   const saveTemplate = async (newStatus = 'draft') => {

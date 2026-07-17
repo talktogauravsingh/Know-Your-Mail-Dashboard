@@ -36,6 +36,18 @@ class EmailAIService
         ];
     }
 
+    public function generateStream(array $payload)
+    {
+        $response = Http::withHeaders([
+            'X-API-Key' => $this->key,
+            'Accept' => 'application/json',
+        ])->timeout($this->timeout)
+          ->withOptions(['stream' => true])
+          ->post(rtrim($this->base, '/') . '/api/v1/email/generate-stream', $payload);
+
+        return $response->toPsrResponse()->getBody();
+    }
+
     public function spamCheck(array $payload): array
     {
         $response = Http::withHeaders([

@@ -1,6 +1,14 @@
-name	email	country	salary
-tejas1	tejas.hande@impactguru.org	India	10000
-tejas2	tejashande08@gmail.com	India	20000
-tejas3	tejashande45@gmail.com	US	200
-tejas4 	jiggubhai10@gmail.com	US	100
-tejas5	tejashande01@yopmail.com	UK	5000
+name,email,country,salary
+Gaurav,gaurav.singh@impactguru.com,India,10000
+Tejas08,tejashande08@gmail.com,India,20000
+Tejas45,tejashande45@gmail.com,US,200
+Gaurav2,talktoogaurav@gmail.com,US,100
+ShivamP,shivam.pandey1@impactguru.com,UK,5000
+Shivam2,aman879651@gmail.com,India,4000
+Shivam3,iamsvpandey@gmail.com,India,4000
+Shivam3,discuss.with.shivam@gmail.com,India,4000
+Shivam3,shivampandeyy00@gmail.com,India,4000
+Shivam3,shivamp879651@gmail.com,India,4000
+Tejas,tejas.hande@impactguru.com,India,4000 
+Tejas,tejas.hande@impactguru.org,India,4000
+Soumik,soumiknandi819@gmail.com,India,4000

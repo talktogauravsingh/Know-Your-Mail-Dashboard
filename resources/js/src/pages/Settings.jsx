@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Navigate, useSearchParams } from "react-router-dom";
 import {
     Card,
     CardHeader,
@@ -21,8 +22,19 @@ import {
     Plus,
     Trash2,
     Server,
+    KeyRound,
+    Ban,
+    Shield,
+    Eye,
+    EyeOff,
 } from "lucide-react";
 import { useStore } from "../store/useStore";
+import TeamManagement from "./settings/TeamManagement";
+import MyProfile from "./settings/MyProfile";
+import SenderDomains from "./settings/SenderDomains";
+import SmtpCredentials from "./settings/SmtpCredentials";
+import Suppressions from "./settings/Suppressions";
+import KymConsole from "./settings/KymConsole";
 
 function formatMoney(amountMinor = 0, currency = "INR") {
     const safeAmountMinor = Number(amountMinor) || 0;
@@ -77,8 +89,31 @@ function loadRazorpayScript() {
 }
 
 export default function Settings() {
-    const [activeTab, setActiveTab] = useState("team");
+    const user = useStore((state) => state.user);
+    const userRoleSlug = user?.role?.slug;
+    const isSettingsAllowed = userRoleSlug === "super-admin" || userRoleSlug === "admin" || userRoleSlug === "root";
+    const isTeamAllowed = isSettingsAllowed; // Team management is accessible to all settings users since settings as a whole is now restricted
+
+    const [searchParams] = useSearchParams();
+    const tabParam = searchParams.get("tab");
+    const [activeTab, setActiveTab] = useState(tabParam || "profile");
+    const [hasDefaulted, setHasDefaulted] = useState(false);
+
+    useEffect(() => {
+        if (tabParam) {
+            setActiveTab(tabParam);
+        } else if (userRoleSlug && !hasDefaulted) {
+            setActiveTab(isTeamAllowed ? "team" : "profile");
+            setHasDefaulted(true);
+        }
+    }, [userRoleSlug, isTeamAllowed, hasDefaulted, tabParam]);
+
+    if (user && !isSettingsAllowed) {
+        return <Navigate to="/dashboard" replace />;
+    }
+
     const [isAddingSmtp, setIsAddingSmtp] = useState(false);
+    const [showSmtpPassword, setShowSmtpPassword] = useState(false);
     const [newSmtp, setNewSmtp] = useState({
         provider: "Custom SMTP",
         host: "",
@@ -109,7 +144,6 @@ export default function Settings() {
     const fetchSmtpConfigurations = useStore(
         (state) => state.fetchSmtpConfigurations,
     );
-    const user = useStore((state) => state.user);
     const smtpConfigurationsLoading = useStore(
         (state) => state.smtpConfigurationsLoading,
     );
@@ -174,10 +208,16 @@ export default function Settings() {
 
     const tabs = [
         { id: "profile", label: "My Profile", icon: User },
-        { id: "team", label: "Team Management", icon: Users },
-        { id: "integrations", label: "Email Integrations", icon: Mail },
+        ...(isTeamAllowed ? [{ id: "team", label: "Team Management", icon: Users }] : []),
+        { id: "integrations", label: "Third-Party SMTP", icon: Mail },
         { id: "domains", label: "Sender Domains", icon: Globe },
+        { id: "smtp-credentials", label: "SMTP Relay Keys", icon: KeyRound },
+        { id: "suppressions", label: "Suppression List", icon: Ban },
     ];
+
+    if (user?.role?.slug === "root") {
+        tabs.push({ id: "kym-console", label: "KYM Root Console", icon: Shield });
+    }
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 max-w-5xl mx-auto pb-10">
@@ -191,95 +231,9 @@ export default function Settings() {
                 </p>
             </div>
 
-            <div className="flex flex-col md:flex-row gap-8">
-                {/* Sidebar Nav */}
-                <div className="w-full md:w-64 shrink-0 space-y-1">
-                    {tabs.map((tab) => {
-                        const Icon = tab.icon;
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                                    activeTab === tab.id
-                                        ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300"
-                                        : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-                                }`}
-                            >
-                                <Icon
-                                    className={`w-4 h-4 ${activeTab === tab.id ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"}`}
-                                />
-                                {tab.label}
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {/* Content Area */}
-                <div className="flex-1 space-y-6">
+            <div className="w-full space-y-6">
                     {activeTab === "team" && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between">
-                                    <div>
-                                        <CardTitle>Team Members</CardTitle>
-                                        <CardDescription>
-                                            Manage who has access to this
-                                            workspace.
-                                        </CardDescription>
-                                    </div>
-                                    <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                                        Invite User
-                                    </Button>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="divide-y divide-slate-200 dark:divide-slate-800 border-t border-slate-200 dark:border-slate-800">
-                                        <div className="flex items-center justify-between py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold dark:bg-indigo-900/50 dark:text-indigo-300">
-                                                    GS
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-sm text-slate-900 dark:text-slate-50">
-                                                        Gaurav Singh{" "}
-                                                        <Badge
-                                                            variant="secondary"
-                                                            className="ml-1 text-[10px] py-0"
-                                                        >
-                                                            You
-                                                        </Badge>
-                                                    </p>
-                                                    <p className="text-xs text-slate-500">
-                                                        gaurav@emailtracker.io
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-none dark:bg-slate-800 dark:text-slate-300">
-                                                Admin
-                                            </Badge>
-                                        </div>
-                                        <div className="flex items-center justify-between py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold dark:bg-slate-800 dark:text-slate-400">
-                                                    SM
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-sm text-slate-900 dark:text-slate-50">
-                                                        Sarah Marketing
-                                                    </p>
-                                                    <p className="text-xs text-slate-500">
-                                                        sarah@emailtracker.io
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-none dark:bg-slate-800 dark:text-slate-300">
-                                                Editor
-                                            </Badge>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                        <TeamManagement />
                     )}
 
                     {activeTab === "billing" && (
@@ -445,64 +399,15 @@ export default function Settings() {
                     )}
 
                     {activeTab === "domains" && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between">
-                                    <div>
-                                        <CardTitle>Sender Domains</CardTitle>
-                                        <CardDescription>
-                                            Authenticate your domains to improve
-                                            deliverability.
-                                        </CardDescription>
-                                    </div>
-                                    <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
-                                        <Globe className="w-4 h-4" /> Add Domain
-                                    </Button>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
-                                        <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
-                                            <div className="flex items-center gap-3">
-                                                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                                                <div>
-                                                    <p className="font-bold text-sm text-slate-900 dark:text-slate-50">
-                                                        emailtracker.io
-                                                    </p>
-                                                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                                                        Authenticated (DKIM,
-                                                        SPF, DMARC)
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Button variant="ghost" size="sm">
-                                                Manage DNS
-                                            </Button>
-                                        </div>
-                                        <div className="flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-900/50">
-                                            <div className="flex items-center gap-3">
-                                                <AlertCircle className="w-5 h-5 text-amber-500" />
-                                                <div>
-                                                    <p className="font-bold text-sm text-slate-900 dark:text-slate-50">
-                                                        marketing-updates.com
-                                                    </p>
-                                                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                                                        Pending Verification - 2
-                                                        records missing
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="bg-white dark:bg-slate-950"
-                                            >
-                                                Verify Now
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                        <SenderDomains setActiveTab={setActiveTab} />
+                    )}
+
+                    {activeTab === "smtp-credentials" && (
+                        <SmtpCredentials />
+                    )}
+
+                    {activeTab === "suppressions" && (
+                        <Suppressions />
                     )}
 
                     {activeTab === "integrations" && (
@@ -680,11 +585,24 @@ export default function Settings() {
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <label className="text-sm font-medium text-slate-900 dark:text-slate-50">
-                                                        Password / Secret
-                                                    </label>
+                                                    <div className="flex justify-between items-center">
+                                                        <label className="text-sm font-medium text-slate-900 dark:text-slate-50">
+                                                            Password / Secret
+                                                        </label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowSmtpPassword(!showSmtpPassword)}
+                                                            className="text-xs text-indigo-650 dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold focus:outline-none"
+                                                        >
+                                                            {showSmtpPassword ? (
+                                                                <><EyeOff className="h-3.5 w-3.5" /> Hide</>
+                                                            ) : (
+                                                                <><Eye className="h-3.5 w-3.5" /> Show</>
+                                                            )}
+                                                        </button>
+                                                    </div>
                                                     <Input
-                                                        type="password"
+                                                        type={showSmtpPassword ? "text" : "password"}
                                                         value={newSmtp.password}
                                                         onChange={(e) =>
                                                             setNewSmtp({
@@ -851,44 +769,14 @@ export default function Settings() {
                     )}
 
                     {activeTab === "profile" && (
+                        <MyProfile />
+                    )}
+
+                    {activeTab === "kym-console" && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>My Profile</CardTitle>
-                                    <CardDescription>
-                                        Update your personal information.
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid gap-4 sm:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-slate-900 dark:text-slate-50">
-                                                Full Name
-                                            </label>
-                                            <Input
-                                                defaultValue="Gaurav Singh"
-                                                className="dark:bg-slate-950"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-slate-900 dark:text-slate-50">
-                                                Email Address
-                                            </label>
-                                            <Input
-                                                defaultValue="gaurav@emailtracker.io"
-                                                disabled
-                                                className="dark:bg-slate-950"
-                                            />
-                                        </div>
-                                    </div>
-                                    <Button className="mt-4 bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-200">
-                                        Save Changes
-                                    </Button>
-                                </CardContent>
-                            </Card>
+                            <KymConsole />
                         </div>
                     )}
-                </div>
             </div>
         </div>
     );

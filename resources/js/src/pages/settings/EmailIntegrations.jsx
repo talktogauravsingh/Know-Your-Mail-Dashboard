@@ -9,11 +9,12 @@ import {
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Input } from "../../components/ui/Input";
-import { Server, Plus, Trash2 } from "lucide-react";
+import { Server, Plus, Trash2, Eye, EyeOff } from "lucide-react";
 import { useStore } from "../../store/useStore";
 
 export default function EmailIntegrations() {
     const [isAddingSmtp, setIsAddingSmtp] = useState(false);
+    const [showSmtpPassword, setShowSmtpPassword] = useState(false);
     const [newSmtp, setNewSmtp] = useState({
         provider: "Custom SMTP",
         host: "",
@@ -143,17 +144,30 @@ export default function EmailIntegrations() {
                                         className="bg-white dark:bg-slate-950"
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-slate-900 dark:text-slate-50">
-                                        Password / Secret
-                                    </label>
-                                    <Input
-                                        type="password"
-                                        value={newSmtp.password}
-                                        onChange={(e) => setNewSmtp({ ...newSmtp, password: e.target.value })}
-                                        className="bg-white dark:bg-slate-950"
-                                    />
-                                </div>
+                                 <div className="space-y-2">
+                                     <div className="flex justify-between items-center">
+                                         <label className="text-sm font-medium text-slate-900 dark:text-slate-50">
+                                             Password / Secret
+                                         </label>
+                                         <button
+                                             type="button"
+                                             onClick={() => setShowSmtpPassword(!showSmtpPassword)}
+                                             className="text-xs text-indigo-650 dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold focus:outline-none"
+                                         >
+                                             {showSmtpPassword ? (
+                                                 <><EyeOff className="h-3.5 w-3.5" /> Hide</>
+                                             ) : (
+                                                 <><Eye className="h-3.5 w-3.5" /> Show</>
+                                             )}
+                                         </button>
+                                     </div>
+                                     <Input
+                                         type={showSmtpPassword ? "text" : "password"}
+                                         value={newSmtp.password}
+                                         onChange={(e) => setNewSmtp({ ...newSmtp, password: e.target.value })}
+                                         className="bg-white dark:bg-slate-950"
+                                     />
+                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-slate-900 dark:text-slate-50">
                                         Sender Name

@@ -10,7 +10,6 @@ import AppLayout from './layouts/AppLayout';
 // Pages
 import Login from './pages/Login';
 import Signup from './pages/Signup';
-import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Campaigns from './pages/Campaigns';
 import CreateCampaign from './pages/CreateCampaign';
@@ -22,6 +21,10 @@ import BulkImport from './pages/BulkImport';
 import Settings from './pages/Settings';
 import Billing from './pages/Billing';
 import TemplateDesigner from './pages/TemplateDesigner';
+import Automations from './pages/Automations';
+import AutomationBuilder from './pages/AutomationBuilder';
+import FounderDashboard from './pages/FounderDashboard';
+
 
 // Protected Route Wrapper
 function ProtectedRoute({ children }) {
@@ -48,16 +51,29 @@ function ProtectedRoute({ children }) {
 import { ToastList } from './components/ui/ToastList';
 
 export default function App() {
+  const theme = useStore((state) => state.theme);
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
   return (
     <BrowserRouter>
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<Landing />} />
-        
         <Route element={<AuthLayout />}>
+          <Route path="/" element={<Login />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
         </Route>
+
+        {/* Founder Standalone Route (bypasses app auth, protected on web server basic auth) */}
+        <Route path="/founder" element={<FounderDashboard />} />
+
 
         {/* Protected Routes */}
         <Route 
@@ -70,6 +86,7 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/campaigns" element={<Campaigns />} />
           <Route path="/campaigns/new" element={<CreateCampaign />} />
+          <Route path="/campaigns/:id/edit" element={<CreateCampaign />} />
           <Route path="/campaigns/:id" element={<CampaignAnalytics />} />
           <Route path="/templates" element={<Templates />} />
           <Route path="/templates/builder" element={<TemplateBuilder />} />
@@ -77,6 +94,9 @@ export default function App() {
           <Route path="/bulk-import" element={<BulkImport />} />
           <Route path="/billing" element={<Billing />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/automations" element={<Automations />} />
+          <Route path="/automations/new" element={<AutomationBuilder />} />
+          <Route path="/automations/:id" element={<AutomationBuilder />} />
           <Route
             path="/templates/designer"
             element={<TemplateDesigner />}

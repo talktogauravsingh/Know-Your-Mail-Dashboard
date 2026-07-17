@@ -3,7 +3,47 @@
 return [
     'default_provider' => env('PAYMENT_PROVIDER', 'razorpay'),
 
+    // Core list of features in the system
+    'features' => [
+        'ai_generation' => [
+            'name' => 'AI Email Copy Assistant',
+            'description' => 'Generate and rewrite email copy with AI.',
+        ],
+        'custom_domain' => [
+            'name' => 'Custom Sender Domain',
+            'description' => 'Verify and send using your own branded domain.',
+        ],
+        'track_conversions' => [
+            'name' => 'Conversion Tracking',
+            'description' => 'Track business conversions driven by your campaigns.',
+        ],
+        'advanced_analytics' => [
+            'name' => 'Advanced Analytics',
+            'description' => 'In-depth hierarchical campaign performance reporting.',
+        ],
+    ],
+
     'plans' => [
+        'free' => [
+            'name' => 'Free',
+            'description' => 'Default workspace access before a paid plan is activated.',
+            'currency' => 'INR',
+            'amount_minor' => 0,
+            'interval' => 'month',
+            'emails_limit' => 500,
+            'sort_order' => 1,
+            'is_public' => false,
+            'features' => [
+                '500 emails per month',
+                'Basic workspace access',
+                '1 Custom Domain limit',
+                '2 free AI copy generations',
+            ],
+            'feature_keys' => [
+                'custom_domain' => ['is_enabled' => 1, 'limit_value' => 1],
+                'ai_generation' => ['is_enabled' => 1, 'limit_value' => 2],
+            ],
+        ],
         'starter' => [
             'name' => 'Starter',
             'description' => 'For early teams sending their first campaigns.',
@@ -16,6 +56,12 @@ return [
                 '5,000 emails per month',
                 'Basic campaign analytics',
                 'Shared sending infrastructure',
+                '3 Custom Domain limit',
+                '5 AI copy generations per month',
+            ],
+            'feature_keys' => [
+                'custom_domain' => ['is_enabled' => 1, 'limit_value' => 3],
+                'ai_generation' => ['is_enabled' => 1, 'limit_value' => 5],
             ],
         ],
         'pro' => [
@@ -30,6 +76,15 @@ return [
                 '20,000 emails per month',
                 'Advanced analytics',
                 'Priority email support',
+                'Unlimited Custom Domains',
+                '100 AI copy generations per month',
+                'Conversion tracking',
+            ],
+            'feature_keys' => [
+                'custom_domain' => ['is_enabled' => 1, 'limit_value' => null],
+                'ai_generation' => ['is_enabled' => 1, 'limit_value' => 100],
+                'track_conversions' => ['is_enabled' => 1, 'limit_value' => null],
+                'advanced_analytics' => ['is_enabled' => 1, 'limit_value' => null],
             ],
         ],
         'scale' => [
@@ -44,6 +99,16 @@ return [
                 '250,000 emails per month',
                 'Dedicated onboarding support',
                 'Higher throughput sending',
+                'Unlimited Custom Domains',
+                'Unlimited AI copy generations',
+                'Conversion tracking',
+                'Advanced analytics',
+            ],
+            'feature_keys' => [
+                'custom_domain' => ['is_enabled' => 1, 'limit_value' => null],
+                'ai_generation' => ['is_enabled' => 1, 'limit_value' => null],
+                'track_conversions' => ['is_enabled' => 1, 'limit_value' => null],
+                'advanced_analytics' => ['is_enabled' => 1, 'limit_value' => null],
             ],
         ],
         'manual_test' => [
@@ -57,6 +122,10 @@ return [
             'is_public' => false,
             'features' => [
                 'Internal testing only',
+            ],
+            'feature_keys' => [
+                'custom_domain' => ['is_enabled' => 1, 'limit_value' => 1],
+                'ai_generation' => ['is_enabled' => 1, 'limit_value' => 5],
             ],
         ],
     ],

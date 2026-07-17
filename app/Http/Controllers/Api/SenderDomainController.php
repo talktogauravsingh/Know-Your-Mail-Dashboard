@@ -7,6 +7,10 @@ use App\Models\SenderDomain;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
+
 class SenderDomainController extends Controller
 {
     /**
@@ -27,24 +31,55 @@ class SenderDomainController extends Controller
      */
     public function store(Request $request)
     {
+        $orgId = (int) $request->user()->organization_id;
+        $quota = app(\App\Services\FeatureGateService::class)->checkQuota('custom_domain', $orgId);
+        if (!$quota['has_access']) {
+            return response()->json([
+                'error' => 'feature_locked',
+                'message' => 'Custom Domain verification is not included in your current plan. Please upgrade.'
+            ], 403);
+        }
+
+        if ($quota['remaining'] !== null) {
+            $existingCount = SenderDomain::where('organization_id', $orgId)->count();
+            if ($existingCount >= $quota['remaining']) {
+                return response()->json([
+                    'error' => 'quota_exceeded',
+                    'message' => "You have reached the maximum limit of {$quota['remaining']} custom domains for your plan. Please upgrade to add more."
+                ], 403);
+            }
+        }
+
         $request->validate([
             'domain' => [
                 'required',
                 'string',
                 'max:253',
                 'regex:/^(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/',
-                function ($attribute, $value, $fail) use ($request) {
-                    $exists = SenderDomain::where('organization_id', $request->user()->organization_id)
-                        ->where('domain', strtolower($value))
-                        ->exists();
+                function ($attribute, $value, $fail) {
+                    $exists = SenderDomain::where('domain', strtolower($value))->exists();
                     if ($exists) {
-                        $fail('This domain has already been added.');
+                        $fail('This domain has already been registered by another organization.');
                     }
                 },
             ],
         ]);
 
-        $appHost = config('app.tracking_domain', parse_url(config('app.url'), PHP_URL_HOST));
+        $appHost = config('app.tracking_domain') ?: parse_url(config('app.url'), PHP_URL_HOST);
+
+        // Generate RSA 2048-bit keypair
+        $config = [
+            "digest_alg" => "sha256",
+            "private_key_bits" => 2048,
+            "private_key_type" => OPENSSL_KEYTYPE_RSA,
+        ];
+        $pkey = openssl_pkey_new($config);
+        openssl_pkey_export($pkey, $privateKeyPem);
+        $pubKeyDetails = openssl_pkey_get_details($pkey);
+        $publicKeyPem = $pubKeyDetails["key"];
+
+        // Format public key for DNS TXT: strip PEM tags, newlines and spaces
+        $publicKeyClean = preg_replace('/-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\r|\n|\s+/', '', $publicKeyPem);
 
         $domain = SenderDomain::create([
             'organization_id' => $request->user()->organization_id,
@@ -52,9 +87,8 @@ class SenderDomainController extends Controller
             'status'          => 'pending',
             'cname_target'    => $appHost,
             'dkim_selector'   => 'kym',
-            // In production, generate a real RSA keypair and store the private key
-            // in a secrets manager; only the public key lives in the DB.
-            'dkim_public_key' => $this->generateDkimPublicKeyPlaceholder(),
+            'dkim_public_key' => $publicKeyClean,
+            'dkim_private_key'=> $privateKeyPem,
         ]);
 
         return response()->json($this->formatDomain($domain), 201);
@@ -76,8 +110,6 @@ class SenderDomainController extends Controller
 
     /**
      * Trigger a DNS verification check for a domain.
-     * In production this would do real DNS lookups (dns_get_record / external API).
-     * For now it checks the presence of expected records and marks accordingly.
      */
     public function verify(Request $request, int $id)
     {
@@ -85,22 +117,133 @@ class SenderDomainController extends Controller
             ->where('organization_id', $request->user()->organization_id)
             ->firstOrFail();
 
-        // ── Real DNS check ───────────────────────────────────────────────────
+        $appHost = config('app.tracking_domain') ?: parse_url(config('app.url'), PHP_URL_HOST);
+
+        // DNS checks
         $spfVerified   = $this->checkSpf($senderDomain->domain);
         $dkimVerified  = $this->checkDkim($senderDomain->domain, $senderDomain->dkim_selector);
         $dmarcVerified = $this->checkDmarc($senderDomain->domain);
+        $cnameVerified = $this->checkCname($senderDomain->domain, $appHost);
 
+        // CNAME verification is optional for email relay/sending, but SPF, DKIM, and DMARC are required
         $fullyVerified = $spfVerified && $dkimVerified && $dmarcVerified;
 
         $senderDomain->update([
             'spf_verified'   => $spfVerified,
             'dkim_verified'  => $dkimVerified,
             'dmarc_verified' => $dmarcVerified,
+            'cname_verified' => $cnameVerified,
+            'cname_target'   => $cnameVerified ? $appHost : $senderDomain->cname_target,
             'status'         => $fullyVerified ? 'verified' : 'pending',
             'verified_at'    => $fullyVerified ? now() : null,
         ]);
 
         return response()->json($this->formatDomain($senderDomain->fresh()));
+    }
+
+    /**
+     * Provision DNS records directly in Cloudflare.
+     */
+    public function provisionCloudflare(Request $request, int $id)
+    {
+        $request->validate([
+            'cloudflare_api_token' => ['required', 'string'],
+            'cloudflare_zone_id'   => ['nullable', 'string'],
+        ]);
+
+        $domain = SenderDomain::where('id', $id)
+            ->where('organization_id', $request->user()->organization_id)
+            ->firstOrFail();
+
+        $apiToken = $request->cloudflare_api_token;
+        $zoneId = $request->cloudflare_zone_id;
+        $domainName = $domain->domain;
+
+        $appHost = config('app.tracking_domain') ?: parse_url(config('app.url'), PHP_URL_HOST);
+
+        try {
+            // 1. Resolve Zone ID if not provided
+            if (!$zoneId) {
+                $response = Http::withToken($apiToken)
+                    ->get("https://api.cloudflare.com/client/v4/zones?name=" . $domainName);
+
+                if (!$response->successful() || count($response->json('result') ?? []) === 0) {
+                    // Try getting base domain zone if it's a subdomain
+                    $parts = explode('.', $domainName);
+                    if (count($parts) > 2) {
+                        $baseDomain = implode('.', array_slice($parts, -2));
+                        $response = Http::withToken($apiToken)
+                            ->get("https://api.cloudflare.com/client/v4/zones?name=" . $baseDomain);
+                    }
+                }
+
+                if (!$response->successful() || count($response->json('result') ?? []) === 0) {
+                    return response()->json(['message' => 'Cloudflare Zone could not be resolved for domain ' . $domainName], 422);
+                }
+
+                $zoneId = $response->json('result.0.id');
+            }
+
+            // Define DNS records to create
+            $records = [
+                // Tracking CNAME: em.domain.com -> appHost
+                [
+                    'type' => 'CNAME',
+                    'name' => 'em',
+                    'content' => $appHost,
+                    'proxied' => false,
+                    'ttl' => 3600
+                ],
+                // SPF Record: TXT @ -> v=spf1 include:appHost ~all
+                [
+                    'type' => 'TXT',
+                    'name' => '@',
+                    'content' => 'v=spf1 include:' . $appHost . ' ~all',
+                    'ttl' => 3600
+                ],
+                // DKIM Record: TXT selector._domainkey -> v=DKIM1; k=rsa; p=public_key
+                [
+                    'type' => 'TXT',
+                    'name' => $domain->dkim_selector . '._domainkey',
+                    'content' => 'v=DKIM1; k=rsa; p=' . $domain->dkim_public_key,
+                    'ttl' => 3600
+                ],
+                // DMARC Record: TXT _dmarc -> v=DMARC1; p=none; rua=mailto:dmarc@appHost
+                [
+                    'type' => 'TXT',
+                    'name' => '_dmarc',
+                    'content' => 'v=DMARC1; p=none; rua=mailto:dmarc@' . $appHost,
+                    'ttl' => 3600
+                ]
+            ];
+
+            foreach ($records as $recordData) {
+                $dnsRes = Http::withToken($apiToken)
+                    ->post("https://api.cloudflare.com/client/v4/zones/{$zoneId}/dns_records", $recordData);
+
+                if (!$dnsRes->successful()) {
+                    // Check if error is 'record already exists' (code 81057)
+                    $errors = $dnsRes->json('errors') ?? [];
+                    $isDuplicate = false;
+                    foreach ($errors as $err) {
+                        if ($err['code'] === 81057) {
+                            $isDuplicate = true;
+                            break;
+                        }
+                    }
+                    if (!$isDuplicate) {
+                        // Log or return error if not duplicate
+                        Log::warning("Failed to create DNS record in Cloudflare: " . $dnsRes->body());
+                    }
+                }
+            }
+
+            // Trigger verify check after record injection
+            return $this->verify($request, $id);
+
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Cloudflare integration failed: ' . $e->getMessage()], 500);
+        }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -114,6 +257,7 @@ class SenderDomainController extends Controller
             'spf_verified' => $d->spf_verified,
             'dkim_verified'=> $d->dkim_verified,
             'dmarc_verified'=> $d->dmarc_verified,
+            'cname_verified'=> $d->cname_verified,
             'verified_at'  => $d->verified_at?->format('M d, Y'),
             'dns_records'  => $d->getDnsRecords(),
             'created_at'   => $d->created_at->format('M d, Y'),
@@ -130,7 +274,7 @@ class SenderDomainController extends Controller
                 }
             }
         } catch (\Exception $e) {
-            // DNS lookup failure — treat as not verified
+            // DNS lookup failure
         }
         return false;
     }
@@ -167,12 +311,19 @@ class SenderDomainController extends Controller
         return false;
     }
 
-    /**
-     * Placeholder — replace with a real RSA keygen in production.
-     */
-    private function generateDkimPublicKeyPlaceholder(): string
+    private function checkCname(string $domain, string $expectedTarget): bool
     {
-        // In production: openssl_pkey_new + openssl_pkey_get_details
-        return 'PLACEHOLDER_REPLACE_WITH_REAL_RSA_PUBLIC_KEY_' . strtoupper(Str::random(8));
+        try {
+            $host = 'em.' . $domain;
+            $records = dns_get_record($host, DNS_CNAME);
+            foreach ($records as $record) {
+                if (isset($record['target']) && strtolower(rtrim($record['target'], '.')) === strtolower(rtrim($expectedTarget, '.'))) {
+                    return true;
+                }
+            }
+        } catch (\Exception $e) {
+            // DNS lookup failure
+        }
+        return false;
     }
 }

@@ -30,7 +30,7 @@ return new class extends Migration {
             $table->index(['organization_id', 'email'], 'idx_org_email');
         });
 
-        if (Schema::hasColumn('recipients', 'attributes')) {
+        if (Schema::hasColumn('recipients', 'attributes') && DB::getDriverName() === 'pgsql') {
             DB::statement('ALTER TABLE recipients ALTER COLUMN attributes TYPE jsonb USING attributes::jsonb');
         }
     }

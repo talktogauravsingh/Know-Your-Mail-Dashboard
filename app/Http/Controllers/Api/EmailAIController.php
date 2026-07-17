@@ -22,6 +22,14 @@ class EmailAIController extends Controller
 
     public function generate(GenerateEmailAIRequest $request)
     {
+        $orgId = (int) auth()->user()->organization_id;
+        if (!app(\App\Services\FeatureGateService::class)->consumeCredit('ai_generation', $orgId)) {
+            return response()->json([
+                'error' => 'feature_locked',
+                'message' => 'You have run out of AI generation credits for your billing cycle. Please upgrade your plan.'
+            ], 403);
+        }
+
         $data = $request->validated();
         $result = $this->service->generate($data);
 
@@ -54,6 +62,36 @@ class EmailAIController extends Controller
         ]);
     }
 
+    public function generateStream(GenerateEmailAIRequest $request)
+    {
+        $orgId = (int) auth()->user()->organization_id;
+        if (!app(\App\Services\FeatureGateService::class)->consumeCredit('ai_generation', $orgId)) {
+            return response()->json([
+                'error' => 'feature_locked',
+                'message' => 'You have run out of AI generation credits for your billing cycle. Please upgrade your plan.'
+            ], 403);
+        }
+
+        $data = $request->validated();
+
+        return response()->stream(function () use ($data) {
+            $stream = $this->service->generateStream($data);
+            while (!$stream->eof()) {
+                echo $stream->read(1024);
+                if (connection_aborted()) {
+                    break;
+                }
+                ob_flush();
+                flush();
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'Connection' => 'keep-alive',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
+
     public function spamCheck(SpamCheckEmailAIRequest $request)
     {
         $data = $request->validated();
@@ -64,6 +102,14 @@ class EmailAIController extends Controller
 
     public function rewrite(RewriteEmailAIRequest $request)
     {
+        $orgId = (int) auth()->user()->organization_id;
+        if (!app(\App\Services\FeatureGateService::class)->consumeCredit('ai_generation', $orgId)) {
+            return response()->json([
+                'error' => 'feature_locked',
+                'message' => 'You have run out of AI generation credits for your billing cycle. Please upgrade your plan.'
+            ], 403);
+        }
+
         $data = $request->validated();
         $result = $this->service->rewrite($data);
 

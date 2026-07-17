@@ -12,16 +12,17 @@ services:
     environment:
       # These environment variables align with your .env
       - APP_ENV=${APP_ENV:-local}
-      - DB_CONNECTION=${DB_CONNECTION:-pgsql}
-      - DB_HOST=${DB_HOST:-aws-1-ap-northeast-2.pooler.supabase.com}
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_DATABASE=${DB_DATABASE:-postgres}
-      - DB_USERNAME=${DB_USERNAME:-postgres.dtlisdqyoticllzhufju}
-      - DB_PASSWORD=${DB_PASSWORD:-yUYYZYf3152uZyPa}
+      - DB_CONNECTION=${DB_CONNECTION:-mysql}
+      - DB_HOST=${DB_HOST:-127.0.0.1}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_DATABASE=${DB_DATABASE:-emailer_db}
+      - DB_USERNAME=${DB_USERNAME:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-root123}
       - CACHE_STORE=${CACHE_STORE:-redis}
-      - REDIS_CLIENT=${REDIS_CLIENT:-phpredis}
+      - REDIS_CLIENT=${REDIS_CLIENT:-predis}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-kym_encryption_secret_key_32_bytes_long_key_!}
 
   web:
     image: nginx:alpine
