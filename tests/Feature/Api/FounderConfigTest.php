@@ -12,11 +12,17 @@ class FounderConfigTest extends TestCase
     {
         parent::setUp();
         Cache::forget('founder_system_configs');
+        if (file_exists(storage_path('app/redis_connection.json'))) {
+            unlink(storage_path('app/redis_connection.json'));
+        }
     }
 
     protected function tearDown(): void
     {
         Cache::forget('founder_system_configs');
+        if (file_exists(storage_path('app/redis_connection.json'))) {
+            unlink(storage_path('app/redis_connection.json'));
+        }
         parent::tearDown();
     }
 
@@ -111,5 +117,38 @@ class FounderConfigTest extends TestCase
 
         $nonExistent = FounderController::getSetting('NON_EXISTENT_VAL', 'default_fallback');
         $this->assertEquals('default_fallback', $nonExistent);
+    }
+
+    public function test_can_retrieve_redis_connection_details()
+    {
+        $response = $this->getJson('/api/founder/redis-connection');
+
+        $response->assertStatus(200)
+                 ->assertJsonStructure([
+                     'success',
+                     'connection' => [
+                         'host',
+                         'port',
+                         'password',
+                         'configured'
+                     ],
+                     'status'
+                 ]);
+    }
+
+    public function test_fails_to_save_invalid_redis_connection()
+    {
+        $response = $this->postJson('/api/founder/redis-connection', [
+            'host' => 'invalid-host-name-should-fail-testing-auth',
+            'port' => 6379,
+            'password' => null
+        ]);
+
+        $response->assertStatus(422)
+                 ->assertJson([
+                     'success' => false
+                 ]);
+
+        $this->assertFalse(file_exists(storage_path('app/redis_connection.json')));
     }
 }
