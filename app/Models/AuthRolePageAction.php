@@ -29,4 +29,9 @@ class AuthRolePageAction extends Model
     {
         return $this->belongsTo(AuthPageAction::class, 'page_action_id');
     }
+
+    public function pageActionPivot()
+    {
+        return $this->hasOne(AuthPageAction::class, 'id', 'page_action_id')->where('status', 1);
+    }
 }

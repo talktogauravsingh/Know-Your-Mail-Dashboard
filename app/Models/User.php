@@ -129,5 +129,64 @@ class User extends Authenticatable implements MustVerifyEmail
             ->where('auth_role_page_actions.access', 1)
             ->exists();
     }
+
+    public function getAuthRolePageActionList()
+    {
+        $userId = $this->id;
+
+        $roles = AuthUserRole::where("user_id", $userId)
+            ->where('status', 1)
+            ->with([
+                'pageActions.pageActionPivot.page',
+                'pageActions.pageActionPivot.action',
+            ])
+            ->get();
+
+        $permissionList = [
+            "isRoot" => 0,
+            "permissionList" => []
+        ];
+
+        // Check if root user (either via legacy role slug 'root' or auth role name 'root')
+        if (($this->role && $this->role->slug === 'root') || 
+            $this->authRoles()->where('auth_roles.name', 'root')->where('auth_user_roles.status', 1)->exists()) {
+            $permissionList['isRoot'] = 1;
+        }
+
+        foreach ($roles as $userRole) {
+            $role = $userRole->role;
+            if (!$role) {
+                continue;
+            }
+
+            if (in_array($role->id, [1, 2]) || $role->name === 'root') {
+                $permissionList['isRoot'] = 1;
+            }
+
+            foreach ($userRole->pageActions as $rolePageAction) {
+                $pageAction = $rolePageAction->pageActionPivot;
+                if (!$pageAction || $pageAction->status != 1) {
+                    continue;
+                }
+
+                $page = $pageAction->page;
+                $action = $pageAction->action;
+
+                if ($page && $action) {
+                    if (!isset($permissionList["permissionList"][$page->id])) {
+                        $permissionList["permissionList"][$page->id] = [];
+                    }
+                    $permissionList["permissionList"][$page->id][$action->id] = [
+                        "pageId" => $page->id,
+                        "pageName" => $page->name,
+                        "actionId" => $action->id,
+                        "actionName" => $action->name
+                    ];
+                }
+            }
+        }
+
+        return $permissionList;
+    }
 }
 

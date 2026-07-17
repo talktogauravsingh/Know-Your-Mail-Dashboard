@@ -36,4 +36,9 @@ class AuthUserRole extends Model
     {
         return $this->belongsTo(User::class, 'added_by');
     }
+
+    public function pageActions()
+    {
+        return $this->hasMany(AuthRolePageAction::class, 'role_id', 'role_id')->where('access', 1);
+    }
 }

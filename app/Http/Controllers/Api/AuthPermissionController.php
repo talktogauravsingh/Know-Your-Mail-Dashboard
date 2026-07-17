@@ -201,6 +201,11 @@ class AuthPermissionController extends Controller
             });
         }
 
+        // Hide root role if user email is not techknowyourmail@gmail.com
+        if ($currentUser->email !== 'techknowyourmail@gmail.com') {
+            $query->where('name', '!=', 'root');
+        }
+
         return response()->json($query->get());
     }
 
@@ -209,6 +214,10 @@ class AuthPermissionController extends Controller
         $currentUser = $request->user();
         if (!$currentUser) {
             abort(401, 'Unauthenticated.');
+        }
+
+        if (strtolower($request->input('name')) === 'root' && $currentUser->email !== 'techknowyourmail@gmail.com') {
+            abort(403, 'Unauthorized to configure root role.');
         }
 
         $validated = $request->validate([
@@ -231,7 +240,16 @@ class AuthPermissionController extends Controller
 
     public function updateRole(Request $request, AuthRole $role)
     {
+        $currentUser = $request->user();
+        if (!$currentUser) {
+            abort(401, 'Unauthenticated.');
+        }
+
         $this->checkRoleAccess($request, $role);
+
+        if (($role->name === 'root' || ($request->has('name') && strtolower($request->input('name')) === 'root')) && $currentUser->email !== 'techknowyourmail@gmail.com') {
+            abort(403, 'Unauthorized to configure root role.');
+        }
 
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255|unique:auth_roles,name,' . $role->id,
@@ -248,7 +266,16 @@ class AuthPermissionController extends Controller
 
     public function destroyRole(Request $request, AuthRole $role)
     {
+        $currentUser = $request->user();
+        if (!$currentUser) {
+            abort(401, 'Unauthenticated.');
+        }
+
         $this->checkRoleAccess($request, $role);
+
+        if ($role->name === 'root' && $currentUser->email !== 'techknowyourmail@gmail.com') {
+            abort(403, 'Unauthorized to configure root role.');
+        }
 
         $role->delete();
         return response()->json(null, 204);
@@ -260,7 +287,16 @@ class AuthPermissionController extends Controller
 
     public function assignRolePermissions(Request $request, AuthRole $role)
     {
+        $currentUser = $request->user();
+        if (!$currentUser) {
+            abort(401, 'Unauthenticated.');
+        }
+
         $this->checkRoleAccess($request, $role);
+
+        if ($role->name === 'root' && $currentUser->email !== 'techknowyourmail@gmail.com') {
+            abort(403, 'Unauthorized to configure root role.');
+        }
 
         $validated = $request->validate([
             'permissions' => 'required|array',
@@ -294,13 +330,28 @@ class AuthPermissionController extends Controller
 
     public function getUserRoles(Request $request, User $user)
     {
+        $currentUser = $request->user();
+        if (!$currentUser) {
+            abort(401, 'Unauthenticated.');
+        }
+
         $this->checkUserAccess($request, $user);
 
-        return response()->json($user->authRoles);
+        $roles = $user->authRoles;
+        if ($currentUser->email !== 'techknowyourmail@gmail.com') {
+            $roles = $roles->filter(fn($r) => $r->name !== 'root');
+        }
+
+        return response()->json($roles->values());
     }
 
     public function assignUserRoles(Request $request, User $user)
     {
+        $currentUser = $request->user();
+        if (!$currentUser) {
+            abort(401, 'Unauthenticated.');
+        }
+
         $this->checkUserAccess($request, $user);
 
         $validated = $request->validate([
@@ -309,11 +360,15 @@ class AuthPermissionController extends Controller
             'status' => 'sometimes|integer',
         ]);
 
-        $currentUser = $request->user();
-        $addedBy = $currentUser ? $currentUser->id : 1;
+        $hasRootRole = AuthRole::whereIn('id', $validated['role_ids'])->where('name', 'root')->exists();
+        if (($user->email === 'techknowyourmail@gmail.com' || $hasRootRole) && $currentUser->email !== 'techknowyourmail@gmail.com') {
+            abort(403, 'Unauthorized to configure root user or role.');
+        }
+
+        $addedBy = $currentUser->id;
         $status = $validated['status'] ?? 1;
 
-        if ($currentUser && $currentUser->role?->slug !== 'root') {
+        if ($currentUser->role?->slug !== 'root') {
             foreach ($validated['role_ids'] as $roleId) {
                 $role = AuthRole::find($roleId);
                 $role->load('creator');
