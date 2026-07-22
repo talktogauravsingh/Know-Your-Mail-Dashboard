@@ -127,7 +127,7 @@ class AuthController extends Controller
         $token = $user->createToken('auth-token')->plainTextToken;
 
         return response()->json([
-            'user' => $user->load('role'),
+            'user' => $user->load('role')->append('auth_permissions'),
             'token' => $token,
         ]);
     }
@@ -158,7 +158,7 @@ class AuthController extends Controller
         $token = $user->createToken('auth-token')->plainTextToken;
 
         return response()->json([
-            'user' => $user->load('role'),
+            'user' => $user->load('role')->append('auth_permissions'),
             'token' => $token,
         ]);
     }
@@ -199,7 +199,7 @@ class AuthController extends Controller
         $token = $user->createToken('auth-token')->plainTextToken;
 
         return response()->json([
-            'user' => $user->load('role.permissions'),
+            'user' => $user->load('role.permissions')->append('auth_permissions'),
             'token' => $token,
         ]);
     }
@@ -251,7 +251,7 @@ public function createManager(Request $request)
         $token = $manager->createToken('auth-token')->plainTextToken;
 
         return response()->json([
-            'manager' => $manager->load('role.permissions'),
+            'manager' => $manager->load('role.permissions')->append('auth_permissions'),
             'token' => $token,
         ]);
     }

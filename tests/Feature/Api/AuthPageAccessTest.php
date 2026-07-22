@@ -215,6 +215,19 @@ class AuthPageAccessTest extends TestCase
 
     public function test_root_hiding_and_protection_restrictions()
     {
+        // Create settings view page action and map it to manager role
+        $settingsViewPageAction = AuthPageAction::create([
+            'page_id' => AUTH_PAGE_SETTINGS,
+            'action_id' => AUTH_ACTION_VIEW,
+            'description' => 'View settings page',
+            'status' => 1,
+        ]);
+        AuthRolePageAction::create([
+            'role_id' => $this->role->id,
+            'page_action_id' => $settingsViewPageAction->id,
+            'access' => 1,
+        ]);
+
         // 1. Create a root user under techknowyourmail@gmail.com
         $rootUser = User::factory()->create([
             'email' => 'techknowyourmail@gmail.com',
@@ -226,6 +239,13 @@ class AuthPageAccessTest extends TestCase
             'email' => 'admin_user@example.com',
             'role_id' => $this->normalUser->role_id,
             'organization_id' => $this->normalUser->organization_id,
+        ]);
+
+        AuthUserRole::create([
+            'user_id' => $adminUser->id,
+            'role_id' => $this->role->id,
+            'status' => 1,
+            'added_by' => $rootUser->id,
         ]);
 
         // Assert root role exists

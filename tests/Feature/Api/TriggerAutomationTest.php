@@ -39,11 +39,13 @@ class TriggerAutomationTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        $rootRole = \App\Models\Role::where('slug', 'root')->first();
         $this->user = User::create([
             'name' => 'Test Admin',
             'email' => 'testadmin@example.com',
             'password' => bcrypt('password'),
             'organization_id' => $this->org->id,
+            'role_id' => $rootRole?->id,
         ]);
 
         $this->campaign = Campaign::create([
@@ -120,9 +122,11 @@ class TriggerAutomationTest extends TestCase
     {
         // Create an organization 2 and user 2
         $org2 = Organization::create(['name' => 'Org Two']);
+        $rootRole = \App\Models\Role::where('slug', 'root')->first();
         $user2 = User::factory()->create([
             'organization_id' => $org2->id,
             'email' => 'user2@example.com',
+            'role_id' => $rootRole?->id,
         ]);
 
         // Create automation belonging to Org 1

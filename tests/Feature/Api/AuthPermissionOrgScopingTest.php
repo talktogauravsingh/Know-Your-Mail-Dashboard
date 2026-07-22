@@ -26,6 +26,8 @@ class AuthPermissionOrgScopingTest extends TestCase
     protected $orgB;
     protected $rootRole;
     protected $adminRole;
+    protected $authRoleAId;
+    protected $authRoleBId;
 
     protected function setUp(): void
     {
@@ -59,6 +61,65 @@ class AuthPermissionOrgScopingTest extends TestCase
             'role_id' => null,
             'organization_id' => $this->orgA->id,
         ]);
+
+        // Insert settings page and actions
+        $settingsPageId = \Illuminate\Support\Facades\DB::table('auth_pages')->insertGetId(['name' => 'Settings', 'status' => 1]);
+        $viewActionId = \Illuminate\Support\Facades\DB::table('auth_actions')->insertGetId(['name' => 'view']);
+        $editActionId = \Illuminate\Support\Facades\DB::table('auth_actions')->insertGetId(['name' => 'edit']);
+        $allActionId = \Illuminate\Support\Facades\DB::table('auth_actions')->insertGetId(['name' => 'all']);
+
+        $viewPageActionId = \Illuminate\Support\Facades\DB::table('auth_page_actions')->insertGetId([
+            'page_id' => $settingsPageId,
+            'action_id' => $viewActionId,
+            'description' => 'View Settings actions',
+            'status' => 1
+        ]);
+        $editPageActionId = \Illuminate\Support\Facades\DB::table('auth_page_actions')->insertGetId([
+            'page_id' => $settingsPageId,
+            'action_id' => $editActionId,
+            'description' => 'Edit Settings actions',
+            'status' => 1
+        ]);
+
+        // Auth Role Org A
+        $this->authRoleAId = \Illuminate\Support\Facades\DB::table('auth_roles')->insertGetId([
+            'name' => 'Admin Role A',
+            'description' => 'Org A Admin',
+            'parent_id' => 0,
+            'status' => 1,
+            'type' => 0,
+            'created_by' => $this->rootUser->id,
+        ]);
+        \Illuminate\Support\Facades\DB::table('auth_role_page_actions')->insert([
+            ['role_id' => $this->authRoleAId, 'page_action_id' => $viewPageActionId, 'access' => 1],
+            ['role_id' => $this->authRoleAId, 'page_action_id' => $editPageActionId, 'access' => 1],
+        ]);
+        \Illuminate\Support\Facades\DB::table('auth_user_roles')->insert([
+            'user_id' => $this->adminA->id,
+            'role_id' => $this->authRoleAId,
+            'status' => 1,
+            'added_by' => $this->rootUser->id,
+        ]);
+
+        // Auth Role Org B
+        $this->authRoleBId = \Illuminate\Support\Facades\DB::table('auth_roles')->insertGetId([
+            'name' => 'Admin Role B',
+            'description' => 'Org B Admin',
+            'parent_id' => 0,
+            'status' => 1,
+            'type' => 0,
+            'created_by' => $this->rootUser->id,
+        ]);
+        \Illuminate\Support\Facades\DB::table('auth_role_page_actions')->insert([
+            ['role_id' => $this->authRoleBId, 'page_action_id' => $viewPageActionId, 'access' => 1],
+            ['role_id' => $this->authRoleBId, 'page_action_id' => $editPageActionId, 'access' => 1],
+        ]);
+        \Illuminate\Support\Facades\DB::table('auth_user_roles')->insert([
+            'user_id' => $this->adminB->id,
+            'role_id' => $this->authRoleBId,
+            'status' => 1,
+            'added_by' => $this->rootUser->id,
+        ]);
     }
 
     public function test_root_user_bypasses_all_permission_checks()
@@ -80,7 +141,7 @@ class AuthPermissionOrgScopingTest extends TestCase
         // Root should succeed
         $this->actingAs($this->rootUser, 'sanctum');
         $response = $this->postJson('/api/auth-permissions/pages', [
-            'name' => 'Settings',
+            'name' => 'SettingsUnique',
         ]);
         $response->assertStatus(201);
     }
@@ -115,7 +176,11 @@ class AuthPermissionOrgScopingTest extends TestCase
         $response->assertJsonCount(1);
         $response->assertJsonPath('0.name', 'Role Org B');
 
-        // 3. Root listing roles should see both roles
+        // 3. Root listing roles should see both roles (delete the seeded admin roles first)
+        \Illuminate\Support\Facades\DB::table('auth_user_roles')->whereIn('role_id', [$this->authRoleAId, $this->authRoleBId])->delete();
+        \Illuminate\Support\Facades\DB::table('auth_role_page_actions')->whereIn('role_id', [$this->authRoleAId, $this->authRoleBId])->delete();
+        \Illuminate\Support\Facades\DB::table('auth_roles')->whereIn('id', [$this->authRoleAId, $this->authRoleBId])->delete();
+
         $this->actingAs($this->rootUser, 'sanctum');
         $response = $this->getJson('/api/auth-permissions/roles');
         $response->assertStatus(200);

@@ -188,5 +188,10 @@ class User extends Authenticatable implements MustVerifyEmail
 
         return $permissionList;
     }
+
+    public function getAuthPermissionsAttribute()
+    {
+        return $this->getAuthRolePageActionList();
+    }
 }
 

@@ -48,6 +48,47 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function PermissionGate({ page, action = 'view', children }) {
+  const { user } = useStore();
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  const perms = user.auth_permissions;
+  if (!perms) {
+    return children;
+  }
+  
+  if (perms.isRoot === 1) {
+    return children;
+  }
+  
+  const list = perms.permissionList;
+  if (!list) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  const pageKey = Object.keys(list).find(key => {
+    const pagePerms = list[key];
+    const firstPerm = Object.values(pagePerms)[0];
+    return firstPerm && firstPerm.pageName === page;
+  });
+  
+  if (!pageKey) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  const pageActions = list[pageKey];
+  const hasAccess = Object.values(pageActions).some(act => act.actionName === action || act.actionName === 'all');
+  
+  if (!hasAccess) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return children;
+}
+
 import { ToastList } from './components/ui/ToastList';
 
 export default function App() {
@@ -83,23 +124,23 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/campaigns" element={<Campaigns />} />
-          <Route path="/campaigns/new" element={<CreateCampaign />} />
-          <Route path="/campaigns/:id/edit" element={<CreateCampaign />} />
-          <Route path="/campaigns/:id" element={<CampaignAnalytics />} />
-          <Route path="/templates" element={<Templates />} />
-          <Route path="/templates/builder" element={<TemplateBuilder />} />
-          <Route path="/audience" element={<Audience />} />
-          <Route path="/bulk-import" element={<BulkImport />} />
-          <Route path="/billing" element={<Billing />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/automations" element={<Automations />} />
-          <Route path="/automations/new" element={<AutomationBuilder />} />
-          <Route path="/automations/:id" element={<AutomationBuilder />} />
+          <Route path="/dashboard" element={<PermissionGate page="Overview"><Dashboard /></PermissionGate>} />
+          <Route path="/campaigns" element={<PermissionGate page="Campaigns"><Campaigns /></PermissionGate>} />
+          <Route path="/campaigns/new" element={<PermissionGate page="Campaigns" action="create"><CreateCampaign /></PermissionGate>} />
+          <Route path="/campaigns/:id/edit" element={<PermissionGate page="Campaigns" action="edit"><CreateCampaign /></PermissionGate>} />
+          <Route path="/campaigns/:id" element={<PermissionGate page="Campaigns"><CampaignAnalytics /></PermissionGate>} />
+          <Route path="/templates" element={<PermissionGate page="Templates"><Templates /></PermissionGate>} />
+          <Route path="/templates/builder" element={<PermissionGate page="Templates" action="create"><TemplateBuilder /></PermissionGate>} />
+          <Route path="/audience" element={<PermissionGate page="Audience"><Audience /></PermissionGate>} />
+          <Route path="/bulk-import" element={<PermissionGate page="Global Import"><BulkImport /></PermissionGate>} />
+          <Route path="/billing" element={<PermissionGate page="Billing & Plan"><Billing /></PermissionGate>} />
+          <Route path="/settings" element={<PermissionGate page="Settings"><Settings /></PermissionGate>} />
+          <Route path="/automations" element={<PermissionGate page="Automation"><Automations /></PermissionGate>} />
+          <Route path="/automations/new" element={<PermissionGate page="Automation" action="create"><AutomationBuilder /></PermissionGate>} />
+          <Route path="/automations/:id" element={<PermissionGate page="Automation" action="edit"><AutomationBuilder /></PermissionGate>} />
           <Route
             path="/templates/designer"
-            element={<TemplateDesigner />}
+            element={<PermissionGate page="Templates"><TemplateDesigner /></PermissionGate>}
           />
         </Route>
       </Routes>

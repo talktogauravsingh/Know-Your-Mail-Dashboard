@@ -50,12 +50,34 @@ export default function AppLayout() {
   const location = useLocation();
   const currentPlanName = billingSummary?.current_plan?.name || 'Free';
   const userRoleSlug = user?.role?.slug;
-  const isSettingsAllowed = userRoleSlug === 'super-admin' || userRoleSlug === 'admin' || userRoleSlug === 'root';
+
+  const hasPagePermission = (pageName, actionName = 'view') => {
+    if (!user) return false;
+    const perms = user.auth_permissions;
+    if (!perms) return true; 
+    if (perms.isRoot === 1) return true;
+    
+    const list = perms.permissionList;
+    if (!list) return false;
+    
+    const pageKey = Object.keys(list).find(key => {
+      const pagePerms = list[key];
+      const firstPerm = Object.values(pagePerms)[0];
+      return firstPerm && firstPerm.pageName === pageName;
+    });
+    
+    if (!pageKey) return false;
+    
+    const pageActions = list[pageKey];
+    return Object.values(pageActions).some(act => act.actionName === actionName || act.actionName === 'all');
+  };
+
+  const isSettingsAllowed = userRoleSlug === 'super-admin' || userRoleSlug === 'admin' || userRoleSlug === 'root' || hasPagePermission('Settings');
   const filteredNavigation = navigation.filter(item => {
-    if (item.href === '/settings' || item.href === '/founder') {
-      return isSettingsAllowed;
+    if (item.href === '/founder') {
+      return userRoleSlug === 'root' || hasPagePermission('Founder Console');
     }
-    return true;
+    return hasPagePermission(item.name);
   });
 
   const searchParams = new URLSearchParams(location.search);
