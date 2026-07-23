@@ -25,6 +25,7 @@ class SystemConfigSeeder extends Seeder
             'ENCRYPTION_KEY' => ['value' => env('ENCRYPTION_KEY', 'kym_encryption_secret_key_32_bytes_long_key_!'), 'description' => 'Shared secret key for DKIM / domain verification payload encryption'],
             'GEMINI_API_KEY' => ['value' => env('GEMINI_API_KEY', ''), 'description' => 'Google Gemini AI API key'],
             'VITE_KYM_API_URL' => ['value' => env('VITE_KYM_API_URL', 'http://localhost/api'), 'description' => 'Frontend API base URL'],
+            'REDIS_URL' => ['value' => env('REDIS_URL', 'redis://default:Xr7mFKHN4PLKamd0nIgHQL6hF2OOKkSz@gold-cohesive-bait-59377.db.redis.io:12609'), 'description' => 'Shared Cloud Redis connection URL'],
             'LOG_LEVEL' => ['value' => env('LOG_LEVEL', 'debug'), 'description' => 'System logging level'],
         ];
 
