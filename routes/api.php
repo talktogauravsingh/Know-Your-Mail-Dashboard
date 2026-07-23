@@ -188,6 +188,7 @@ Route::prefix('founder')->group(function () {
     Route::post('flush-queue', [\App\Http\Controllers\Api\FounderController::class, 'flushQueue']);
     Route::get('config', [\App\Http\Controllers\Api\FounderController::class, 'getConfigs']);
     Route::post('config', [\App\Http\Controllers\Api\FounderController::class, 'saveConfig']);
+    Route::post('config/clear-cache', [\App\Http\Controllers\Api\FounderController::class, 'clearConfigCache']);
     Route::delete('config/{key}', [\App\Http\Controllers\Api\FounderController::class, 'deleteConfig']);
     Route::get('redis-connection', [\App\Http\Controllers\Api\FounderController::class, 'getRedisConnection']);
     Route::post('redis-connection', [\App\Http\Controllers\Api\FounderController::class, 'saveRedisConnection']);

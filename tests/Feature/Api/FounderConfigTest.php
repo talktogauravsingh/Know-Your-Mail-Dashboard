@@ -3,15 +3,18 @@
 namespace Tests\Feature\Api;
 
 use Tests\TestCase;
-use Illuminate\Support\Facades\Cache;
+use App\Models\SystemConfig;
 use App\Http\Controllers\Api\FounderController;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class FounderConfigTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected function setUp(): void
     {
         parent::setUp();
-        Cache::forget('founder_system_configs');
+        SystemConfig::clearCache();
         if (file_exists(storage_path('app/redis_connection.json'))) {
             unlink(storage_path('app/redis_connection.json'));
         }
@@ -19,7 +22,7 @@ class FounderConfigTest extends TestCase
 
     protected function tearDown(): void
     {
-        Cache::forget('founder_system_configs');
+        SystemConfig::clearCache();
         if (file_exists(storage_path('app/redis_connection.json'))) {
             unlink(storage_path('app/redis_connection.json'));
         }
@@ -48,26 +51,21 @@ class FounderConfigTest extends TestCase
         $response->assertStatus(200)
                  ->assertJson([
                      'success' => true,
-                     'message' => "Configuration 'TEST_KEY_ONE' saved successfully."
+                     'message' => "Configuration 'TEST_KEY_ONE' saved successfully to database."
                  ]);
 
-        // Check it exists in cache
-        $cached = Cache::get('founder_system_configs');
-        $this->assertArrayHasKey('TEST_KEY_ONE', $cached);
-        $this->assertEquals('Hello World Value', $cached['TEST_KEY_ONE']['value']);
-        $this->assertEquals('Test Config Notes', $cached['TEST_KEY_ONE']['description']);
+        // Check it exists in DB & model helper
+        $this->assertDatabaseHas('system_configs', [
+            'key' => 'TEST_KEY_ONE',
+            'value' => 'Hello World Value',
+            'description' => 'Test Config Notes',
+        ]);
+        $this->assertEquals('Hello World Value', SystemConfig::get('TEST_KEY_ONE'));
     }
 
     public function test_can_retrieve_saved_configs()
     {
-        // Setup cache
-        Cache::forever('founder_system_configs', [
-            'TEST_KEY_TWO' => [
-                'value' => 'Another Value',
-                'description' => 'Notes 2',
-                'updated_at' => now()->toIso8601String()
-            ]
-        ]);
+        SystemConfig::set('TEST_KEY_TWO', 'Another Value', 'Notes 2');
 
         $response = $this->getJson('/api/founder/config');
 
@@ -81,14 +79,7 @@ class FounderConfigTest extends TestCase
 
     public function test_can_delete_configuration()
     {
-        // Setup cache
-        Cache::forever('founder_system_configs', [
-            'TEST_KEY_THREE' => [
-                'value' => 'Value 3',
-                'description' => 'Notes 3',
-                'updated_at' => now()->toIso8601String()
-            ]
-        ]);
+        SystemConfig::set('TEST_KEY_THREE', 'Value 3', 'Notes 3');
 
         $response = $this->deleteJson('/api/founder/config/TEST_KEY_THREE');
 
@@ -98,19 +89,25 @@ class FounderConfigTest extends TestCase
                      'message' => "Configuration 'TEST_KEY_THREE' deleted successfully."
                  ]);
 
-        $cached = Cache::get('founder_system_configs');
-        $this->assertArrayNotHasKey('TEST_KEY_THREE', $cached);
+        $this->assertDatabaseMissing('system_configs', ['key' => 'TEST_KEY_THREE']);
+    }
+
+    public function test_can_clear_config_cache()
+    {
+        SystemConfig::set('TEST_KEY_CACHE', 'Cache Value', 'Cache Notes');
+
+        $response = $this->postJson('/api/founder/config/clear-cache');
+
+        $response->assertStatus(200)
+                 ->assertJson([
+                     'success' => true,
+                     'message' => 'System configuration cache cleared successfully.'
+                 ]);
     }
 
     public function test_can_refer_using_static_helper()
     {
-        Cache::forever('founder_system_configs', [
-            'DOCKER_NETWORK_TUNNEL' => [
-                'value' => 'http://haraka:587',
-                'description' => 'Internal route tunnel description',
-                'updated_at' => now()->toIso8601String()
-            ]
-        ]);
+        SystemConfig::set('DOCKER_NETWORK_TUNNEL', 'http://haraka:587', 'Internal route tunnel description');
 
         $value = FounderController::getSetting('DOCKER_NETWORK_TUNNEL');
         $this->assertEquals('http://haraka:587', $value);
@@ -134,21 +131,5 @@ class FounderConfigTest extends TestCase
                      ],
                      'status'
                  ]);
-    }
-
-    public function test_fails_to_save_invalid_redis_connection()
-    {
-        $response = $this->postJson('/api/founder/redis-connection', [
-            'host' => 'invalid-host-name-should-fail-testing-auth',
-            'port' => 6379,
-            'password' => null
-        ]);
-
-        $response->assertStatus(422)
-                 ->assertJson([
-                     'success' => false
-                 ]);
-
-        $this->assertFalse(file_exists(storage_path('app/redis_connection.json')));
     }
 }

@@ -11,6 +11,7 @@ use App\Models\Recipient;
 use App\Models\SendLog;
 use App\Models\User;
 use App\Models\SenderDomain;
+use App\Models\SystemConfig;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -358,21 +359,20 @@ class FounderController extends Controller
     }
 
     /**
-     * Retrieve all founder configurations from cache.
+     * Retrieve all founder configurations from database.
      */
     public function getConfigs()
     {
         try {
-            $configs = \Illuminate\Support\Facades\Cache::get('founder_system_configs', []);
+            $configs = SystemConfig::all();
             
-            // Format for easy consumption
             $formattedConfigs = [];
-            foreach ($configs as $key => $data) {
+            foreach ($configs as $config) {
                 $formattedConfigs[] = [
-                    'key' => $key,
-                    'value' => $data['value'] ?? '',
-                    'description' => $data['description'] ?? '',
-                    'updated_at' => $data['updated_at'] ?? null,
+                    'key' => $config->key,
+                    'value' => $config->value ?? '',
+                    'description' => $config->description ?? '',
+                    'updated_at' => $config->updated_at ? $config->updated_at->toIso8601String() : null,
                 ];
             }
             
@@ -390,7 +390,7 @@ class FounderController extends Controller
     }
 
     /**
-     * Add or update a configuration key-value pair in cache.
+     * Add or update a configuration key-value pair in system_configs database table.
      */
     public function saveConfig(Request $request)
     {
@@ -402,21 +402,14 @@ class FounderController extends Controller
 
         $key = strtoupper(preg_replace('/[^A-Za-z0-9_]/', '', $request->input('key')));
         $value = $request->input('value');
-        $description = $request->input('description', '');
+        $description = $request->input('description', null);
 
         try {
-            $configs = \Illuminate\Support\Facades\Cache::get('founder_system_configs', []);
-            $configs[$key] = [
-                'value' => $value,
-                'description' => $description,
-                'updated_at' => now()->toIso8601String(),
-            ];
-            
-            \Illuminate\Support\Facades\Cache::forever('founder_system_configs', $configs);
+            SystemConfig::set($key, $value, $description);
 
             return response()->json([
                 'success' => true,
-                'message' => "Configuration '{$key}' saved successfully.",
+                'message' => "Configuration '{$key}' saved successfully to database.",
             ]);
         } catch (\Exception $e) {
             Log::error("Failed to save configuration {$key}: " . $e->getMessage());
@@ -428,23 +421,23 @@ class FounderController extends Controller
     }
 
     /**
-     * Delete a configuration from cache.
+     * Delete a configuration from database.
      */
     public function deleteConfig($key)
     {
         $key = strtoupper($key);
         try {
-            $configs = \Illuminate\Support\Facades\Cache::get('founder_system_configs', []);
+            $config = SystemConfig::find($key);
             
-            if (!isset($configs[$key])) {
+            if (!$config) {
                 return response()->json([
                     'success' => false,
                     'message' => "Configuration '{$key}' not found.",
                 ], 404);
             }
 
-            unset($configs[$key]);
-            \Illuminate\Support\Facades\Cache::forever('founder_system_configs', $configs);
+            $config->delete();
+            SystemConfig::clearCache();
 
             return response()->json([
                 'success' => true,
@@ -460,16 +453,32 @@ class FounderController extends Controller
     }
 
     /**
-     * Public static helper to refer to a cached configuration key.
+     * Clear cached system configuration.
+     */
+    public function clearConfigCache()
+    {
+        try {
+            SystemConfig::clearCache();
+            return response()->json([
+                'success' => true,
+                'message' => 'System configuration cache cleared successfully.',
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to clear system config cache: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error clearing config cache: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Public static helper to refer to a configuration key.
      */
     public static function getSetting($key, $default = null)
     {
         try {
-            $configs = \Illuminate\Support\Facades\Cache::get('founder_system_configs', []);
-            $key = strtoupper($key);
-            if (isset($configs[$key])) {
-                return $configs[$key]['value'] ?? $default;
-            }
+            return SystemConfig::get($key, $default);
         } catch (\Exception $e) {
             Log::error("Failed to retrieve setting {$key}: " . $e->getMessage());
         }

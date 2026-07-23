@@ -75,6 +75,26 @@ class AppServiceProvider extends ServiceProvider
                 \Illuminate\Support\Facades\Log::error('Failed to bootstrap dynamic Redis connection: ' . $e->getMessage());
             }
         }
+
+        // Dynamically override runtime configs from DB system_configs if available
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('system_configs')) {
+                $appUrl = \App\Models\SystemConfig::get('APP_URL');
+                if ($appUrl) {
+                    config(['app.url' => $appUrl]);
+                }
+                $trackingUrl = \App\Models\SystemConfig::get('TRACKING_BASE_URL');
+                if ($trackingUrl) {
+                    config(['mail.tracking_base_url' => $trackingUrl]);
+                }
+                $geminiKey = \App\Models\SystemConfig::get('GEMINI_API_KEY');
+                if ($geminiKey) {
+                    config(['ai.providers.gemini.key' => $geminiKey]);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignore during early migrations or when database connection isn't initialized
+        }
     }
 
     protected function registerPolicies(): void
