@@ -359,26 +359,16 @@ class FounderController extends Controller
     }
 
     /**
-     * Retrieve all founder configurations from database.
+     * Retrieve all founder configurations from Redis Cloud.
      */
     public function getConfigs()
     {
         try {
             $configs = SystemConfig::all();
             
-            $formattedConfigs = [];
-            foreach ($configs as $config) {
-                $formattedConfigs[] = [
-                    'key' => $config->key,
-                    'value' => $config->value ?? '',
-                    'description' => $config->description ?? '',
-                    'updated_at' => $config->updated_at ? $config->updated_at->toIso8601String() : null,
-                ];
-            }
-            
             return response()->json([
                 'success' => true,
-                'configs' => $formattedConfigs,
+                'configs' => $configs,
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to retrieve founder configurations: ' . $e->getMessage());
@@ -390,7 +380,7 @@ class FounderController extends Controller
     }
 
     /**
-     * Add or update a configuration key-value pair in system_configs database table.
+     * Add or update a configuration key-value pair in Redis Cloud.
      */
     public function saveConfig(Request $request)
     {
@@ -409,7 +399,7 @@ class FounderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => "Configuration '{$key}' saved successfully to database.",
+                'message' => "Configuration '{$key}' saved successfully to Redis Cloud.",
             ]);
         } catch (\Exception $e) {
             Log::error("Failed to save configuration {$key}: " . $e->getMessage());
@@ -421,23 +411,20 @@ class FounderController extends Controller
     }
 
     /**
-     * Delete a configuration from database.
+     * Delete a configuration from Redis Cloud.
      */
     public function deleteConfig($key)
     {
         $key = strtoupper($key);
         try {
-            $config = SystemConfig::find($key);
+            $deleted = SystemConfig::deleteConfig($key);
             
-            if (!$config) {
+            if (!$deleted) {
                 return response()->json([
                     'success' => false,
                     'message' => "Configuration '{$key}' not found.",
                 ], 404);
             }
-
-            $config->delete();
-            SystemConfig::clearCache();
 
             return response()->json([
                 'success' => true,

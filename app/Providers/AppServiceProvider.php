@@ -76,24 +76,22 @@ class AppServiceProvider extends ServiceProvider
             }
         }
 
-        // Dynamically override runtime configs from DB system_configs if available
+        // Dynamically override runtime configs from Redis Cloud if available
         try {
-            if (\Illuminate\Support\Facades\Schema::hasTable('system_configs')) {
-                $appUrl = \App\Models\SystemConfig::get('APP_URL');
-                if ($appUrl) {
-                    config(['app.url' => $appUrl]);
-                }
-                $trackingUrl = \App\Models\SystemConfig::get('TRACKING_BASE_URL');
-                if ($trackingUrl) {
-                    config(['mail.tracking_base_url' => $trackingUrl]);
-                }
-                $geminiKey = \App\Models\SystemConfig::get('GEMINI_API_KEY');
-                if ($geminiKey) {
-                    config(['ai.providers.gemini.key' => $geminiKey]);
-                }
+            $appUrl = \App\Models\SystemConfig::get('APP_URL');
+            if ($appUrl) {
+                config(['app.url' => $appUrl]);
+            }
+            $trackingUrl = \App\Models\SystemConfig::get('TRACKING_BASE_URL');
+            if ($trackingUrl) {
+                config(['mail.tracking_base_url' => $trackingUrl]);
+            }
+            $geminiKey = \App\Models\SystemConfig::get('GEMINI_API_KEY');
+            if ($geminiKey) {
+                config(['ai.providers.gemini.key' => $geminiKey]);
             }
         } catch (\Throwable $e) {
-            // Ignore during early migrations or when database connection isn't initialized
+            // Gracefully ignore during boot if Redis is unreachable
         }
     }
 

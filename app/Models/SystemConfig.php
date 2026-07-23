@@ -2,80 +2,100 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Log;
 
-class SystemConfig extends Model
+class SystemConfig
 {
-    protected $table = 'system_configs';
-
-    protected $primaryKey = 'key';
-
-    public $incrementing = false;
-
-    protected $keyType = 'string';
-
-    protected $fillable = [
-        'key',
-        'value',
-        'description',
-    ];
-
-    public const CACHE_KEY = 'system_configs_all_cache';
+    public const REDIS_PREFIX = 'kym:config:';
+    public const REDIS_META_HASH = 'kym:configs:meta';
 
     /**
-     * Retrieve all configurations as an associative array [key => value], cached.
-     */
-    public static function allCached(): array
-    {
-        return Cache::rememberForever(self::CACHE_KEY, function () {
-            try {
-                return self::query()->pluck('value', 'key')->all();
-            } catch (\Throwable $e) {
-                return [];
-            }
-        });
-    }
-
-    /**
-     * Get a configuration value by key, falling back to .env or default.
+     * Get a configuration value by key from Redis Cloud, with fallback to env().
      */
     public static function get(string $key, mixed $default = null): mixed
     {
-        $key = strtoupper($key);
-        $configs = self::allCached();
-
-        if (array_key_exists($key, $configs) && $configs[$key] !== null && $configs[$key] !== '') {
-            return $configs[$key];
+        $upperKey = strtoupper($key);
+        try {
+            $val = Redis::get(self::REDIS_PREFIX . $upperKey);
+            if ($val !== null && $val !== '') {
+                return $val;
+            }
+        } catch (\Throwable $e) {
+            Log::error("Error reading config key {$upperKey} from Redis Cloud: " . $e->getMessage());
         }
 
         return env($key, $default);
     }
 
     /**
-     * Set a configuration value and refresh the cache.
+     * Set a configuration value in Redis Cloud.
      */
-    public static function set(string $key, mixed $value, ?string $description = null): self
+    public static function set(string $key, mixed $value, ?string $description = null): void
     {
-        $key = strtoupper($key);
-        $data = ['value' => (string) $value];
-        if ($description !== null) {
-            $data['description'] = $description;
+        $upperKey = strtoupper($key);
+        $valStr = (string) $value;
+
+        try {
+            // Save raw key for fast single-key lookup
+            Redis::set(self::REDIS_PREFIX . $upperKey, $valStr);
+
+            // Save meta object in Redis Hash for admin listing
+            $metaData = [
+                'key' => $upperKey,
+                'value' => $valStr,
+                'description' => $description ?? '',
+                'updated_at' => now()->toIso8601String(),
+            ];
+            Redis::hset(self::REDIS_META_HASH, $upperKey, json_encode($metaData));
+        } catch (\Throwable $e) {
+            Log::error("Error setting config key {$upperKey} in Redis Cloud: " . $e->getMessage());
+            throw $e;
         }
-
-        $config = self::updateOrCreate(['key' => $key], $data);
-        self::clearCache();
-
-        return $config;
     }
 
     /**
-     * Clear the cached system configurations.
+     * Delete a configuration key from Redis Cloud.
+     */
+    public static function deleteConfig(string $key): bool
+    {
+        $upperKey = strtoupper($key);
+        try {
+            Redis::del(self::REDIS_PREFIX . $upperKey);
+            $deleted = Redis::hdel(self::REDIS_META_HASH, $upperKey);
+            return $deleted > 0;
+        } catch (\Throwable $e) {
+            Log::error("Error deleting config key {$upperKey} from Redis Cloud: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Retrieve all stored configuration records from Redis Cloud.
+     */
+    public static function all(): array
+    {
+        try {
+            $rawList = Redis::hgetall(self::REDIS_META_HASH);
+            $results = [];
+            foreach ($rawList as $key => $jsonStr) {
+                $decoded = json_decode($jsonStr, true);
+                if (is_array($decoded)) {
+                    $results[] = $decoded;
+                }
+            }
+            return $results;
+        } catch (\Throwable $e) {
+            Log::error("Error fetching all configs from Redis Cloud: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Clear cached system configuration.
      */
     public static function clearCache(): void
     {
-        Cache::forget(self::CACHE_KEY);
-        // Also forget legacy founder config cache key if present
-        Cache::forget('founder_system_configs');
+        // No-op for Redis Cloud since data is read live from Redis Cloud
     }
 }
