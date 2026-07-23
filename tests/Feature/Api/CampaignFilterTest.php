@@ -36,7 +36,7 @@ class CampaignFilterTest extends TestCase
             'name' => 'Completed Campaign',
             'subject' => 'Subject 2',
             'body' => 'Body text 2',
-            'status' => 'sent',
+            'status' => 'completed',
             'sender_config_id' => 1,
         ]);
 
