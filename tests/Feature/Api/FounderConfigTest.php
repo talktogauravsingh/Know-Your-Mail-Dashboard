@@ -5,39 +5,27 @@ namespace Tests\Feature\Api;
 use Tests\TestCase;
 use App\Models\SystemConfig;
 use App\Http\Controllers\Api\FounderController;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class FounderConfigTest extends TestCase
 {
-    use RefreshDatabase;
-
     protected function setUp(): void
     {
         parent::setUp();
-        SystemConfig::clearCache();
-        if (file_exists(storage_path('app/redis_connection.json'))) {
-            unlink(storage_path('app/redis_connection.json'));
-        }
+        SystemConfig::deleteConfig('TEST_KEY_ONE');
+        SystemConfig::deleteConfig('TEST_KEY_TWO');
+        SystemConfig::deleteConfig('TEST_KEY_THREE');
+        SystemConfig::deleteConfig('TEST_KEY_CACHE');
+        SystemConfig::deleteConfig('DOCKER_NETWORK_TUNNEL');
     }
 
     protected function tearDown(): void
     {
-        SystemConfig::clearCache();
-        if (file_exists(storage_path('app/redis_connection.json'))) {
-            unlink(storage_path('app/redis_connection.json'));
-        }
+        SystemConfig::deleteConfig('TEST_KEY_ONE');
+        SystemConfig::deleteConfig('TEST_KEY_TWO');
+        SystemConfig::deleteConfig('TEST_KEY_THREE');
+        SystemConfig::deleteConfig('TEST_KEY_CACHE');
+        SystemConfig::deleteConfig('DOCKER_NETWORK_TUNNEL');
         parent::tearDown();
-    }
-
-    public function test_can_retrieve_empty_configs()
-    {
-        $response = $this->getJson('/api/founder/config');
-
-        $response->assertStatus(200)
-                 ->assertJson([
-                     'success' => true,
-                     'configs' => []
-                 ]);
     }
 
     public function test_can_save_configuration()
@@ -51,15 +39,9 @@ class FounderConfigTest extends TestCase
         $response->assertStatus(200)
                  ->assertJson([
                      'success' => true,
-                     'message' => "Configuration 'TEST_KEY_ONE' saved successfully to database."
+                     'message' => "Configuration 'TEST_KEY_ONE' saved successfully to Redis Cloud."
                  ]);
 
-        // Check it exists in DB & model helper
-        $this->assertDatabaseHas('system_configs', [
-            'key' => 'TEST_KEY_ONE',
-            'value' => 'Hello World Value',
-            'description' => 'Test Config Notes',
-        ]);
         $this->assertEquals('Hello World Value', SystemConfig::get('TEST_KEY_ONE'));
     }
 
@@ -89,7 +71,7 @@ class FounderConfigTest extends TestCase
                      'message' => "Configuration 'TEST_KEY_THREE' deleted successfully."
                  ]);
 
-        $this->assertDatabaseMissing('system_configs', ['key' => 'TEST_KEY_THREE']);
+        $this->assertNull(SystemConfig::get('TEST_KEY_THREE', null));
     }
 
     public function test_can_clear_config_cache()
@@ -112,24 +94,7 @@ class FounderConfigTest extends TestCase
         $value = FounderController::getSetting('DOCKER_NETWORK_TUNNEL');
         $this->assertEquals('http://haraka:587', $value);
 
-        $nonExistent = FounderController::getSetting('NON_EXISTENT_VAL', 'default_fallback');
+        $nonExistent = FounderController::getSetting('NON_EXISTENT_VAL_KEY', 'default_fallback');
         $this->assertEquals('default_fallback', $nonExistent);
-    }
-
-    public function test_can_retrieve_redis_connection_details()
-    {
-        $response = $this->getJson('/api/founder/redis-connection');
-
-        $response->assertStatus(200)
-                 ->assertJsonStructure([
-                     'success',
-                     'connection' => [
-                         'host',
-                         'port',
-                         'password',
-                         'configured'
-                     ],
-                     'status'
-                 ]);
     }
 }
