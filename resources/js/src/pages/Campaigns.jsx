@@ -458,13 +458,36 @@ export default function Campaigns() {
           </TableHeader>
           <TableBody>
             {sortedCampaigns.map((c) => {
-              const status = c.status?.toLowerCase();
+              const status = (c.status || '').toLowerCase();
               const isDraft = status === 'draft';
-              const isCompleted = status === 'completed';
-              const isActive = ['running', 'sent', 'scheduled', 'pending'].includes(status);
+              const isCompleted = status === 'completed' || status === 'sent';
+              const isScheduled = status === 'scheduled';
+              const isPaused = status === 'paused';
               
-              // Map display status text
-              const displayStatus = isDraft ? 'Draft' : isCompleted ? 'Completed' : 'Active';
+              // Map display status text & color indicators
+              let displayStatus = 'Active';
+              let textColor = 'text-emerald-600 dark:text-emerald-500';
+              let dotColor = 'bg-emerald-500';
+
+              if (isDraft) {
+                displayStatus = 'Draft';
+                textColor = 'text-amber-600 dark:text-amber-500';
+                dotColor = 'bg-amber-500';
+              } else if (isScheduled) {
+                displayStatus = 'Scheduled';
+                textColor = 'text-blue-600 dark:text-blue-400';
+                dotColor = 'bg-blue-500';
+              } else if (isCompleted) {
+                displayStatus = 'Completed';
+                textColor = 'text-[#626F86] dark:text-slate-400';
+                dotColor = 'bg-[#626F86]';
+              } else if (isPaused) {
+                displayStatus = 'Paused';
+                textColor = 'text-orange-600 dark:text-orange-400';
+                dotColor = 'bg-orange-500';
+              } else if (status) {
+                displayStatus = status.charAt(0).toUpperCase() + status.slice(1);
+              }
 
               return (
                 <TableRow key={c.id} className="border-slate-100 dark:border-slate-900 hover:bg-[#F4F5F7] dark:hover:bg-slate-900/20 transition-colors">
@@ -478,17 +501,10 @@ export default function Campaigns() {
                     </Link>
                   </TableCell>
 
-                  {/* Status Indicators (No badge, colored text and dot) */}
+                  {/* Status Indicators */}
                   <TableCell className="py-1 border-r border-slate-200 dark:border-slate-800 last:border-r-0">
-                    <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${
-                      isCompleted ? 'text-[#626F86] dark:text-slate-400' :
-                      isDraft ? 'text-amber-600 dark:text-amber-500' :
-                      'text-emerald-600 dark:text-emerald-500'
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${
-                        isCompleted ? 'bg-[#626F86]' :
-                        isDraft ? 'bg-amber-500' : 'bg-emerald-500'
-                      }`} />
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${textColor}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
                       {displayStatus}
                     </span>
                   </TableCell>
