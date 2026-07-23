@@ -30,15 +30,7 @@ class SystemConfigSeeder extends Seeder
         ];
 
         foreach ($defaults as $key => $data) {
-            if (!SystemConfig::where('key', $key)->exists()) {
-                SystemConfig::create([
-                    'key' => $key,
-                    'value' => $data['value'],
-                    'description' => $data['description'],
-                ]);
-            }
+            SystemConfig::set($key, $data['value'], $data['description']);
         }
-
-        SystemConfig::clearCache();
     }
 }
