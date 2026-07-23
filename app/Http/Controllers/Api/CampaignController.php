@@ -16,6 +16,30 @@ class CampaignController extends Controller
 {
     public function index(Request $request)
     {
+        // Helper to reliably resolve query parameters from Request or REQUEST_URI fallback
+        $getParam = function ($key) use ($request) {
+            $val = $request->input($key) ?? $request->query($key);
+            if ($val !== null && $val !== '') {
+                return $val;
+            }
+            if (isset($_SERVER['REQUEST_URI']) && str_contains($_SERVER['REQUEST_URI'], '?')) {
+                $parts = parse_url($_SERVER['REQUEST_URI']);
+                if (!empty($parts['query'])) {
+                    parse_str($parts['query'], $queryParams);
+                    if (isset($queryParams[$key]) && $queryParams[$key] !== '') {
+                        return $queryParams[$key];
+                    }
+                }
+            }
+            return null;
+        };
+
+        $search = $getParam('search');
+        $status = $getParam('status');
+        $dateFilter = $getParam('date_filter');
+        $startDate = $getParam('start_date');
+        $endDate = $getParam('end_date');
+
         $query = Campaign::where('organization_id', Auth::user()->organization_id ?? 1)
             ->with(['variants'])
             ->withCount([
@@ -27,36 +51,35 @@ class CampaignController extends Controller
             ->withSum('sendLogs as total_clicks', 'clicks_count');
 
         // Apply Search Filter
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where('name', 'like', '%' . $search . '%');
+        if ($search !== null && $search !== '') {
+            $query->where('name', 'like', '%' . trim($search) . '%');
         }
 
         // Apply Status Filter
-        if ($request->filled('status') && $request->input('status') !== 'all') {
-            $status = $request->input('status');
-            if ($status === 'active') {
-                $query->whereIn('status', ['running', 'sent', 'scheduled', 'pending']);
+        if ($status !== null && $status !== '' && strtolower($status) !== 'all') {
+            $cleanStatus = strtolower(trim($status));
+            if ($cleanStatus === 'active') {
+                $query->whereIn(DB::raw('LOWER(status)'), ['running', 'sent', 'scheduled', 'pending']);
             } else {
-                $query->where('status', $status);
+                $query->where(DB::raw('LOWER(status)'), $cleanStatus);
             }
         }
 
         // Apply Date Filter
-        if ($request->filled('date_filter') && $request->input('date_filter') !== 'all') {
-            $dateFilter = $request->input('date_filter');
-            if ($dateFilter === 'custom') {
-                if ($request->filled('start_date')) {
-                    $query->whereDate('created_at', '>=', $request->input('start_date'));
+        if ($dateFilter !== null && $dateFilter !== '' && strtolower($dateFilter) !== 'all') {
+            $cleanDateFilter = strtolower(trim($dateFilter));
+            if ($cleanDateFilter === 'custom') {
+                if ($startDate) {
+                    $query->whereDate('created_at', '>=', $startDate);
                 }
-                if ($request->filled('end_date')) {
-                    $query->whereDate('created_at', '<=', $request->input('end_date'));
+                if ($endDate) {
+                    $query->whereDate('created_at', '<=', $endDate);
                 }
             } else {
                 $days = 30;
-                if ($dateFilter === '7days') {
+                if ($cleanDateFilter === '7days') {
                     $days = 7;
-                } elseif ($dateFilter === '90days') {
+                } elseif ($cleanDateFilter === '90days') {
                     $days = 90;
                 }
                 $query->where('created_at', '>=', now()->subDays($days));
