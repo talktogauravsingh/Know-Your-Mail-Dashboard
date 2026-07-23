@@ -10,6 +10,15 @@ class SystemConfig
     public const REDIS_PREFIX = 'kym:config:';
     public const REDIS_META_HASH = 'kym:configs:meta';
 
+    protected static function connection()
+    {
+        try {
+            return Redis::connection('cloud_config');
+        } catch (\Throwable $e) {
+            return Redis::connection('default');
+        }
+    }
+
     /**
      * Get a configuration value by key from Redis Cloud, with fallback to env().
      */
@@ -17,7 +26,7 @@ class SystemConfig
     {
         $upperKey = strtoupper($key);
         try {
-            $val = Redis::get(self::REDIS_PREFIX . $upperKey);
+            $val = self::connection()->get(self::REDIS_PREFIX . $upperKey);
             if ($val !== null && $val !== '') {
                 return $val;
             }
@@ -38,7 +47,7 @@ class SystemConfig
 
         try {
             // Save raw key for fast single-key lookup
-            Redis::set(self::REDIS_PREFIX . $upperKey, $valStr);
+            self::connection()->set(self::REDIS_PREFIX . $upperKey, $valStr);
 
             // Save meta object in Redis Hash for admin listing
             $metaData = [
@@ -47,7 +56,7 @@ class SystemConfig
                 'description' => $description ?? '',
                 'updated_at' => now()->toIso8601String(),
             ];
-            Redis::hset(self::REDIS_META_HASH, $upperKey, json_encode($metaData));
+            self::connection()->hset(self::REDIS_META_HASH, $upperKey, json_encode($metaData));
         } catch (\Throwable $e) {
             Log::error("Error setting config key {$upperKey} in Redis Cloud: " . $e->getMessage());
             throw $e;
@@ -61,8 +70,8 @@ class SystemConfig
     {
         $upperKey = strtoupper($key);
         try {
-            Redis::del(self::REDIS_PREFIX . $upperKey);
-            $deleted = Redis::hdel(self::REDIS_META_HASH, $upperKey);
+            self::connection()->del(self::REDIS_PREFIX . $upperKey);
+            $deleted = self::connection()->hdel(self::REDIS_META_HASH, $upperKey);
             return $deleted > 0;
         } catch (\Throwable $e) {
             Log::error("Error deleting config key {$upperKey} from Redis Cloud: " . $e->getMessage());
@@ -76,7 +85,7 @@ class SystemConfig
     public static function all(): array
     {
         try {
-            $rawList = Redis::hgetall(self::REDIS_META_HASH);
+            $rawList = self::connection()->hgetall(self::REDIS_META_HASH);
             $results = [];
             foreach ($rawList as $key => $jsonStr) {
                 $decoded = json_decode($jsonStr, true);
